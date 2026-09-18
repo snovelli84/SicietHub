@@ -190,9 +190,16 @@ function openZConnect(){
 
 function openPerfetto(){
 
-    window.open(
-        "https://app.perfetto.it",
-        "_blank"
+    let store = isIOS()
+        ? "https://apps.apple.com/it/search?term=antos%20perfetto"
+        : "https://play.google.com/store/search?q=antos+perfettoapp&c=apps";
+
+    window.location="perfettoapp://";
+
+    setTimeout(function(){
+        window.location=store;
+    },1500);
+
     );
 }
 
