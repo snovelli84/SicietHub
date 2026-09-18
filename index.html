@@ -187,13 +187,18 @@ function openZConnect(){
 }
 
 /* PERFETTO APP */
-
+    
 function openPerfetto(){
 
-       let store = isIOS()
-        ? "https://apps.apple.com/it/app/my-perfetto/id1328294353"
-        : "https://play.google.com/store/apps/details?id=it.antos.perfettoapp";
-               window.location="myperfetto://";
+    if(isIOS()){
+        window.open(
+            "https://apps.apple.com/it/app/my-perfetto/id132829435",
+            "_blank"
+        );
+    }else{
+        window.open(
+            "https://play.google.com/store/apps/details?id=it.antos.perfettoapp",
+            "_blank"
         );
     }
 }
