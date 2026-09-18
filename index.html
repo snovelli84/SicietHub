@@ -1,42 +1,128 @@
-const apps = [
-  {
-    name: "PerfettoApp",
-    icon: "📋",
-    androidStore:
-      "https://play.google.com/store/apps/details?id=it.antos.perfettoapp",
-    iosStore:
-      "https://apps.apple.com/mg/app/my-perfetto/id1328294353"
-  },
-  {
-    name: "Zucchetti ZConnect",
-    icon: "👨‍💼",
-    androidStore:
-      "https://play.google.com/store/search?q=zucchetti%20zconnect&c=apps",
-    iosStore:
-      "https://apps.apple.com/it/search?term=zconnect"
-  },
-  {
-    name: "Outlook",
-    icon: "📧",
-    androidStore:
-      "https://play.google.com/store/apps/details?id=com.microsoft.office.outlook",
-    iosStore:
-      "https://apps.apple.com/it/app/microsoft-outlook/id951937596"
-  },
-  {
-    name: "Teams",
-    icon: "💬",
-    androidStore:
-      "https://play.google.com/store/apps/details?id=com.microsoft.teams",
-    iosStore:
-      "https://apps.apple.com/it/app/microsoft-teams/id1113153706"
-  },
-  {
-    name: "AuthPoint",
-    icon: "🔐",
-    androidStore:
-      "https://play.google.com/store/apps/details?id=com.watchguard.authpoint",
-    iosStore:
-      "https://apps.apple.com/us/app/authpoint/id1222166588"
-  }
-];
+export default function WebAppAziendale() {
+
+  const apps = [
+    {
+      name: "PerfettoApp",
+      icon: "📋",
+      androidStore:
+        "https://play.google.com/store/apps/details?id=it.antos.perfettoapp",
+      iosStore:
+        "https://apps.apple.com/mg/app/my-perfetto/id1328294353"
+    },
+    {
+      name: "Zucchetti ZConnect",
+      icon: "👨‍💼",
+      androidStore:
+        "https://play.google.com/store/search?q=zucchetti%20zconnect&c=apps",
+      iosStore:
+        "https://apps.apple.com/it/search?term=zconnect"
+    },
+    {
+      name: "Outlook",
+      icon: "📧",
+      androidStore:
+        "https://play.google.com/store/apps/details?id=com.microsoft.office.outlook",
+      iosStore:
+        "https://apps.apple.com/it/app/microsoft-outlook/id951937596"
+    },
+    {
+      name: "Teams",
+      icon: "💬",
+      androidStore:
+        "https://play.google.com/store/apps/details?id=com.microsoft.teams",
+      iosStore:
+        "https://apps.apple.com/it/app/microsoft-teams/id1113153706"
+    },
+    {
+      name: "AuthPoint",
+      icon: "🔐",
+      androidStore:
+        "https://play.google.com/store/apps/details?id=com.watchguard.authpoint",
+      iosStore:
+        "https://apps.apple.com/us/app/authpoint/id1222166588"
+    }
+  ];
+
+  const openApp = (app) => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+    window.open(
+      isIOS ? app.iosStore : app.androidStore,
+      "_blank"
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-100">
+
+      <header className="bg-blue-900 text-white p-6 shadow-lg">
+        <div className="max-w-md mx-auto text-center">
+          <h1 className="text-3xl font-bold">
+            SICIET
+          </h1>
+
+          <p className="text-blue-100 mt-2">
+            Portale Applicazioni Aziendali
+          </p>
+        </div>
+      </header>
+
+      <main className="max-w-md mx-auto p-4">
+
+        <div className="bg-white rounded-3xl shadow p-4 mb-5">
+          <h2 className="font-semibold mb-2">
+            Benvenuto
+          </h2>
+
+          <p className="text-sm text-gray-600">
+            Seleziona un'applicazione per aprirla o
+            installarla sul dispositivo.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+
+          {apps.map((app) => (
+            <button
+              key={app.name}
+              onClick={() => openApp(app)}
+              className="bg-white p-6 rounded-3xl shadow-lg hover:shadow-xl transition-all"
+            >
+              <div className="text-5xl mb-3">
+                {app.icon}
+              </div>
+
+              <div className="font-semibold text-sm">
+                {app.name}
+              </div>
+            </button>
+          ))}
+
+        </div>
+
+        <div className="mt-6 bg-white rounded-3xl shadow p-5">
+
+          <h2 className="font-semibold mb-3">
+            Servizi Futuri
+          </h2>
+
+          <ul className="space-y-2 text-sm text-gray-600">
+            <li>📄 Modulistica Aziendale</li>
+            <li>📚 Procedure Operative</li>
+            <li>🏖 Richiesta Ferie e Permessi</li>
+            <li>🛠 Assistenza IT</li>
+            <li>📞 Numeri Utili</li>
+            <li>📢 Comunicazioni Aziendali</li>
+          </ul>
+
+        </div>
+
+        <div className="text-center text-xs text-gray-400 mt-6">
+          SICIET srl
+        </div>
+
+      </main>
+
+    </div>
+  );
+}
