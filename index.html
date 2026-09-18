@@ -1,20 +1,23 @@
 <!DOCTYPE html>
 <html lang="it">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>SICIET Hub</title>
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>SICIET HUB</title>
 
 <style>
+
 *{
+    box-sizing:border-box;
     margin:0;
     padding:0;
-    box-sizing:border-box;
 }
 
 body{
-    font-family: Arial, sans-serif;
+    font-family:Arial,sans-serif;
     background:#f4f6f9;
 }
 
@@ -26,7 +29,11 @@ header{
 }
 
 header h1{
-    margin-bottom:10px;
+    font-size:32px;
+}
+
+header p{
+    margin-top:10px;
 }
 
 .container{
@@ -35,19 +42,18 @@ header h1{
 
 .grid{
     display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    grid-template-columns:repeat(2,1fr);
     gap:15px;
 }
 
 .card{
     background:white;
-    border-radius:15px;
-    text-decoration:none;
-    color:#333;
-    text-align:center;
+    border-radius:20px;
     padding:25px 15px;
-    box-shadow:0 2px 8px rgba(0,0,0,.15);
-    transition:0.2s;
+    text-align:center;
+    cursor:pointer;
+    box-shadow:0 2px 10px rgba(0,0,0,.15);
+    transition:.2s;
 }
 
 .card:hover{
@@ -55,54 +61,143 @@ header h1{
 }
 
 .icon{
-    font-size:48px;
-    margin-bottom:10px;
+    font-size:50px;
 }
 
-.name{
+.title{
+    margin-top:10px;
     font-weight:bold;
+    color:#333;
 }
+
+footer{
+    text-align:center;
+    padding:20px;
+    color:#666;
+    font-size:12px;
+}
+
 </style>
+
 </head>
 
 <body>
 
 <header>
     <h1>SICIET</h1>
-    <p>Portale Aziendale</p>
+    <p>Portale Applicazioni Aziendali</p>
 </header>
 
 <div class="container">
 
     <div class="grid">
 
-        https://app.perfetto.it
+        <div class="card" onclick="openPerfetto()">
             <div class="icon">🏢</div>
-            <div class="name">PerfettoApp</div>
-        </a>
+            <div class="title">PerfettoApp</div>
+        </div>
 
-        <a class="card" href="httpsit
+        <div class="card" onclick="openZConnect()">
             <div class="icon">💰</div>
-            <div class="name">ZConnect</div>
-        </a>
+            <div class="title">ZConnect</div>
+        </div>
 
-        <a class="card" href="ms  <div class="icon">📧</div>
-            <div class="name">Outlook</div>
-        </a>
+        <div class="card" onclick="openOutlook()">
+            <div class="icon">📧</div>
+            <div class="title">Outlook</div>
+        </div>
 
-        msteams://
+        <div class="card" onclick="openTeams()">
             <div class="icon">💬</div>
-            <div class="name">Teams</div>
-        </a>
+            <div class="title">Teams</div>
+        </div>
 
-        authpoint://
+        <div class="card" onclick="openAuthPoint()">
             <div class="icon">🔐</div>
-            <div class="name">AuthPoint</div>
-        </a>
+            <div class="title">AuthPoint</div>
+        </div>
 
     </div>
 
 </div>
 
+<footer>
+    SICIET HUB
+</footer>
+
+<script>
+
+function isIOS(){
+    return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+/* TEAMS */
+
+function openTeams(){
+
+    let store = isIOS()
+        ? "https://apps.apple.com/it/app/microsoft-teams/id1113153706"
+        : "https://play.google.com/store/apps/details?id=com.microsoft.teams";
+
+    window.location="msteams://";
+
+    setTimeout(function(){
+        window.location=store;
+    },1500);
+}
+
+/* OUTLOOK */
+
+function openOutlook(){
+
+    let store = isIOS()
+        ? "https://apps.apple.com/it/app/microsoft-outlook/id951937596"
+        : "https://play.google.com/store/apps/details?id=com.microsoft.office.outlook";
+
+    window.location="ms-outlook://";
+
+    setTimeout(function(){
+        window.location=store;
+    },1500);
+}
+
+/* AUTHPOINT */
+
+function openAuthPoint(){
+
+    let store = isIOS()
+        ? "https://apps.apple.com/it/search?term=watchguard%20authpoint"
+        : "https://play.google.com/store/search?q=watchguard+authpoint&c=apps";
+
+    window.location="authpoint://";
+
+    setTimeout(function(){
+        window.location=store;
+    },1500);
+}
+
+/* ZCONNECT */
+
+function openZConnect(){
+
+    window.open(
+        "https://zconnect.zucchetti.it",
+        "_blank"
+    );
+}
+
+/* PERFETTO APP */
+
+function openPerfetto(){
+
+    window.open(
+        "https://app.perfetto.it",
+        "_blank"
+    );
+}
+
+</script>
+
 </body>
+
 </html>
