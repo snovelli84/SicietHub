@@ -1,89 +1,42 @@
-<!DOCTYPE html>
-<html lang="it">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SICIET Portal</title>
-
-<style>
-body{
-    margin:0;
-    font-family:Arial,sans-serif;
-    background:#f4f6f9;
-}
-
-header{
-    background:#005baa;
-    color:white;
-    text-align:center;
-    padding:20px;
-}
-
-.grid{
-    display:grid;
-    grid-template-columns:repeat(2,1fr);
-    gap:15px;
-    padding:20px;
-}
-
-.card{
-    background:white;
-    border-radius:15px;
-    padding:20px;
-    text-align:center;
-    text-decoration:none;
-    color:black;
-    box-shadow:0 2px 8px rgba(0,0,0,.1);
-}
-
-.card:hover{
-    background:#eef5ff;
-}
-
-.icon{
-    font-size:42px;
-}
-
-.name{
-    margin-top:10px;
-    font-weight:bold;
-}
-</style>
-</head>
-
-<body>
-
-<header>
-    <h1>SICIET</h1>
-    <p>Portale Aziendale</p>
-</header>
-
-<div class="grid">
-
-    <a class="card" href="https://app.iv class="icon">🏢</div>
-        <div class="name">PerfettoApp</div>
-    </a>
-
-    <a class="card" href="https://zconnect.zucchetti.itcon">💰</div>
-        <div class="name">ZConnect</div>
-    </a>
-
-    ms-outlook://
-        <div class="icon">📧</div>
-        <div class="name">Outlook</div>
-    </a>
-
-    msteams://
-        <div class="icon">💬</div>
-        <div class="name">Teams</div>
-    </a>
-
-    authpoint://
-        <div class="icon">🔐</div>
-        <div class="name">AuthPoint</div>
-    </a>
-
-</div>
-
-</body>
-</html>
+const apps = [
+  {
+    name: "PerfettoApp",
+    icon: "📋",
+    androidStore:
+      "https://play.google.com/store/apps/details?id=it.antos.perfettoapp",
+    iosStore:
+      "https://apps.apple.com/mg/app/my-perfetto/id1328294353"
+  },
+  {
+    name: "Zucchetti ZConnect",
+    icon: "👨‍💼",
+    androidStore:
+      "https://play.google.com/store/search?q=zucchetti%20zconnect&c=apps",
+    iosStore:
+      "https://apps.apple.com/it/search?term=zconnect"
+  },
+  {
+    name: "Outlook",
+    icon: "📧",
+    androidStore:
+      "https://play.google.com/store/apps/details?id=com.microsoft.office.outlook",
+    iosStore:
+      "https://apps.apple.com/it/app/microsoft-outlook/id951937596"
+  },
+  {
+    name: "Teams",
+    icon: "💬",
+    androidStore:
+      "https://play.google.com/store/apps/details?id=com.microsoft.teams",
+    iosStore:
+      "https://apps.apple.com/it/app/microsoft-teams/id1113153706"
+  },
+  {
+    name: "AuthPoint",
+    icon: "🔐",
+    androidStore:
+      "https://play.google.com/store/apps/details?id=com.watchguard.authpoint",
+    iosStore:
+      "https://apps.apple.com/us/app/authpoint/id1222166588"
+  }
+];
