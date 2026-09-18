@@ -1,128 +1,108 @@
-export default function WebAppAziendale() {
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  const apps = [
-    {
-      name: "PerfettoApp",
-      icon: "📋",
-      androidStore:
-        "https://play.google.com/store/apps/details?id=it.antos.perfettoapp",
-      iosStore:
-        "https://apps.apple.com/mg/app/my-perfetto/id1328294353"
-    },
-    {
-      name: "Zucchetti ZConnect",
-      icon: "👨‍💼",
-      androidStore:
-        "https://play.google.com/store/search?q=zucchetti%20zconnect&c=apps",
-      iosStore:
-        "https://apps.apple.com/it/search?term=zconnect"
-    },
-    {
-      name: "Outlook",
-      icon: "📧",
-      androidStore:
-        "https://play.google.com/store/apps/details?id=com.microsoft.office.outlook",
-      iosStore:
-        "https://apps.apple.com/it/app/microsoft-outlook/id951937596"
-    },
-    {
-      name: "Teams",
-      icon: "💬",
-      androidStore:
-        "https://play.google.com/store/apps/details?id=com.microsoft.teams",
-      iosStore:
-        "https://apps.apple.com/it/app/microsoft-teams/id1113153706"
-    },
-    {
-      name: "AuthPoint",
-      icon: "🔐",
-      androidStore:
-        "https://play.google.com/store/apps/details?id=com.watchguard.authpoint",
-      iosStore:
-        "https://apps.apple.com/us/app/authpoint/id1222166588"
-    }
-  ];
+<title>SICIET Hub</title>
 
-  const openApp = (app) => {
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
 
-    window.open(
-      isIOS ? app.iosStore : app.androidStore,
-      "_blank"
-    );
-  };
+body{
+    font-family: Arial, sans-serif;
+    background:#f4f6f9;
+}
 
-  return (
-    <div className="min-h-screen bg-slate-100">
+header{
+    background:#005baa;
+    color:white;
+    text-align:center;
+    padding:25px;
+}
 
-      <header className="bg-blue-900 text-white p-6 shadow-lg">
-        <div className="max-w-md mx-auto text-center">
-          <h1 className="text-3xl font-bold">
-            SICIET
-          </h1>
+header h1{
+    margin-bottom:10px;
+}
 
-          <p className="text-blue-100 mt-2">
-            Portale Applicazioni Aziendali
-          </p>
-        </div>
-      </header>
+.container{
+    padding:20px;
+}
 
-      <main className="max-w-md mx-auto p-4">
+.grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:15px;
+}
 
-        <div className="bg-white rounded-3xl shadow p-4 mb-5">
-          <h2 className="font-semibold mb-2">
-            Benvenuto
-          </h2>
+.card{
+    background:white;
+    border-radius:15px;
+    text-decoration:none;
+    color:#333;
+    text-align:center;
+    padding:25px 15px;
+    box-shadow:0 2px 8px rgba(0,0,0,.15);
+    transition:0.2s;
+}
 
-          <p className="text-sm text-gray-600">
-            Seleziona un'applicazione per aprirla o
-            installarla sul dispositivo.
-          </p>
-        </div>
+.card:hover{
+    transform:translateY(-3px);
+}
 
-        <div className="grid grid-cols-2 gap-4">
+.icon{
+    font-size:48px;
+    margin-bottom:10px;
+}
 
-          {apps.map((app) => (
-            <button
-              key={app.name}
-              onClick={() => openApp(app)}
-              className="bg-white p-6 rounded-3xl shadow-lg hover:shadow-xl transition-all"
-            >
-              <div className="text-5xl mb-3">
-                {app.icon}
-              </div>
+.name{
+    font-weight:bold;
+}
+</style>
+</head>
 
-              <div className="font-semibold text-sm">
-                {app.name}
-              </div>
-            </button>
-          ))}
+<body>
 
-        </div>
+<header>
+    <h1>SICIET</h1>
+    <p>Portale Aziendale</p>
+</header>
 
-        <div className="mt-6 bg-white rounded-3xl shadow p-5">
+<div class="container">
 
-          <h2 className="font-semibold mb-3">
-            Servizi Futuri
-          </h2>
+    <div class="grid">
 
-          <ul className="space-y-2 text-sm text-gray-600">
-            <li>📄 Modulistica Aziendale</li>
-            <li>📚 Procedure Operative</li>
-            <li>🏖 Richiesta Ferie e Permessi</li>
-            <li>🛠 Assistenza IT</li>
-            <li>📞 Numeri Utili</li>
-            <li>📢 Comunicazioni Aziendali</li>
-          </ul>
+        https://app.perfetto.it
+            <div class="icon">🏢</div>
+            <div class="name">PerfettoApp</div>
+        </a>
 
-        </div>
+        <a class="card" href="httpsit
+            <div class="icon">💰</div>
+            <div class="name">ZConnect</div>
+        </a>
 
-        <div className="text-center text-xs text-gray-400 mt-6">
-          SICIET srl
-        </div>
+        <a class="card" href="ms  <div class="icon">📧</div>
+            <div class="name">Outlook</div>
+        </a>
 
-      </main>
+        msteams://
+            <div class="icon">💬</div>
+            <div class="name">Teams</div>
+        </a>
+
+        authpoint://
+            <div class="icon">🔐</div>
+            <div class="name">AuthPoint</div>
+        </a>
 
     </div>
-  );
-}
+
+</div>
+
+</body>
+</html>
