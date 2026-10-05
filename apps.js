@@ -9,7 +9,9 @@
  *   description  breve descrizione dell'utilità
  *   category     categoria (usata per i filtri)
  *   emoji        icona di riserva se l'immagine non è disponibile
- *   icon         (opzionale) URL di un'immagine quadrata
+ *   icon         (opzionale) URL di un'immagine quadrata. Di norma NON serve:
+ *                l'icona ufficiale viene presa in automatico dall'App Store
+ *                usando l'ID contenuto nel link ios.store.
  *
  *   ios.scheme   URL scheme che apre l'app (es. "msteams://"). Se assente, si va direttamente all'App Store.
  *   ios.store    link alla pagina dell'App Store

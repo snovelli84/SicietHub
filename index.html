@@ -245,20 +245,84 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     return e;
   }
 
+  /* ---------- Icone ufficiali ----------
+     Le icone vengono prese dall'App Store tramite l'API pubblica di Apple
+     (iTunes Lookup), usando l'ID presente nel link ios.store.
+     Ordine: campo "icon" di apps.js -> icona App Store -> emoji. */
+
+  var ICON_CACHE_KEY = "siciet-icons-v1";
+  var ICON_CACHE_TTL = 7 * 24 * 3600 * 1000;
+  var storeIcons = {};
+  var iconBoxes = [];
+
+  function appStoreId(app){
+    var m = app.ios && app.ios.store && app.ios.store.match(/\/id(\d+)/);
+    return m ? m[1] : null;
+  }
+
+  function showImage(box, urls, app){
+    if(!urls.length){ box.textContent = app.emoji || "📱"; return; }
+    var img = new Image();
+    img.alt = "";
+    img.onload = function(){ box.textContent = ""; box.appendChild(img); };
+    img.onerror = function(){ showImage(box, urls.slice(1), app); };
+    img.src = urls[0];
+  }
+
+  function iconUrls(app){
+    var urls = [];
+    if(app.icon) urls.push(app.icon);
+    var id = appStoreId(app);
+    if(id && storeIcons[id]) urls.push(storeIcons[id]);
+    return urls;
+  }
+
   function iconFor(app){
-    var box = el("div", "app-icon");
+    var box = el("div", "app-icon", app.emoji || "📱");
     box.setAttribute("aria-hidden", "true");
-    if(app.icon){
-      var img = new Image();
-      img.alt = "";
-      img.loading = "lazy";
-      img.src = app.icon;
-      img.onerror = function(){ box.textContent = app.emoji || "📱"; };
-      box.appendChild(img);
-    }else{
-      box.textContent = app.emoji || "📱";
-    }
+    iconBoxes.push({ box: box, app: app });
+    showImage(box, iconUrls(app), app);
     return box;
+  }
+
+  function refreshIcons(){
+    iconBoxes.forEach(function(it){
+      if(it.box.isConnected && !it.box.querySelector("img")){
+        showImage(it.box, iconUrls(it.app), it.app);
+      }
+    });
+  }
+
+  function loadStoreIcons(){
+    try{
+      var cached = JSON.parse(localStorage.getItem(ICON_CACHE_KEY) || "null");
+      if(cached && Date.now() - cached.t < ICON_CACHE_TTL){
+        storeIcons = cached.icons || {};
+        refreshIcons();
+        if(apps.every(function(a){ var id = appStoreId(a); return !id || storeIcons[id]; })) return;
+      }
+    }catch(e){}
+
+    var ids = apps.map(appStoreId).filter(Boolean);
+    if(!ids.length) return;
+
+    // JSONP: l'API di Apple non consente chiamate fetch dirette dal browser.
+    var cb = "sicietIcons" + Date.now();
+    var script = document.createElement("script");
+    window[cb] = function(data){
+      (data && data.results || []).forEach(function(r){
+        var url = r.artworkUrl512 || r.artworkUrl100;
+        if(r.trackId && url) storeIcons[r.trackId] = url;
+      });
+      try{ localStorage.setItem(ICON_CACHE_KEY, JSON.stringify({ t: Date.now(), icons: storeIcons })); }catch(e){}
+      refreshIcons();
+      delete window[cb];
+      script.remove();
+    };
+    script.onerror = function(){ delete window[cb]; script.remove(); };
+    script.src = "https://itunes.apple.com/lookup?country=it&entity=software&id=" +
+      ids.join(",") + "&callback=" + cb;
+    document.head.appendChild(script);
   }
 
   function renderChips(){
@@ -282,6 +346,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   }
 
   function renderList(){
+    iconBoxes = [];
     var q = norm(qEl.value.trim());
     var shown = apps.filter(function(a){
       if(currentCat !== "Tutte" && a.category !== currentCat) return false;
@@ -401,6 +466,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   qEl.addEventListener("input", renderList);
   renderChips();
   renderList();
+  loadStoreIcons();
 })();
 </script>
 
