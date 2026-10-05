@@ -118,7 +118,7 @@ window.SICIET_APPS = [
   {
     id: "ninjaone",
     name: "NinjaOne",
-    description: "Accesso alla piattaforma NinjaOne per la gestione e l'assistenza IT.",
+    description: "Accesso remoto al PC",
     category: "IT",
     emoji: "🥷",
     web: "https://eu.ninjarmm.com/auth/#/mlogin?region=europe",
