@@ -22,7 +22,11 @@
  *                    se assente, si apre la pagina del Play Store, che mostra
  *                    il pulsante "Apri" se l'app è già installata.
  *
- *   web          (opzionale) versione web, usata da PC o come alternativa
+ *   web          (opzionale) versione web, usata da PC o come alternativa.
+ *                Se un'app ha SOLO "web" (niente ios/android), al tocco si apre
+ *                direttamente il sito su qualsiasi dispositivo.
+ *   iconStoreId  (opzionale) ID App Store da cui prendere l'icona ufficiale,
+ *                utile per i servizi solo web che hanno comunque un'app.
  *
  *   verified     true se lo scheme è documentato/testato, false se è un tentativo
  */
@@ -110,5 +114,15 @@ window.SICIET_APPS = [
       scheme: "authpoint" // da verificare: se errato si apre il Play Store
     },
     verified: false
+  },
+  {
+    id: "ninjaone",
+    name: "NinjaOne",
+    description: "Accesso alla piattaforma NinjaOne per la gestione e l'assistenza IT.",
+    category: "IT",
+    emoji: "🥷",
+    web: "https://eu.ninjarmm.com/auth/#/mlogin?region=europe",
+    iconStoreId: "1416138607", // icona dell'app NinjaOne Mobile
+    verified: true
   }
 ];
