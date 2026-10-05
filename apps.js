@@ -34,13 +34,14 @@ window.SICIET_APPS = [
     category: "Operatività",
     emoji: "📊",
     icon: "https://play-lh.googleusercontent.com/jQ2J1DkQmT1AyLmUgCqx0ZXNmLcVQs7iFmgTIgfs-ZI6kJ6aI4UNcAtmMSjCgdbNuLgKnIFcobB0z-Cxf0SZ=w240-h480-rw",
+    // Scheme sconosciuto ("myperfetto://" testato: non funziona). Si apre la
+    // pagina dello store, che mostra "Apri" se l'app è già installata.
+    // Aggiungere qui ios.scheme / android.scheme quando Antos lo comunica.
     ios: {
-      scheme: "myperfetto://",
       store: "https://apps.apple.com/it/app/my-perfetto/id1328294353"
     },
     android: {
-      package: "it.antos.perfettoapp",
-      scheme: "myperfetto" // da verificare: se errato si apre il Play Store
+      package: "it.antos.perfettoapp"
     },
     verified: false
   },
