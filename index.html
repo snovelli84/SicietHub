@@ -256,6 +256,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   var iconBoxes = [];
 
   function appStoreId(app){
+    if(app.iconStoreId) return String(app.iconStoreId);
     var m = app.ios && app.ios.store && app.ios.store.match(/\/id(\d+)/);
     return m ? m[1] : null;
   }
@@ -419,6 +420,12 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   /* ---------- Click su un'app ---------- */
 
   function onAppClick(app){
+    // Servizi solo web (nessuna app da installare): si apre il sito.
+    if(app.web && !app.ios && !app.android){
+      window.open(app.web, "_blank", "noopener");
+      return;
+    }
+
     if(platform === "desktop"){
       showDesktopSheet(app);
       return;

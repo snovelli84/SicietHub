@@ -31,6 +31,7 @@ Tutto si configura in [`apps.js`](apps.js). Esempio:
 
 - `android.package`: è il valore `id=` nell'indirizzo della pagina Play Store dell'app.
 - `ios.store`: l'indirizzo della pagina App Store.
+- Servizi solo web (es. NinjaOne): basta indicare `web` senza `ios`/`android`; al tocco si apre il sito su qualsiasi dispositivo. Con `iconStoreId` si può usare l'icona dell'eventuale app sull'App Store.
 - Icona: viene presa in automatico dall'App Store (icona ufficiale), usando l'ID nel link `ios.store`. Viene salvata nel browser per 7 giorni. Se non è disponibile si usa l'`emoji`. Per forzare un'immagine diversa si può indicare `icon: "https://..."`.
 - `scheme`: l'indirizzo "speciale" che apre l'app (es. `msteams://`). Va chiesto al fornitore dell'app o cercato nella sua documentazione.
 
