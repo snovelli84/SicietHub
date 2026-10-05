@@ -1,215 +1,408 @@
 <!DOCTYPE html>
 <html lang="it">
-
 <head>
-
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>SICIET HUB</title>
+<meta name="description" content="Portale delle applicazioni aziendali SICIET">
+<meta name="theme-color" content="#005baa">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SICIET HUB">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
 <style>
-
-*{
-    box-sizing:border-box;
-    margin:0;
-    padding:0;
+:root{
+  --brand:#005baa;
+  --brand-dark:#00457f;
+  --bg:#f4f6f9;
+  --card:#ffffff;
+  --text:#1d2430;
+  --muted:#5d6878;
+  --border:#e3e7ee;
+  --chip:#e8eef6;
+  --shadow:0 2px 10px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#11161d;
+    --card:#1a212b;
+    --text:#e8edf3;
+    --muted:#9aa6b5;
+    --border:#2a3340;
+    --chip:#232c38;
+    --shadow:0 2px 10px rgba(0,0,0,.4);
+  }
 }
 
+*{box-sizing:border-box;margin:0;padding:0}
+
 body{
-    font-family:Arial,sans-serif;
-    background:#f4f6f9;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  -webkit-tap-highlight-color:transparent;
 }
 
 header{
-    background:#005baa;
-    color:white;
-    text-align:center;
-    padding:25px;
+  background:var(--brand);
+  color:#fff;
+  padding:calc(24px + env(safe-area-inset-top)) 16px 56px;
+  text-align:center;
+}
+header h1{font-size:28px;letter-spacing:.5px}
+header p{margin-top:6px;opacity:.9}
+
+main{
+  max-width:720px;
+  margin:-36px auto 0;
+  padding:0 16px calc(24px + env(safe-area-inset-bottom));
 }
 
-header h1{
-    font-size:32px;
+.search{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  background:var(--card);
+  border-radius:14px;
+  padding:0 14px;
+  box-shadow:var(--shadow);
+}
+.search input{
+  flex:1;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:var(--text);
+  font-size:16px; /* 16px evita lo zoom automatico su iOS */
+  padding:14px 0;
 }
 
-header p{
-    margin-top:10px;
+.chips{
+  display:flex;
+  gap:8px;
+  overflow-x:auto;
+  padding:14px 0 4px;
+  scrollbar-width:none;
 }
-
-.container{
-    padding:20px;
+.chips::-webkit-scrollbar{display:none}
+.chip{
+  flex:none;
+  border:0;
+  border-radius:999px;
+  padding:8px 14px;
+  font-size:14px;
+  background:var(--chip);
+  color:var(--text);
+  cursor:pointer;
 }
+.chip[aria-pressed="true"]{background:var(--brand);color:#fff}
 
-.grid{
-    display:grid;
-    grid-template-columns:repeat(2,1fr);
-    gap:15px;
+.list{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+
+.app{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  width:100%;
+  text-align:left;
+  border:1px solid var(--border);
+  background:var(--card);
+  color:inherit;
+  font:inherit;
+  border-radius:18px;
+  padding:14px;
+  box-shadow:var(--shadow);
+  cursor:pointer;
+  transition:transform .15s;
 }
+.app:active{transform:scale(.98)}
+@media (hover:hover){.app:hover{transform:translateY(-2px)}}
 
-.card{
-    background:white;
-    border-radius:20px;
-    padding:25px 15px;
-    text-align:center;
-    cursor:pointer;
-    box-shadow:0 2px 10px rgba(0,0,0,.15);
-    transition:.2s;
+.app-icon{
+  flex:none;
+  width:56px;height:56px;
+  border-radius:14px;
+  background:var(--chip);
+  display:flex;align-items:center;justify-content:center;
+  font-size:30px;
+  overflow:hidden;
 }
+.app-icon img{width:100%;height:100%;object-fit:cover}
 
-.card:hover{
-    transform:translateY(-3px);
+.app-body{flex:1;min-width:0}
+.app-name{font-weight:700;font-size:17px}
+.app-desc{color:var(--muted);font-size:14px;margin-top:3px;line-height:1.35}
+.app-cat{
+  display:inline-block;
+  margin-top:6px;
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:.5px;
+  color:var(--brand);
 }
+@media (prefers-color-scheme: dark){.app-cat{color:#6fb0ee}}
+.chev{flex:none;color:var(--muted);font-size:22px}
 
-.icon{
-    font-size:50px;
+.empty{text-align:center;color:var(--muted);padding:40px 0}
+
+footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
+
+/* Pannello in basso */
+.backdrop{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.35);
+  opacity:0;pointer-events:none;
+  transition:opacity .2s;
 }
-
-.icon img{
-    width:50px;
-    height:auto;
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;
+  max-width:720px;margin:0 auto;
+  background:var(--card);
+  border-radius:20px 20px 0 0;
+  padding:20px 16px calc(20px + env(safe-area-inset-bottom));
+  transform:translateY(110%);
+  transition:transform .25s ease,visibility .25s;
+  box-shadow:0 -4px 20px rgba(0,0,0,.2);
+  visibility:hidden;
 }
-
-.title{
-    margin-top:10px;
-    font-weight:bold;
-    color:#333;
+.open .backdrop{opacity:1;pointer-events:auto}
+.open .sheet{transform:none;visibility:visible}
+.sheet h2{font-size:18px}
+.sheet p{color:var(--muted);font-size:14px;margin-top:6px;line-height:1.4}
+.sheet .actions{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+.btn{
+  display:block;
+  text-align:center;
+  text-decoration:none;
+  border:0;
+  border-radius:12px;
+  padding:14px;
+  font-size:16px;
+  font-weight:600;
+  cursor:pointer;
+  background:var(--chip);
+  color:var(--text);
 }
-
-footer{
-    text-align:center;
-    padding:20px;
-    color:#666;
-    font-size:12px;
-}
-
+.btn.primary{background:var(--brand);color:#fff}
 </style>
-
 </head>
 
 <body>
 
 <header>
-    <h1>SICIET</h1>
-    <p>Portale Applicazioni Aziendali</p>
+  <h1>SICIET HUB</h1>
+  <p>Portale Applicazioni Aziendali</p>
 </header>
 
-<div class="container">
+<main>
+  <label class="search">
+    <span aria-hidden="true">🔍</span>
+    <input id="q" type="search" placeholder="Cerca un'app…" autocomplete="off" aria-label="Cerca un'app">
+  </label>
 
-    <div class="grid">
+  <div class="chips" id="chips" role="toolbar" aria-label="Categorie"></div>
 
-        <div class="card" onclick="openPerfetto()">
-            <div class="icon">
-                <img src="https://play-lh.googleusercontent.com/jQ2J1DkQmT1AyLmUgCqx0ZXNmLcVQs7iFmgTIgfs-ZI6kJ6aI4UNcAtmMSjCgdbNuLgKnIFcobB0z-Cxf0SZ=w240-h480-rw"
-                     alt="Perfetto"
-                     onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'📊',style:'font-size:50px'}))"/>
-            </div>
-            <div class="title">PerfettoApp</div>
-        </div>
+  <div class="list" id="list"></div>
+</main>
 
-        <div class="card" onclick="openZConnect()">
-            <div class="icon">💰</div>
-            <div class="title">ZConnect</div>
-        </div>
+<footer>SICIET HUB</footer>
 
-        <div class="card" onclick="openOutlook()">
-            <div class="icon">📧</div>
-            <div class="title">Outlook</div>
-        </div>
-
-        <div class="card" onclick="openTeams()">
-            <div class="icon">💬</div>
-            <div class="title">Teams</div>
-        </div>
-
-        <div class="card" onclick="openAuthPoint()">
-            <div class="icon">🔐</div>
-            <div class="title">AuthPoint</div>
-        </div>
-
-    </div>
-
+<div id="sheetWrap" aria-hidden="true">
+  <div class="backdrop" id="backdrop"></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <h2 id="sheetTitle"></h2>
+    <p id="sheetText"></p>
+    <div class="actions" id="sheetActions"></div>
+  </div>
 </div>
 
-<footer>
-    SICIET HUB
-</footer>
-
+<script src="apps.js"></script>
+<script src="launcher.js"></script>
 <script>
+(function(){
+  "use strict";
 
-function isIOS(){
-    return /iPhone|iPad|iPod/i.test(navigator.userAgent);
-}
+  var apps = window.SICIET_APPS || [];
+  var L = window.SicietLauncher;
+  var platform = L.detectPlatform();
 
-/* Prova ad aprire l'app con uno schema; se non risponde entro il timeout,
-   va allo store corretto in base al sistema operativo. */
-function tryOpenApp(scheme, iosStore, androidStore){
+  var listEl = document.getElementById("list");
+  var chipsEl = document.getElementById("chips");
+  var qEl = document.getElementById("q");
+  var sheetWrap = document.getElementById("sheetWrap");
 
-    let store = isIOS() ? iosStore : androidStore;
+  var currentCat = "Tutte";
 
-    let left = false;
-    document.addEventListener("visibilitychange", function onVis(){
-        if(document.visibilityState === "hidden"){
-            left = true;
-            document.removeEventListener("visibilitychange", onVis);
-        }
+  function el(tag, cls, text){
+    var e = document.createElement(tag);
+    if(cls) e.className = cls;
+    if(text != null) e.textContent = text;
+    return e;
+  }
+
+  function iconFor(app){
+    var box = el("div", "app-icon");
+    box.setAttribute("aria-hidden", "true");
+    if(app.icon){
+      var img = new Image();
+      img.alt = "";
+      img.loading = "lazy";
+      img.src = app.icon;
+      img.onerror = function(){ box.textContent = app.emoji || "📱"; };
+      box.appendChild(img);
+    }else{
+      box.textContent = app.emoji || "📱";
+    }
+    return box;
+  }
+
+  function renderChips(){
+    var cats = ["Tutte"];
+    apps.forEach(function(a){
+      if(a.category && cats.indexOf(a.category) < 0) cats.push(a.category);
+    });
+    chipsEl.innerHTML = "";
+    if(cats.length < 3) return; // con una sola categoria i filtri non servono
+    cats.forEach(function(c){
+      var b = el("button", "chip", c);
+      b.type = "button";
+      b.setAttribute("aria-pressed", String(c === currentCat));
+      b.onclick = function(){ currentCat = c; renderChips(); renderList(); };
+      chipsEl.appendChild(b);
+    });
+  }
+
+  function norm(s){
+    return (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  }
+
+  function renderList(){
+    var q = norm(qEl.value.trim());
+    var shown = apps.filter(function(a){
+      if(currentCat !== "Tutte" && a.category !== currentCat) return false;
+      if(!q) return true;
+      return norm(a.name + " " + a.description + " " + a.category).indexOf(q) >= 0;
     });
 
-    window.location = scheme;
+    listEl.innerHTML = "";
+    if(!shown.length){
+      listEl.appendChild(el("div", "empty", "Nessuna app trovata."));
+      return;
+    }
 
-    setTimeout(function(){
-        if(!left){
-            window.location = store;
-        }
-    }, 1500);
-}
+    shown.forEach(function(app){
+      var b = el("button", "app");
+      b.type = "button";
+      b.setAttribute("aria-label", app.name + ": " + app.description);
 
-/* TEAMS - verificato */
-function openTeams(){
-    tryOpenApp(
-        "msteams://",
-        "https://apps.apple.com/it/app/microsoft-teams/id1113153706",
-        "https://play.google.com/store/apps/details?id=com.microsoft.teams"
+      var body = el("div", "app-body");
+      body.appendChild(el("div", "app-name", app.name));
+      body.appendChild(el("div", "app-desc", app.description));
+      if(app.category) body.appendChild(el("span", "app-cat", app.category));
+
+      b.appendChild(iconFor(app));
+      b.appendChild(body);
+      b.appendChild(el("span", "chev", "›"));
+
+      b.onclick = function(){ onAppClick(app); };
+      listEl.appendChild(b);
+    });
+  }
+
+  /* ---------- Pannello ---------- */
+
+  function openSheet(title, text, actions){
+    document.getElementById("sheetTitle").textContent = title;
+    document.getElementById("sheetText").textContent = text;
+    var box = document.getElementById("sheetActions");
+    box.innerHTML = "";
+    actions.forEach(function(a){
+      var node;
+      if(a.href){
+        node = el("a", "btn" + (a.primary ? " primary" : ""), a.label);
+        node.href = a.href;
+        if(a.newTab){ node.target = "_blank"; node.rel = "noopener"; }
+      }else{
+        node = el("button", "btn" + (a.primary ? " primary" : ""), a.label);
+        node.type = "button";
+        node.onclick = a.onClick;
+      }
+      box.appendChild(node);
+    });
+    var close = el("button", "btn", "Chiudi");
+    close.type = "button";
+    close.onclick = closeSheet;
+    box.appendChild(close);
+
+    sheetWrap.classList.add("open");
+    sheetWrap.setAttribute("aria-hidden", "false");
+  }
+
+  function closeSheet(){
+    sheetWrap.classList.remove("open");
+    sheetWrap.setAttribute("aria-hidden", "true");
+  }
+
+  document.getElementById("backdrop").onclick = closeSheet;
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape") closeSheet(); });
+
+  /* ---------- Click su un'app ---------- */
+
+  function onAppClick(app){
+    if(platform === "desktop"){
+      showDesktopSheet(app);
+      return;
+    }
+
+    var res = L.launch(app, platform);
+    if(res.action === "none") return;
+
+    // Pannello di riserva: se l'apertura automatica non funziona,
+    // l'utente ha comunque i pulsanti per aprire l'app o scaricarla.
+    var actions = [];
+    if(platform === "ios" && app.ios && app.ios.scheme){
+      actions.push({ label: "Apri " + app.name, primary: true, href: app.ios.scheme });
+    }
+    if(platform === "android" && app.android && app.android.scheme){
+      actions.push({ label: "Apri " + app.name, primary: true, href: L.androidIntentUrl(app) });
+    }
+    actions.push({
+      label: "Scarica da " + L.storeName(platform),
+      primary: !actions.length,
+      href: res.store
+    });
+
+    openSheet(
+      app.name,
+      res.action === "open"
+        ? "Stiamo aprendo l'app. Se non è installata verrai portato su " + L.storeName(platform) + "."
+        : "Ti stiamo portando su " + L.storeName(platform) + ": se l'app è già installata, tocca \"Apri\".",
+      actions
     );
-}
+  }
 
-/* OUTLOOK - verificato */
-function openOutlook(){
-    tryOpenApp(
-        "ms-outlook://",
-        "https://apps.apple.com/it/app/microsoft-outlook/id951937596",
-        "https://play.google.com/store/apps/details?id=com.microsoft.office.outlook"
+  function showDesktopSheet(app){
+    var actions = [];
+    if(app.web) actions.push({ label: "Apri versione web", primary: true, href: app.web, newTab: true });
+    if(app.ios) actions.push({ label: "App Store (iPhone / iPad)", href: app.ios.store, newTab: true });
+    if(app.android) actions.push({ label: "Play Store (Android)", href: L.playStoreUrl(app.android.package), newTab: true });
+    openSheet(
+      app.name,
+      app.description + (app.web ? "" : " Apri questa pagina dallo smartphone per installare o aprire l'app."),
+      actions
     );
-}
+  }
 
-/* AUTHPOINT - store verificati, schema non ufficiale (tentativo) */
-function openAuthPoint(){
-    tryOpenApp(
-        "authpoint://",
-        "https://apps.apple.com/us/app/watchguard-authpoint/id1335115425",
-        "https://play.google.com/store/apps/details?id=com.watchguard.authpoint"
-    );
-}
-
-/* ZCONNECT - store verificati, schema non ufficiale (tentativo) */
-function openZConnect(){
-    tryOpenApp(
-        "zconnect://",
-        "https://apps.apple.com/it/app/zconnect-enterprise-edition/id1254381259",
-        "https://play.google.com/store/apps/details?id=com.zucchetti.hr.hrsuite&hl=it"
-    );
-}
-
-/* PERFETTO APP - store verificati (ID corretto), schema non ufficiale (tentativo) */
-function openPerfetto(){
-    tryOpenApp(
-        "myperfetto://",
-        "https://apps.apple.com/us/app/my-perfetto/id1328294353",
-        "https://play.google.com/store/apps/details?id=it.antos.perfettoapp"
-    );
-}
-
+  qEl.addEventListener("input", renderList);
+  renderChips();
+  renderList();
+})();
 </script>
 
 </body>
-
 </html>
