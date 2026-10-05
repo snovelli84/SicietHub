@@ -9,7 +9,9 @@
  *   description  breve descrizione dell'utilità
  *   category     categoria (usata per i filtri)
  *   emoji        icona di riserva se l'immagine non è disponibile
- *   icon         (opzionale) URL di un'immagine quadrata
+ *   icon         (opzionale) URL di un'immagine quadrata. Di norma NON serve:
+ *                l'icona ufficiale viene presa in automatico dall'App Store
+ *                usando l'ID contenuto nel link ios.store.
  *
  *   ios.scheme   URL scheme che apre l'app (es. "msteams://"). Se assente, si va direttamente all'App Store.
  *   ios.store    link alla pagina dell'App Store
@@ -27,13 +29,15 @@
 window.SICIET_APPS = [
   {
     id: "perfetto",
-    name: "PerfettoApp",
-    description: "Gestione delle attività e degli interventi di lavoro.",
+    name: "MyPerfetto",
+    description: "Commesse, rapportini di lavoro, note spese e ore caricate sui progetti.",
     category: "Operatività",
     emoji: "📊",
     icon: "https://play-lh.googleusercontent.com/jQ2J1DkQmT1AyLmUgCqx0ZXNmLcVQs7iFmgTIgfs-ZI6kJ6aI4UNcAtmMSjCgdbNuLgKnIFcobB0z-Cxf0SZ=w240-h480-rw",
+    // Scheme sconosciuto ("myperfetto://" testato: non funziona). Si apre la
+    // pagina dello store, che mostra "Apri" se l'app è già installata.
+    // Aggiungere qui ios.scheme / android.scheme quando Antos lo comunica.
     ios: {
-      scheme: "myperfetto://",
       store: "https://apps.apple.com/it/app/my-perfetto/id1328294353"
     },
     android: {
@@ -52,7 +56,8 @@ window.SICIET_APPS = [
       store: "https://apps.apple.com/it/app/zconnect-enterprise-edition/id1254381259"
     },
     android: {
-      package: "com.zucchetti.hr.hrsuite"
+      package: "com.zucchetti.hr.hrsuite",
+      scheme: "zconnect" // da verificare: se errato si apre il Play Store
     },
     verified: false
   },
@@ -101,7 +106,8 @@ window.SICIET_APPS = [
       store: "https://apps.apple.com/it/app/watchguard-authpoint/id1335115425"
     },
     android: {
-      package: "com.watchguard.authpoint"
+      package: "com.watchguard.authpoint",
+      scheme: "authpoint" // da verificare: se errato si apre il Play Store
     },
     verified: false
   }
