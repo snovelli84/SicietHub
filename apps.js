@@ -39,7 +39,8 @@ window.SICIET_APPS = [
       store: "https://apps.apple.com/it/app/my-perfetto/id1328294353"
     },
     android: {
-      package: "it.antos.perfettoapp"
+      package: "it.antos.perfettoapp",
+      scheme: "myperfetto" // da verificare: se errato si apre il Play Store
     },
     verified: false
   },
@@ -54,7 +55,8 @@ window.SICIET_APPS = [
       store: "https://apps.apple.com/it/app/zconnect-enterprise-edition/id1254381259"
     },
     android: {
-      package: "com.zucchetti.hr.hrsuite"
+      package: "com.zucchetti.hr.hrsuite",
+      scheme: "zconnect" // da verificare: se errato si apre il Play Store
     },
     verified: false
   },
@@ -103,7 +105,8 @@ window.SICIET_APPS = [
       store: "https://apps.apple.com/it/app/watchguard-authpoint/id1335115425"
     },
     android: {
-      package: "com.watchguard.authpoint"
+      package: "com.watchguard.authpoint",
+      scheme: "authpoint" // da verificare: se errato si apre il Play Store
     },
     verified: false
   }
