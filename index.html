@@ -54,8 +54,16 @@ header{
   padding:calc(24px + env(safe-area-inset-top)) 16px 56px;
   text-align:center;
 }
-header h1{font-size:28px;letter-spacing:.5px}
-header p{margin-top:6px;opacity:.9}
+header h1{margin:0}
+.logo{
+  display:inline-block;
+  background:#fff;
+  border-radius:20px;
+  padding:12px 20px;
+  box-shadow:0 4px 16px rgba(0,0,0,.18);
+}
+.logo img{display:block;height:80px;width:auto}
+header p{margin-top:12px;opacity:.9}
 
 main{
   max-width:720px;
@@ -195,7 +203,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 <body>
 
 <header>
-  <h1>SICIET HUB</h1>
+  <h1><span class="logo"><img src="icons/logo.png" alt="SICIET HUB" width="447" height="360"></span></h1>
   <p>Portale Applicazioni Aziendali</p>
 </header>
 
