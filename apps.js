@@ -88,6 +88,7 @@ window.SICIET_APPS = [
     description: "Archivio della posta aziendale: ricerca e consultazione delle email archiviate.",
     category: "Comunicazione",
     emoji: "🗄️",
+    icon: "icons/mailstore.svg", // simbolo ricavato dal logo ufficiale MailStore
     // Solo web (MailStore Web Access). Raggiungibile da fuori solo da IP italiani.
     web: "https://mailstore.siciet.it",
     verified: true
