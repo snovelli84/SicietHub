@@ -52,7 +52,7 @@ window.SICIET_APPS = [
   {
     id: "zconnect",
     name: "ZConnect",
-    description: "Presenze, timbrature, richieste di ferie e permessi, cedolini.",
+    description: "Visualizzazione Cedolini Buste Paga",
     category: "Risorse umane",
     emoji: "💰",
     ios: {
