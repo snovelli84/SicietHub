@@ -34,7 +34,7 @@ window.SICIET_APPS = [
   {
     id: "perfetto",
     name: "MyPerfetto",
-    description: "Commesse, rapportini di lavoro, note spese e ore caricate sui progetti.",
+    description: "Inserimento Rapportini giornalieri su commessa",
     category: "Operatività",
     emoji: "📊",
     icon: "https://play-lh.googleusercontent.com/jQ2J1DkQmT1AyLmUgCqx0ZXNmLcVQs7iFmgTIgfs-ZI6kJ6aI4UNcAtmMSjCgdbNuLgKnIFcobB0z-Cxf0SZ=w240-h480-rw",
