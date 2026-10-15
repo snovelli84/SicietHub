@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>SICIET HUB – Test</title>
+<link rel="icon" href="icons/favicon-32.png" type="image/png" sizes="32x32">
+<!--
+  Pagina di diagnostica: mostra se il PC è riconosciuto in sede e permette di
+  provare a mano gli indirizzi che aprono i programmi desktop (desktop.scheme).
+-->
+<style>
+:root{
+  --brand:#005baa;
+  --bg:#f4f6f9;
+  --card:#ffffff;
+  --text:#1d2430;
+  --muted:#5d6878;
+  --border:#e3e7ee;
+  --ok:#1e7d3c;
+  --ok-bg:#e3f4e8;
+  --no:#a3401a;
+  --no-bg:#fbe9e1;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#11161d;
+    --card:#1a212b;
+    --text:#e8edf3;
+    --muted:#9aa6b5;
+    --border:#2a3340;
+    --ok:#7fd59a;
+    --ok-bg:#16301f;
+    --no:#f0a283;
+    --no-bg:#3a2118;
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  line-height:1.45;
+}
+header{background:var(--brand);color:#fff;padding:20px 16px}
+header h1{font-size:20px}
+header p{opacity:.85;font-size:14px}
+main{max-width:720px;margin:0 auto;padding:16px;display:grid;gap:16px}
+section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;display:grid;gap:10px}
+h2{font-size:16px}
+.muted{color:var(--muted);font-size:13px}
+dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;font-size:14px}
+dt{color:var(--muted)}
+dd{font-variant-numeric:tabular-nums;min-width:0;overflow-wrap:anywhere}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-weight:600;font-size:13px;background:var(--border)}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.no{background:var(--no-bg);color:var(--no)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px 6px;border-top:1px solid var(--border);vertical-align:top}
+th{color:var(--muted);font-weight:500;border-top:0}
+code{font-family:ui-monospace,Consolas,monospace;font-size:13px}
+.wrap{overflow-x:auto}
+.btn{display:inline-block;padding:6px 12px;border-radius:8px;border:1px solid var(--border);color:var(--text);text-decoration:none;font-size:14px;background:transparent;cursor:pointer;margin:2px 4px 2px 0}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+form{display:flex;gap:8px;flex-wrap:wrap}
+input{flex:1 1 200px;min-width:0;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font:inherit}
+ol{padding-left:20px;font-size:14px;display:grid;gap:4px}
+</style>
+</head>
+<body>
+<header>
+  <h1>SICIET HUB – Pagina di test</h1>
+  <p>Verifica del riconoscimento della sede e dell'apertura dei programmi desktop.</p>
+</header>
+
+<main>
+  <section>
+    <h2>Rete</h2>
+    <dl>
+      <dt>Dispositivo</dt><dd id="platform">…</dd>
+      <dt>IP pubblico</dt><dd id="ip">verifica in corso…</dd>
+      <dt>IP della sede</dt><dd id="officeIps"></dd>
+      <dt>Risultato</dt><dd><span class="pill" id="result">verifica in corso…</span></dd>
+    </dl>
+    <p class="muted">Il portale apre i programmi desktop solo se il risultato è "In sede" e il dispositivo è "PC".</p>
+  </section>
+
+  <section>
+    <h2>Programmi desktop</h2>
+    <p class="muted">Clicca "Apri programma" per ogni riga. Il browser può chiedere conferma ("Aprire …?"): è normale finché non è attiva la policy del file <code>desktop/protocolli-siciet.reg</code>, che vale solo per hub.siciet.it. Se non succede nulla, lo scheme non è registrato sul PC.</p>
+    <div class="wrap">
+      <table>
+        <thead><tr><th>App</th><th>Programma</th><th>Indirizzo</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Prova un altro indirizzo</h2>
+    <p class="muted">Per esempio <code>outlook:</code> (Outlook classico) o uno scheme appena registrato.</p>
+    <form id="custom">
+      <input id="customScheme" value="outlook:" aria-label="Indirizzo da provare">
+      <button class="btn primary" type="submit">Apri</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>Cosa controllare</h2>
+    <ol>
+      <li>Dal PC in ufficio il risultato è "In sede".</li>
+      <li>Teams e Outlook si aprono dalla tabella.</li>
+      <li>Mago4 si apre solo dopo aver importato <code>protocolli-siciet.reg</code> con il percorso corretto.</li>
+      <li>Nel <a href="index.html">portale</a>, MyPerfetto apre Mago4 e ZConnect apre il portale HR.</li>
+      <li>Da casa (o dal telefono in 4G) il risultato è "Fuori sede" e si aprono le versioni web.</li>
+    </ol>
+  </section>
+</main>
+
+<script src="apps.js"></script>
+<script src="launcher.js"></script>
+<script>
+(function(){
+  "use strict";
+  var L = window.SicietLauncher;
+  var apps = window.SICIET_APPS || [];
+  var platform = L.detectPlatform();
+  var names = { desktop: "PC", ios: "iPhone / iPad", android: "Android" };
+
+  document.getElementById("platform").textContent = names[platform] || platform;
+  document.getElementById("officeIps").textContent = (window.SICIET_OFFICE_IPS || []).join(", ") || "nessuno configurato";
+
+  fetch("https://api.ipify.org?format=json", { cache: "no-store" })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ document.getElementById("ip").textContent = d.ip; })
+    .catch(function(){ document.getElementById("ip").textContent = "non rilevato (servizio non raggiungibile)"; });
+
+  L.isOfficeNetwork().then(function(inOffice){
+    var el = document.getElementById("result");
+    el.textContent = inOffice ? "In sede" : "Fuori sede";
+    el.className = "pill " + (inOffice ? "ok" : "no");
+  });
+
+  function cell(tr, content){
+    var td = document.createElement("td");
+    if(typeof content === "string") td.textContent = content; else td.appendChild(content);
+    tr.appendChild(td);
+    return td;
+  }
+
+  function link(label, href, primary, newTab){
+    var a = document.createElement("a");
+    a.className = "btn" + (primary ? " primary" : "");
+    a.textContent = label;
+    a.href = href;
+    if(newTab){ a.target = "_blank"; a.rel = "noopener"; }
+    return a;
+  }
+
+  var rows = document.getElementById("rows");
+  apps.filter(function(a){ return a.desktop && a.desktop.scheme; }).forEach(function(app){
+    var tr = document.createElement("tr");
+    cell(tr, app.name);
+    cell(tr, app.desktop.name || app.name);
+    var code = document.createElement("code");
+    code.textContent = app.desktop.scheme;
+    cell(tr, code);
+    var td = cell(tr, link("Apri programma", app.desktop.scheme, true));
+    if(app.web) td.appendChild(link("Web", app.web, false, true));
+    rows.appendChild(tr);
+  });
+
+  document.getElementById("custom").addEventListener("submit", function(e){
+    e.preventDefault();
+    var v = document.getElementById("customScheme").value.trim();
+    if(v) window.location.href = v;
+  });
+})();
+</script>
+</body>
+</html>
