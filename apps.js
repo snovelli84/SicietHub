@@ -28,8 +28,25 @@
  *   iconStoreId  (opzionale) ID App Store da cui prendere l'icona ufficiale,
  *                utile per i servizi solo web che hanno comunque un'app.
  *
+ *   desktop.scheme  (opzionale) indirizzo che apre il programma installato sul PC
+ *                   (es. "msteams:"). Viene usato SOLO da PC e SOLO dentro la
+ *                   rete aziendale (vedi SICIET_OFFICE_IPS); fuori sede si
+ *                   apre la versione web, se c'è.
+ *   desktop.name    (opzionale) nome del programma desktop, se diverso da "name"
+ *   desktop.preferWeb (opzionale) true per aprire prima la versione web: in sede
+ *                   il programma desktop resta disponibile come pulsante
+ *
  *   verified     true se lo scheme è documentato/testato, false se è un tentativo
  */
+
+/*
+ * IP pubblici della rete aziendale. Se il PC esce su Internet con uno di
+ * questi indirizzi è considerato "in sede" e si aprono le app desktop.
+ */
+window.SICIET_OFFICE_IPS = [
+  "2.40.198.210"
+];
+
 window.SICIET_APPS = [
   {
     id: "perfetto",
@@ -47,6 +64,12 @@ window.SICIET_APPS = [
     android: {
       package: "it.antos.perfettoapp"
     },
+    // Da PC in sede si apre invece Mago4 (Zucchetti Microarea). Lo scheme
+    // "siciet-mago4:" va registrato sui PC: vedi desktop/protocolli-siciet.reg
+    desktop: {
+      scheme: "siciet-mago4:",
+      name: "Mago4"
+    },
     verified: false
   },
   {
@@ -63,6 +86,8 @@ window.SICIET_APPS = [
       package: "com.zucchetti.hr.hrsuite",
       scheme: "zconnect" // da verificare: se errato si apre il Play Store
     },
+    // Da PC si apre il portale HR via web.
+    web: "https://cnagrosseto.errepicloud.it/hrportal/jsp/login.jsp",
     verified: false
   },
   {
@@ -80,6 +105,12 @@ window.SICIET_APPS = [
       scheme: "ms-outlook"
     },
     web: "https://outlook.office.com/mail/",
+    // Da PC si apre prima la versione web; in sede il pannello offre anche
+    // Outlook classico (scheme "siciet-outlook:", vedi desktop/protocolli-siciet.reg).
+    desktop: {
+      scheme: "siciet-outlook:",
+      preferWeb: true
+    },
     verified: true
   },
   {
@@ -108,6 +139,9 @@ window.SICIET_APPS = [
       scheme: "msteams"
     },
     web: "https://teams.microsoft.com/",
+    desktop: {
+      scheme: "msteams:"
+    },
     verified: true
   },
   {
