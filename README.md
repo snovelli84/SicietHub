@@ -51,7 +51,7 @@ Tutto si configura in [`apps.js`](apps.js). Esempio:
 
 **Configurazione dei PC** – Il file [`desktop/protocolli-siciet.reg`](desktop/protocolli-siciet.reg) (da distribuire via GPO o Intune):
 
-1. registra lo scheme `siciet-mago4:`, che avvia il collegamento ClickOnce `Microarea Mago4 (Sicietw19appli).appref-ms` sul desktop dell'utente (se il desktop è su OneDrive o il collegamento ha un altro nome, va aggiornato il percorso);
+1. registra lo scheme `siciet-mago4:`, che avvia il collegamento ClickOnce `Microarea Mago4 (Sicietw19appli).appref-ms` sul desktop dell'utente (se il collegamento ha un altro nome, va aggiornato nel file);
 2. registra lo scheme `siciet-outlook:`, che apre Outlook classico di Microsoft 365 (`OUTLOOK.EXE` in `C:\Program Files\Microsoft Office\root\Office16`);
 3. imposta la policy di Edge e Chrome `AutoLaunchProtocolsFromOrigins`, così il browser non chiede "Aprire Microsoft Teams?" ogni volta, solo per `https://hub.siciet.it`.
 

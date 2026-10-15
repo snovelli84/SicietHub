@@ -5,17 +5,17 @@ Windows Registry Editor Version 5.00
 ; 1) "siciet-mago4:" apre Mago4.
 ;    Mago4 e' un'applicazione ClickOnce: si avvia il collegamento
 ;    "Microarea Mago4 (Sicietw19appli).appref-ms" sul desktop dell'utente.
-;    cmd.exe serve a risolvere %USERPROFILE% per ogni utente (puo' comparire
-;    per un istante una finestra nera).
-;    Se il desktop e' su OneDrive o il collegamento ha un altro nome,
-;    aggiornare il percorso qui sotto.
+;    Si usa PowerShell perche' nel comando non si puo' scrivere %USERPROFILE%
+;    (Windows interpreta "%U" come un segnaposto e lo cancella).
+;    La cartella Desktop e' quella reale dell'utente (anche se su OneDrive).
+;    Se il collegamento ha un altro nome, aggiornarlo qui sotto.
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\Classes\siciet-mago4]
 @="URL:Mago4 (SICIET HUB)"
 "URL Protocol"=""
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\Classes\siciet-mago4\shell\open\command]
-@="cmd.exe /c start \"\" \"%USERPROFILE%\\Desktop\\Microarea Mago4 (Sicietw19appli).appref-ms\""
+@="powershell.exe -NoProfile -WindowStyle Hidden -Command \"Start-Process -FilePath (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Microarea Mago4 (Sicietw19appli).appref-ms')\""
 
 ; 2) "siciet-outlook:" apre Outlook classico (app Microsoft 365, 64 bit).
 ;    Per Office a 32 bit il percorso e' "C:\Program Files (x86)\Microsoft Office\root\Office16\OUTLOOK.EXE".
