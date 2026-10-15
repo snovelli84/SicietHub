@@ -1,0 +1,24 @@
+Windows Registry Editor Version 5.00
+
+; SICIET HUB - configurazione dei PC aziendali (distribuire via GPO o Intune).
+;
+; 1) Registra lo scheme "siciet-mago4:" che apre Mago4 dal portale.
+;    VERIFICARE IL PERCORSO di Mago4.exe: tasto destro sul collegamento di
+;    Mago4 > Proprieta' > campo "Destinazione", e copiarlo qui sotto
+;    (nel file .reg ogni "\" va scritto doppio: "\\").
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\siciet-mago4]
+@="URL:Mago4 (SICIET HUB)"
+"URL Protocol"=""
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\siciet-mago4\shell\open\command]
+@="\"C:\\Program Files (x86)\\Microarea\\Mago4\\Mago4.exe\""
+
+; 2) Evita la domanda "Aprire ...?" del browser, solo per hub.siciet.it.
+;    Togliere "ms-outlook" se Outlook non e' installato sui PC.
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge]
+"AutoLaunchProtocolsFromOrigins"="[{\"protocol\":\"siciet-mago4\",\"allowed_origins\":[\"https://hub.siciet.it\"]},{\"protocol\":\"msteams\",\"allowed_origins\":[\"https://hub.siciet.it\"]},{\"protocol\":\"ms-outlook\",\"allowed_origins\":[\"https://hub.siciet.it\"]}]"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome]
+"AutoLaunchProtocolsFromOrigins"="[{\"protocol\":\"siciet-mago4\",\"allowed_origins\":[\"https://hub.siciet.it\"]},{\"protocol\":\"msteams\",\"allowed_origins\":[\"https://hub.siciet.it\"]},{\"protocol\":\"ms-outlook\",\"allowed_origins\":[\"https://hub.siciet.it\"]}]"
