@@ -3,19 +3,20 @@ Windows Registry Editor Version 5.00
 ; SICIET HUB - configurazione dei PC aziendali (distribuire via GPO o Intune).
 
 ; 1) "siciet-mago4:" apre Mago4.
-;    Mago4 e' un'applicazione ClickOnce: si avvia il collegamento
-;    "Microarea Mago4 (Sicietw19appli).appref-ms" sul desktop dell'utente.
-;    Si usa PowerShell perche' nel comando non si puo' scrivere %USERPROFILE%
-;    (Windows interpreta "%U" come un segnaposto e lo cancella).
-;    La cartella Desktop e' quella reale dell'utente (anche se su OneDrive).
-;    Se il collegamento ha un altro nome, aggiornarlo qui sotto.
+;    Mago4 e' un'applicazione ClickOnce: si apre il suo collegamento
+;    (.appref-ms) con Esplora risorse, come con un doppio clic.
+;    Il collegamento deve trovarsi in C:\ProgramData\SICIET\Mago4.appref-ms
+;    (copia di "Microarea Mago4 (Sicietw19appli)" dal desktop; e' uguale per
+;    tutti gli utenti).
+;    Non si usano cmd o PowerShell: un browser che li avvia viene bloccato
+;    dall'antivirus (Sophos) come comportamento malevolo.
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\Classes\siciet-mago4]
 @="URL:Mago4 (SICIET HUB)"
 "URL Protocol"=""
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\Classes\siciet-mago4\shell\open\command]
-@="powershell.exe -NoProfile -WindowStyle Hidden -Command \"Start-Process -FilePath (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Microarea Mago4 (Sicietw19appli).appref-ms')\""
+@="\"C:\\Windows\\explorer.exe\" \"C:\\ProgramData\\SICIET\\Mago4.appref-ms\""
 
 ; 2) "siciet-outlook:" apre Outlook classico (app Microsoft 365, 64 bit).
 ;    Per Office a 32 bit il percorso e' "C:\Program Files (x86)\Microsoft Office\root\Office16\OUTLOOK.EXE".
