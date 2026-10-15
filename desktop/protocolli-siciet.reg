@@ -1,24 +1,36 @@
 Windows Registry Editor Version 5.00
 
 ; SICIET HUB - configurazione dei PC aziendali (distribuire via GPO o Intune).
-;
-; 1) Registra lo scheme "siciet-mago4:" che apre Mago4 dal portale.
-;    VERIFICARE IL PERCORSO di Mago4.exe: tasto destro sul collegamento di
-;    Mago4 > Proprieta' > campo "Destinazione", e copiarlo qui sotto
-;    (nel file .reg ogni "\" va scritto doppio: "\\").
+
+; 1) "siciet-mago4:" apre Mago4.
+;    Mago4 e' un'applicazione ClickOnce: si avvia il collegamento
+;    "Microarea Mago4 (Sicietw19appli).appref-ms" sul desktop dell'utente.
+;    cmd.exe serve a risolvere %USERPROFILE% per ogni utente (puo' comparire
+;    per un istante una finestra nera).
+;    Se il desktop e' su OneDrive o il collegamento ha un altro nome,
+;    aggiornare il percorso qui sotto.
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\Classes\siciet-mago4]
 @="URL:Mago4 (SICIET HUB)"
 "URL Protocol"=""
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\Classes\siciet-mago4\shell\open\command]
-@="\"C:\\Program Files (x86)\\Microarea\\Mago4\\Mago4.exe\""
+@="cmd.exe /c start \"\" \"%USERPROFILE%\\Desktop\\Microarea Mago4 (Sicietw19appli).appref-ms\""
 
-; 2) Evita la domanda "Aprire ...?" del browser, solo per hub.siciet.it.
-;    Togliere "ms-outlook" se Outlook non e' installato sui PC.
+; 2) "siciet-outlook:" apre Outlook classico (app Microsoft 365, 64 bit).
+;    Per Office a 32 bit il percorso e' "C:\Program Files (x86)\Microsoft Office\root\Office16\OUTLOOK.EXE".
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\siciet-outlook]
+@="URL:Outlook (SICIET HUB)"
+"URL Protocol"=""
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\siciet-outlook\shell\open\command]
+@="\"C:\\Program Files\\Microsoft Office\\root\\Office16\\OUTLOOK.EXE\""
+
+; 3) Evita la domanda "Aprire ...?" del browser, solo per hub.siciet.it.
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge]
-"AutoLaunchProtocolsFromOrigins"="[{\"protocol\":\"siciet-mago4\",\"allowed_origins\":[\"https://hub.siciet.it\"]},{\"protocol\":\"msteams\",\"allowed_origins\":[\"https://hub.siciet.it\"]},{\"protocol\":\"ms-outlook\",\"allowed_origins\":[\"https://hub.siciet.it\"]}]"
+"AutoLaunchProtocolsFromOrigins"="[{\"protocol\":\"siciet-mago4\",\"allowed_origins\":[\"https://hub.siciet.it\"]},{\"protocol\":\"siciet-outlook\",\"allowed_origins\":[\"https://hub.siciet.it\"]},{\"protocol\":\"msteams\",\"allowed_origins\":[\"https://hub.siciet.it\"]}]"
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome]
-"AutoLaunchProtocolsFromOrigins"="[{\"protocol\":\"siciet-mago4\",\"allowed_origins\":[\"https://hub.siciet.it\"]},{\"protocol\":\"msteams\",\"allowed_origins\":[\"https://hub.siciet.it\"]},{\"protocol\":\"ms-outlook\",\"allowed_origins\":[\"https://hub.siciet.it\"]}]"
+"AutoLaunchProtocolsFromOrigins"="[{\"protocol\":\"siciet-mago4\",\"allowed_origins\":[\"https://hub.siciet.it\"]},{\"protocol\":\"siciet-outlook\",\"allowed_origins\":[\"https://hub.siciet.it\"]},{\"protocol\":\"msteams\",\"allowed_origins\":[\"https://hub.siciet.it\"]}]"

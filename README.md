@@ -4,7 +4,7 @@ Portale web con l'elenco delle app aziendali. Toccando un'app:
 
 - **se è installata** sul telefono, viene aperta;
 - **se non è installata**, l'utente viene portato allo store (App Store su iOS, Play Store su Android);
-- **da PC in sede** (rete aziendale) si apre il programma installato sul PC, se configurato (es. Teams, Outlook, Mago4);
+- **da PC in sede** (rete aziendale) si apre il programma installato sul PC, se configurato (es. Teams, Mago4; per Outlook prima la versione web, poi l'app);
 - **da PC fuori sede** si apre la versione web (se esiste), altrimenti un pannello con i link agli store.
 
 Dopo il tocco compare sempre anche un pannello con i pulsanti "Apri" e "Scarica", come riserva nel caso l'apertura automatica non funzioni.
@@ -51,9 +51,10 @@ Tutto si configura in [`apps.js`](apps.js). Esempio:
 
 **Configurazione dei PC** – Il file [`desktop/protocolli-siciet.reg`](desktop/protocolli-siciet.reg) (da distribuire via GPO o Intune):
 
-1. registra lo scheme `siciet-mago4:` che avvia Mago4. **Il percorso di `Mago4.exe` nel file va verificato** (Proprietà del collegamento di Mago4 sul desktop);
-2. imposta la policy di Edge e Chrome `AutoLaunchProtocolsFromOrigins`, così il browser non chiede "Aprire Microsoft Teams?" ogni volta, solo per `https://hub.siciet.it`.
+1. registra lo scheme `siciet-mago4:`, che avvia il collegamento ClickOnce `Microarea Mago4 (Sicietw19appli).appref-ms` sul desktop dell'utente (se il desktop è su OneDrive o il collegamento ha un altro nome, va aggiornato il percorso);
+2. registra lo scheme `siciet-outlook:`, che apre Outlook classico di Microsoft 365 (`OUTLOOK.EXE` in `C:\Program Files\Microsoft Office\root\Office16`);
+3. imposta la policy di Edge e Chrome `AutoLaunchProtocolsFromOrigins`, così il browser non chiede "Aprire Microsoft Teams?" ogni volta, solo per `https://hub.siciet.it`.
 
 Con lo stesso schema si può far aprire qualsiasi programma: si sceglie uno scheme (es. `siciet-nomeprogramma:`), lo si registra nel `.reg` e lo si indica in `desktop.scheme`.
 
-**Limiti** – Il browser non dice se il programma si è aperto davvero: per questo dopo il click compare sempre un pannello con "Apri" e "Apri versione web" come riserva. Teams (`msteams:`) è documentato; `ms-outlook:` è registrato dal nuovo Outlook per Windows, mentre l'Outlook classico potrebbe non rispondere.
+**Limiti** – Il browser non dice se il programma si è aperto davvero: per questo dopo il click compare sempre un pannello con "Apri" e "Apri versione web" come riserva. Teams (`msteams:`) è documentato. Per Outlook si apre prima la versione web; in sede il pannello offre anche Outlook classico (`desktop.preferWeb`).

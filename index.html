@@ -472,6 +472,14 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
       openWebOrSheet(app);
       return;
     }
+    // Prima la versione web; in sede il pannello offre anche il programma.
+    if(app.desktop.preferWeb && app.web){
+      openWebOrSheet(app);
+      L.isOfficeNetwork().then(function(inOffice){
+        if(inOffice) showDesktopAppSheet(app);
+      });
+      return;
+    }
     L.isOfficeNetwork().then(function(inOffice){
       if(inOffice) openDesktopApp(app);
       else openWebOrSheet(app);
@@ -488,6 +496,18 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
       "Stiamo aprendo " + name + " sul PC. Se non si apre, verifica che sia installato" +
         (app.web ? " oppure usa la versione web." : "."),
       actions
+    );
+  }
+
+  function showDesktopAppSheet(app){
+    var name = app.desktop.name || app.name;
+    openSheet(
+      name,
+      "Abbiamo aperto " + name + " nel browser. Se preferisci, puoi usare il programma installato sul PC.",
+      [
+        { label: "Apri " + name + " (app)", primary: true, href: app.desktop.scheme },
+        { label: "Riapri versione web", href: app.web, newTab: true }
+      ]
     );
   }
 

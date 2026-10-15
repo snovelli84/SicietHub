@@ -33,6 +33,8 @@
  *                   rete aziendale (vedi SICIET_OFFICE_IPS); fuori sede si
  *                   apre la versione web, se c'è.
  *   desktop.name    (opzionale) nome del programma desktop, se diverso da "name"
+ *   desktop.preferWeb (opzionale) true per aprire prima la versione web: in sede
+ *                   il programma desktop resta disponibile come pulsante
  *
  *   verified     true se lo scheme è documentato/testato, false se è un tentativo
  */
@@ -103,10 +105,11 @@ window.SICIET_APPS = [
       scheme: "ms-outlook"
     },
     web: "https://outlook.office.com/mail/",
-    // "ms-outlook:" è registrato dal nuovo Outlook per Windows; per Outlook
-    // classico va registrato a mano (vedi desktop/protocolli-siciet.reg).
+    // Da PC si apre prima la versione web; in sede il pannello offre anche
+    // Outlook classico (scheme "siciet-outlook:", vedi desktop/protocolli-siciet.reg).
     desktop: {
-      scheme: "ms-outlook:"
+      scheme: "siciet-outlook:",
+      preferWeb: true
     },
     verified: true
   },
