@@ -42,3 +42,17 @@ Tutto si configura in [`apps.js`](apps.js). Esempio:
 **iOS** – Apple non permette a una pagina web di sapere se un'app è installata. La pagina prova ad aprire lo scheme dell'app; se dopo 2,5 secondi la pagina è ancora visibile, va all'App Store (dove comunque compare **Apri** se l'app c'è). Safari può chiedere conferma ("Aprire in Teams?") o mostrare un avviso di indirizzo non valido se l'app manca: è un comportamento di iOS, non eliminabile.
 
 **Scheme da verificare** – Per Teams e Outlook gli scheme sono documentati. Per MyPerfetto, ZConnect e AuthPoint gli scheme iOS sono tentativi (`verified: false`): se non funzionano, l'utente finisce comunque sull'App Store. Lo stesso tentativo è usato su Android: se lo scheme è sbagliato Chrome apre il Play Store (con il pulsante **Apri**), quindi non ci sono effetti negativi. Gli scheme corretti vanno chiesti ai fornitori (Zucchetti, WatchGuard, Perfetto).
+
+## Pulsante MailStore in Outlook
+
+La cartella [`outlook/`](outlook/) contiene un componente aggiuntivo di Outlook che aggiunge il pulsante **MailStore** in Outlook Web e nel nuovo Outlook. Il pulsante apre un pannello con il collegamento a MailStore Web Access (`https://mailstore.siciet.it`). È un semplice collegamento: non richiede certificati o porte aperte su MailStore, perché il pannello è ospitato su questo sito.
+
+Installazione (una volta, da amministratore):
+
+1. Interfaccia di amministrazione di Microsoft 365 → **Impostazioni → App integrate → Carica app personalizzate**.
+2. Tipo di app: **Componente aggiuntivo di Office**; caricare il file `outlook/manifest.xml` (o indicare `https://hub.siciet.it/outlook/manifest.xml`).
+3. Assegnare l'app a tutta l'organizzazione o a un gruppo e confermare. Può servire fino a qualche ora prima che compaia.
+
+Uso: aprire un messaggio in Outlook → **App** (o i "…" della barra del messaggio) → **MailStore** → **Apri archivio MailStore**.
+
+Se si modifica `manifest.xml` aumentare `<Version>`, senza cambiare `<Id>`.
