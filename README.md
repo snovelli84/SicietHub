@@ -83,6 +83,8 @@ L'app **Ferie e permessi** (categoria Risorse umane, definita in `apps.js` come 
 - `templateId` (`richiesta_ferie`): il modello della email, in *Email Templates*;
 - `publicKey`: in *Account → General*.
 
+Il servizio `siciet_hub` è di tipo **SMTP server** (`smtp.office365.com`, porta 587) con la casella dedicata agli invii. Le email escono come **SICIET HUB** da una casella condivisa generica (`From Email` nel modello), su cui la casella degli invii ha il permesso **Invia come**: così non compare l'indirizzo di una persona.
+
 Destinatari, mittente, oggetto e testo si cambiano nel modello su EmailJS, senza toccare il sito. Il campo **To Email** del modello deve contenere indirizzi fissi, mai una variabile `{{…}}`: altrimenti il modulo potrebbe essere usato per mandare email ad altri indirizzi dalla casella aziendale. Il modulo passa al modello le variabili `{{subject}}`, `{{dipendente}}`, `{{voci}}` (una voce per riga: nel modello va dentro un `<pre>`), `{{totale}}`, `{{note}}` e `{{inviata_il}}`.
 
 Nello stesso punto di `richieste.html` si possono cambiare i tipi di richiesta (`tipi`) e quelli proposti a ore (`tipiAOre`). Se uno dei tre codici è vuoto il modulo funziona in prova: mostra il riepilogo ma non invia nulla.
