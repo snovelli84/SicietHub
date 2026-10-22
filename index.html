@@ -430,7 +430,9 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   function onAppClick(app){
     // Servizi solo web (nessuna app da installare): si apre il sito.
     if(app.web && !app.ios && !app.android){
-      window.open(app.web, "_blank", "noopener");
+      // Le pagine del portale (indirizzo relativo) si aprono nella stessa scheda.
+      if(!/^[a-z][a-z0-9+.-]*:/i.test(app.web)) window.location.href = app.web;
+      else window.open(app.web, "_blank", "noopener");
       return;
     }
 

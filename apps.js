@@ -24,7 +24,9 @@
  *
  *   web          (opzionale) versione web, usata da PC o come alternativa.
  *                Se un'app ha SOLO "web" (niente ios/android), al tocco si apre
- *                direttamente il sito su qualsiasi dispositivo.
+ *                direttamente il sito su qualsiasi dispositivo. Un indirizzo
+ *                relativo (es. "richieste.html") è una pagina di questo portale
+ *                e si apre nella stessa scheda.
  *   iconStoreId  (opzionale) ID App Store da cui prendere l'icona ufficiale,
  *                utile per i servizi solo web che hanno comunque un'app.
  *
@@ -64,6 +66,16 @@ window.SICIET_APPS = [
       scheme: "zconnect" // da verificare: se errato si apre il Play Store
     },
     verified: false
+  },
+  {
+    id: "richieste",
+    name: "Ferie e permessi",
+    description: "Richiesta di ferie, permessi e donazione sangue: arriva via email agli addetti del personale.",
+    category: "Risorse umane",
+    emoji: "🗓️",
+    // Pagina di questo portale: si apre nella stessa scheda.
+    web: "richieste.html",
+    verified: true
   },
   {
     id: "outlook",

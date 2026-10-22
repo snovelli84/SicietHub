@@ -56,3 +56,29 @@ Installazione (una volta, da amministratore):
 Uso: aprire un messaggio in Outlook → **App** (o i "…" della barra del messaggio) → **MailStore** → **Apri archivio MailStore**.
 
 Se si modifica `manifest.xml` aumentare `<Version>`, senza cambiare `<Id>`.
+
+## Richiesta ferie e permessi
+
+L'app **Ferie e permessi** (categoria Risorse umane, definita in `apps.js` come le altre) apre [`richieste.html`](richieste.html): un modulo con nome, cognome ed email del dipendente (obbligatoria, anche personale), una o più voci (Ferie, Permesso, Permesso L.104, Donazione sangue, Altro; ciascuna a giornate intere o a ore) e note. Con **+ Aggiungi un'altra voce** si chiedono più periodi o permessi diversi nella stessa richiesta (fino a 10): nell'email le voci sono in ordine di data, con il totale di giorni e ore. All'invio la richiesta arriva via email agli addetti del personale. Non serve un account o un'email aziendale: nome, cognome ed email restano memorizzati sul dispositivo per le richieste successive.
+
+**Invio delle email** – Il sito è statico, quindi le email le spedisce [EmailJS](https://www.emailjs.com) (gratuito fino a 200 invii al mese), collegato alla casella Microsoft 365 dedicata agli invii. Le credenziali della casella restano su EmailJS; nella pagina ci sono solo tre codici pubblici, in `RICHIESTE_CONFIG` all'inizio dello script di `richieste.html`:
+
+- `serviceId` (`siciet_hub`): la casella collegata, in *Email Services*;
+- `templateId` (`richiesta_ferie`): il modello della email, in *Email Templates*;
+- `publicKey`: in *Account → General*.
+
+Il servizio `siciet_hub` è di tipo **SMTP server** (`smtp.office365.com`, porta 587) con la casella dedicata agli invii. Le email escono come **SICIET HUB** da una casella condivisa generica (`From Email` nel modello), su cui la casella degli invii ha il permesso **Invia come**: così non compare l'indirizzo di una persona.
+
+Destinatari, mittente, oggetto e testo si cambiano nel modello su EmailJS, senza toccare il sito. Il campo **To Email** del modello deve contenere indirizzi fissi, mai una variabile `{{…}}`: altrimenti il modulo potrebbe essere usato per mandare email ad altri indirizzi dalla casella aziendale. Per lo stesso motivo `{{email}}` va usata solo in **Reply To** (così rispondendo si scrive al dipendente) e mai in CC o BCC. Il modulo passa al modello le variabili `{{subject}}`, `{{dipendente}}`, `{{email}}`, `{{voci}}` (una voce per riga: nel modello va dentro un `<pre>`), `{{totale}}`, `{{note}}` e `{{inviata_il}}`.
+
+Nello stesso punto di `richieste.html` si possono cambiare i tipi di richiesta (`tipi`) e quelli proposti a ore (`tipiAOre`). Se uno dei tre codici è vuoto il modulo funziona in prova: mostra il riepilogo ma non invia nulla.
+
+**Allegato .ics (opzionale)** – Con `allegatoIcs: true` in `RICHIESTE_CONFIG` ogni email porta in allegato un file `.ics` con tutte le voci (variabile `{{ics}}`, creata da [`calendar.js`](calendar.js)). Richiede un piano EmailJS a pagamento: nel modello, scheda **Attachments**, allegato di tipo **Variable Attachment**, parametro `ics`, nome file `richiesta.ics`, tipo `text/calendar`. Con il piano gratuito resta disattivato e si usa il pulsante qui sotto.
+
+**Aggiungi al calendario** – La email contiene il pulsante **Aggiungi al calendario**, che apre [`calendario.html`](calendario.html) con le voci della richiesta. Per ogni voce: **Aggiungi a Outlook** apre Outlook sul web / nuovo Outlook con l'evento compilato (titolo "Tipo – Cognome Nome"), **Scarica .ics** crea il file per Outlook classico (evento segnato come Disponibile); con più voci **Scarica tutti (.ics)** crea un unico file. I dati viaggiano nel link dopo `#` (variabile `{{calendario}}`, codificata dal modulo); la pagina li controlla e li mostra solo come testo. Nel modello EmailJS l'indirizzo del pulsante è fisso:
+
+```html
+<p><a href="https://hub.siciet.it/calendario.html#{{calendario}}" style="display:inline-block;background:#005baa;color:#ffffff;text-decoration:none;font-weight:bold;padding:10px 18px;border-radius:8px">Aggiungi al calendario</a></p>
+```
+
+**Limiti** – Il modulo non verifica chi lo compila: chiunque abbia il link può inviare una richiesta con qualsiasi nome. Gli addetti devono quindi considerare l'email come una segnalazione da confermare con il dipendente. I giorni lavorativi indicati contano lunedì–venerdì e non tengono conto delle festività.
