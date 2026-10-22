@@ -437,7 +437,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     }
 
     if(platform === "desktop"){
-      showDesktopSheet(app);
+      onDesktopClick(app);
       return;
     }
 
@@ -468,17 +468,77 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     );
   }
 
+  /* Da PC: in sede si apre il programma desktop, altrimenti la versione web. */
+  function onDesktopClick(app){
+    if(!(app.desktop && app.desktop.scheme)){
+      openWebOrSheet(app);
+      return;
+    }
+    // Prima la versione web; in sede il pannello offre anche il programma.
+    if(app.desktop.preferWeb && app.web){
+      openWebOrSheet(app);
+      L.isOfficeNetwork().then(function(inOffice){
+        if(inOffice) showDesktopAppSheet(app);
+      });
+      return;
+    }
+    L.isOfficeNetwork().then(function(inOffice){
+      if(inOffice) openDesktopApp(app);
+      else openWebOrSheet(app);
+    });
+  }
+
+  function openDesktopApp(app){
+    var name = app.desktop.name || app.name;
+    L.launchDesktop(app);
+    var actions = [{ label: "Apri " + name, primary: true, href: app.desktop.scheme }];
+    if(app.web) actions.push({ label: "Apri versione web", href: app.web, newTab: true });
+    openSheet(
+      name,
+      "Stiamo aprendo " + name + " sul PC. Se non si apre, verifica che sia installato" +
+        (app.web ? " oppure usa la versione web." : "."),
+      actions
+    );
+  }
+
+  function showDesktopAppSheet(app){
+    var name = app.desktop.name || app.name;
+    openSheet(
+      name,
+      "Abbiamo aperto " + name + " nel browser. Se preferisci, puoi usare il programma installato sul PC.",
+      [
+        { label: "Apri " + name + " (app)", primary: true, href: app.desktop.scheme },
+        { label: "Riapri versione web", href: app.web, newTab: true }
+      ]
+    );
+  }
+
+  function openWebOrSheet(app){
+    // window.open può essere bloccato dal browser: in quel caso resta il pannello.
+    // (Con "noopener" window.open restituisce sempre null: si azzera opener a mano.)
+    if(app.web){
+      var w = window.open(app.web, "_blank");
+      if(w){ try{ w.opener = null; }catch(e){} return; }
+    }
+    showDesktopSheet(app);
+  }
+
   function showDesktopSheet(app){
     var actions = [];
     if(app.web) actions.push({ label: "Apri versione web", primary: true, href: app.web, newTab: true });
     if(app.ios) actions.push({ label: "App Store (iPhone / iPad)", href: app.ios.store, newTab: true });
     if(app.android) actions.push({ label: "Play Store (Android)", href: L.playStoreUrl(app.android.package), newTab: true });
-    openSheet(
-      app.name,
-      app.description + (app.web ? "" : " Apri questa pagina dallo smartphone per installare o aprire l'app."),
-      actions
-    );
+    var text = app.description;
+    if(app.desktop && app.desktop.scheme && !app.web){
+      text += " Da PC " + (app.desktop.name || app.name) + " si apre solo dalla rete aziendale; da smartphone puoi usare l'app.";
+    }else if(!app.web){
+      text += " Apri questa pagina dallo smartphone per installare o aprire l'app.";
+    }
+    openSheet(app.name, text, actions);
   }
+
+  // Da PC si verifica subito la rete, così al click la risposta è già pronta.
+  if(platform === "desktop") L.isOfficeNetwork();
 
   qEl.addEventListener("input", renderList);
   renderChips();
