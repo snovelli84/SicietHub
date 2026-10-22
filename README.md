@@ -72,3 +72,17 @@ Installazione (una volta, da amministratore):
 Uso: aprire un messaggio in Outlook → **App** (o i "…" della barra del messaggio) → **MailStore** → **Apri archivio MailStore**.
 
 Se si modifica `manifest.xml` aumentare `<Version>`, senza cambiare `<Id>`.
+
+## Richiesta ferie e permessi
+
+Il pulsante **Richiesta ferie e permessi** in cima al portale apre [`richieste.html`](richieste.html): un modulo con nome e cognome, tipo di richiesta, giorni (o orario per i permessi a ore) e note. All'invio la richiesta arriva via email agli addetti del personale. Non serve un account o un'email aziendale: nome e cognome restano memorizzati sul dispositivo per le richieste successive.
+
+**Invio delle email** – Il sito è statico, quindi per spedire le email si usa [Web3Forms](https://web3forms.com) (gratuito fino a 250 invii al mese):
+
+1. su web3forms.com inserire l'indirizzo a cui devono arrivare le richieste e premere **Create Access Key**: la chiave arriva via email a quell'indirizzo. Per farle arrivare a più addetti conviene usare un gruppo o una casella condivisa di Microsoft 365;
+2. copiare la chiave in `accessKey` all'inizio dello script di `richieste.html` (`RICHIESTE_CONFIG`). La chiave non è una password: può stare in una pagina pubblica, permette solo di mandare email a quell'indirizzo;
+3. nello stesso punto si possono cambiare i tipi di richiesta (`tipi`) e quelli proposti a ore (`tipiAOre`).
+
+Finché `accessKey` è vuota il modulo funziona in prova: mostra il riepilogo ma non invia nulla.
+
+**Limiti** – Il modulo non verifica chi lo compila: chiunque abbia il link può inviare una richiesta con qualsiasi nome. Gli addetti devono quindi considerare l'email come una segnalazione da confermare con il dipendente. I giorni lavorativi indicati contano lunedì–venerdì e non tengono conto delle festività.
