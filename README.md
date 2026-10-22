@@ -77,12 +77,14 @@ Se si modifica `manifest.xml` aumentare `<Version>`, senza cambiare `<Id>`.
 
 L'app **Ferie e permessi** (categoria Risorse umane, definita in `apps.js` come le altre) apre [`richieste.html`](richieste.html): un modulo con nome e cognome, una o più voci (Ferie, Permesso, Permesso L.104, Donazione sangue, Altro; ciascuna a giornate intere o a ore) e note. Con **+ Aggiungi un'altra voce** si chiedono più periodi o permessi diversi nella stessa richiesta (fino a 10): nell'email le voci sono in ordine di data, con il totale di giorni e ore. All'invio la richiesta arriva via email agli addetti del personale. Non serve un account o un'email aziendale: nome e cognome restano memorizzati sul dispositivo per le richieste successive.
 
-**Invio delle email** – Il sito è statico, quindi per spedire le email si usa [Web3Forms](https://web3forms.com) (gratuito fino a 250 invii al mese):
+**Invio delle email** – Il sito è statico, quindi le email le spedisce [EmailJS](https://www.emailjs.com) (gratuito fino a 200 invii al mese), collegato alla casella Microsoft 365 dedicata agli invii. Le credenziali della casella restano su EmailJS; nella pagina ci sono solo tre codici pubblici, in `RICHIESTE_CONFIG` all'inizio dello script di `richieste.html`:
 
-1. su web3forms.com inserire l'indirizzo a cui devono arrivare le richieste e premere **Create Access Key**: la chiave arriva via email a quell'indirizzo. Per farle arrivare a più addetti conviene usare un gruppo o una casella condivisa di Microsoft 365;
-2. copiare la chiave in `accessKey` all'inizio dello script di `richieste.html` (`RICHIESTE_CONFIG`). La chiave non è una password: può stare in una pagina pubblica, permette solo di mandare email a quell'indirizzo;
-3. nello stesso punto si possono cambiare i tipi di richiesta (`tipi`) e quelli proposti a ore (`tipiAOre`).
+- `serviceId` (`siciet_hub`): la casella collegata, in *Email Services*;
+- `templateId` (`richiesta_ferie`): il modello della email, in *Email Templates*;
+- `publicKey`: in *Account → General*.
 
-Finché `accessKey` è vuota il modulo funziona in prova: mostra il riepilogo ma non invia nulla.
+Destinatari, mittente, oggetto e testo si cambiano nel modello su EmailJS, senza toccare il sito. Il campo **To Email** del modello deve contenere indirizzi fissi, mai una variabile `{{…}}`: altrimenti il modulo potrebbe essere usato per mandare email ad altri indirizzi dalla casella aziendale. Il modulo passa al modello le variabili `{{subject}}`, `{{dipendente}}`, `{{voci}}` (una voce per riga: nel modello va dentro un `<pre>`), `{{totale}}`, `{{note}}` e `{{inviata_il}}`.
+
+Nello stesso punto di `richieste.html` si possono cambiare i tipi di richiesta (`tipi`) e quelli proposti a ore (`tipiAOre`). Se uno dei tre codici è vuoto il modulo funziona in prova: mostra il riepilogo ma non invia nulla.
 
 **Limiti** – Il modulo non verifica chi lo compila: chiunque abbia il link può inviare una richiesta con qualsiasi nome. Gli addetti devono quindi considerare l'email come una segnalazione da confermare con il dipendente. I giorni lavorativi indicati contano lunedì–venerdì e non tengono conto delle festività.

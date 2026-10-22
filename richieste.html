@@ -343,12 +343,18 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 /*
  * CONFIGURAZIONE
  * --------------
- * L'invio usa Web3Forms (https://web3forms.com): la chiave si crea gratis
- * indicando l'indirizzo a cui devono arrivare le richieste.
- * Finché accessKey è vuota il modulo funziona in prova e non invia nulla.
+ * L'invio usa EmailJS (https://www.emailjs.com), collegato alla casella
+ * aziendale da cui partono le email. Destinatari, oggetto e testo sono nel
+ * modello "richiesta_ferie" su EmailJS (vedi README).
+ * I tre codici sono pubblici (non sono password). Se uno manca, il modulo
+ * funziona in prova e non invia nulla.
  */
 var RICHIESTE_CONFIG = {
-  accessKey: "",
+  emailjs: {
+    serviceId: "siciet_hub",
+    templateId: "richiesta_ferie",
+    publicKey: "TGJiGEsjcOFoW3tB6"
+  },
   tipi: ["Ferie", "Permesso", "Permesso L.104", "Donazione sangue", "Altro"],
   // Tipi che di solito si chiedono a ore: selezionandoli si passa a "Alcune ore".
   tipiAOre: ["Permesso", "Permesso L.104"],
@@ -359,7 +365,9 @@ var RICHIESTE_CONFIG = {
   "use strict";
 
   var cfg = RICHIESTE_CONFIG;
-  var ENDPOINT = "https://api.web3forms.com/submit";
+  var ENDPOINT = "https://api.emailjs.com/api/v1.0/email/send";
+  var ejs = cfg.emailjs || {};
+  var configured = !!(ejs.serviceId && ejs.templateId && ejs.publicKey);
   var NAME_KEY = "siciet-richieste-nome";
 
   var $ = function(id){ return document.getElementById(id); };
@@ -556,7 +564,7 @@ var RICHIESTE_CONFIG = {
 
   /* ---------- Invio ---------- */
 
-  if(!cfg.accessKey) $("notConfigured").hidden = false;
+  if(!configured) $("notConfigured").hidden = false;
   watchFields($("nome").closest("fieldset"));
   watchFields($("note").closest("fieldset"));
 
@@ -600,30 +608,27 @@ var RICHIESTE_CONFIG = {
       ? "Richiesta " + voci[0].tipo + " – " + dipendente + " – " + voci[0].breve
       : "Richiesta " + unique(voci.map(function(v){ return v.tipo; })).join(", ") + " – " + dipendente + " – " + voci.length + " voci";
 
-    // I nomi dei campi diventano le etichette nella email.
-    var data = {
-      access_key: cfg.accessKey,
-      subject: subject,
-      from_name: "SICIET HUB",
-      "Dipendente": dipendente
-    };
-    var righe = [];
-    voci.forEach(function(v, i){
-      var key = voci.length === 1 ? "Richiesta" : "Voce " + (i + 1);
-      data[key] = v.tipo + ": " + v.testo + " · " + v.quantita;
-      righe.push([key, data[key]]);
+    var righe = voci.map(function(v, i){
+      return [voci.length === 1 ? "Richiesta" : "Voce " + (i + 1), v.tipo + ": " + v.testo + " · " + v.quantita];
     });
-    if(voci.length > 1) data["Totale"] = totale;
-    data["Note"] = note || "—";
-    data["Inviata il"] = fmt(inviata) + " alle " + String(inviata.getHours()).padStart(2, "0") + ":" + String(inviata.getMinutes()).padStart(2, "0");
+
+    // Variabili del modello EmailJS: {{subject}}, {{dipendente}}, {{voci}}…
+    var params = {
+      subject: subject,
+      dipendente: dipendente,
+      voci: righe.map(function(r){ return voci.length === 1 ? r[1] : r[0] + " – " + r[1]; }).join("\n"),
+      totale: totale,
+      note: note || "—",
+      inviata_il: fmt(inviata) + " alle " + String(inviata.getHours()).padStart(2, "0") + ":" + String(inviata.getMinutes()).padStart(2, "0")
+    };
 
     var recap = [["Dipendente", dipendente]].concat(righe);
     if(voci.length > 1) recap.push(["Totale", totale]);
-    recap.push(["Note", data["Note"]]);
+    recap.push(["Note", params.note]);
 
     try{ localStorage.setItem(NAME_KEY, JSON.stringify({ nome: nome, cognome: cognome })); }catch(err){}
 
-    if(!cfg.accessKey){
+    if(!configured){
       showDone(recap, true);
       return;
     }
@@ -634,16 +639,22 @@ var RICHIESTE_CONFIG = {
 
     fetch(ENDPOINT, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "application/json" },
-      body: JSON.stringify(data)
-    })
-      .then(function(r){ return r.json().catch(function(){ return { success: false }; }); })
-      .then(function(res){
-        if(!res.success) throw new Error(res.message || "invio non riuscito");
-        showDone(recap, false);
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        service_id: ejs.serviceId,
+        template_id: ejs.templateId,
+        user_id: ejs.publicKey,
+        template_params: params
       })
-      .catch(function(){
-        fail("La richiesta non è partita. Controlla la connessione e riprova; se il problema continua avvisa direttamente l'ufficio del personale.");
+    })
+      .then(function(r){
+        if(r.ok) return showDone(recap, false);
+        return r.text().then(function(t){ throw new Error("EmailJS " + r.status + ": " + t); });
+      })
+      .catch(function(err){
+        // Il dettaglio tecnico aiuta chi gestisce il portale a capire il problema.
+        var detail = err && err.message && err.message.indexOf("EmailJS") === 0 ? " (" + err.message + ")" : "";
+        fail("La richiesta non è partita. Controlla la connessione e riprova; se il problema continua avvisa direttamente l'ufficio del personale." + detail);
       })
       .then(function(){
         btn.disabled = false;
