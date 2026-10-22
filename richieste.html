@@ -353,7 +353,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
  * modello "richiesta_ferie" su EmailJS (vedi README).
  * Variabili passate al modello: subject, dipendente, email, voci, totale,
  * note, inviata_il, calendario (dati per il pulsante "Aggiungi al calendario"),
- * ics (allegato .ics con le voci, come data URL base64).
+ * ics (allegato .ics con le voci, solo se allegatoIcs è true).
  * I tre codici sono pubblici (non sono password). Se uno manca, il modulo
  * funziona in prova e non invia nulla.
  */
@@ -366,7 +366,11 @@ var RICHIESTE_CONFIG = {
   tipi: ["Ferie", "Permesso", "Permesso L.104", "Donazione sangue", "Altro"],
   // Tipi che di solito si chiedono a ore: selezionandoli si passa a "Alcune ore".
   tipiAOre: ["Permesso", "Permesso L.104"],
-  maxVoci: 10
+  maxVoci: 10,
+  // Allegato .ics nella email: richiede un piano EmailJS a pagamento
+  // (allegato variabile "ics" nel modello). Con false si usa solo il
+  // pulsante "Aggiungi al calendario".
+  allegatoIcs: false
 };
 
 (function(){
@@ -652,10 +656,6 @@ var RICHIESTE_CONFIG = {
       totale: totale,
       note: note || "—",
       inviata_il: fmt(inviata) + " alle " + String(inviata.getHours()).padStart(2, "0") + ":" + String(inviata.getMinutes()).padStart(2, "0"),
-      // Allegato .ics con tutte le voci (allegato "variabile" nel modello EmailJS).
-      ics: "data:text/calendar;base64," + SicietCalendar.base64(
-        SicietCalendar.ics(calendarEvents(voci), dipendente, email, note)
-      ),
       // Dati per calendario.html: nel modello il link è
       // https://hub.siciet.it/calendario.html#{{calendario}}
       calendario: encodeCalendar({
@@ -670,6 +670,13 @@ var RICHIESTE_CONFIG = {
         })
       })
     };
+
+    // Allegato .ics con tutte le voci (allegato "variabile" nel modello EmailJS).
+    if(cfg.allegatoIcs){
+      params.ics = "data:text/calendar;base64," + SicietCalendar.base64(
+        SicietCalendar.ics(calendarEvents(voci), dipendente, email, note)
+      );
+    }
 
     var recap = [["Dipendente", dipendente], ["Email", email]].concat(righe);
     if(voci.length > 1) recap.push(["Totale", totale]);

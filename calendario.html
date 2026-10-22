@@ -92,6 +92,7 @@ dd{min-width:0;overflow-wrap:anywhere}
 .event-when{font-variant-numeric:tabular-nums;color:var(--muted);font-size:15px}
 .event-actions{display:flex;flex-wrap:wrap;gap:8px}
 .events-list{display:grid;gap:12px}
+.btn.all{justify-self:start}
 
 .btn{
   display:inline-block;
@@ -141,9 +142,10 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     <h2 id="eventsTitle">Eventi da aggiungere</h2>
     <p class="muted">Usa questi pulsanti dopo aver approvato la richiesta.</p>
     <div class="events-list" id="list"></div>
+    <button class="btn all" type="button" id="all" hidden>Scarica tutti (.ics)</button>
     <ul class="tips">
       <li><b>Aggiungi a Outlook</b> apre Outlook sul web (o il nuovo Outlook) con l'evento già compilato: scegli il calendario e premi <b>Salva</b>.</li>
-      <li><b>Scarica .ics</b> è per Outlook classico: apri il file scaricato e premi <b>Salva e chiudi</b>.</li>
+      <li><b>Scarica .ics</b> è per Outlook classico: apri il file scaricato e premi <b>Salva e chiudi</b>. Con <b>Scarica tutti</b> un solo file contiene tutti gli eventi: Outlook propone di importarli.</li>
       <li>Con il file .ics l'evento è segnato come <b>Disponibile</b>, per non occupare la tua agenda. Con Outlook sul web, se serve, imposta "Mostra come: Disponibile" prima di salvare.</li>
     </ul>
   </section>
@@ -285,6 +287,13 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     box.appendChild(actions);
     $("list").appendChild(box);
   });
+  if(req.x.length > 1){
+    $("all").hidden = false;
+    $("all").addEventListener("click", function(){
+      var name = ("Richiesta " + req.n + " " + C.isoDay(req.x[0].a)).replace(/[^\w\- àèéìòù]+/gi, "").replace(/\s+/g, "_") + ".ics";
+      download(name, C.ics(req.x, req.n, req.e, req.no));
+    });
+  }
   $("events").hidden = false;
 })();
 </script>
