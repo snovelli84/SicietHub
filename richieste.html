@@ -88,7 +88,7 @@ legend,.label{font-weight:600;font-size:15px;margin-bottom:2px}
 .field{display:grid;gap:6px;min-width:0}
 .field label{font-size:14px;color:var(--muted)}
 
-input[type=text],input[type=date],input[type=time],textarea{
+input[type=text],input[type=email],input[type=date],input[type=time],textarea{
   width:100%;
   font:inherit;
   font-size:16px; /* 16px evita lo zoom automatico su iOS */
@@ -246,6 +246,10 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
             <input type="text" id="cognome" name="cognome" autocomplete="family-name" required>
           </div>
         </div>
+        <div class="field">
+          <label for="email">Email <span class="hint">(anche personale: gli addetti potranno risponderti qui)</span></label>
+          <input type="email" id="email" name="email" autocomplete="email" inputmode="email" required>
+        </div>
       </fieldset>
 
       <div class="entries" id="entries"></div>
@@ -346,6 +350,8 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
  * L'invio usa EmailJS (https://www.emailjs.com), collegato alla casella
  * aziendale da cui partono le email. Destinatari, oggetto e testo sono nel
  * modello "richiesta_ferie" su EmailJS (vedi README).
+ * Variabili passate al modello: subject, dipendente, email, voci, totale,
+ * note, inviata_il.
  * I tre codici sono pubblici (non sono password). Se uno manca, il modulo
  * funziona in prova e non invia nulla.
  */
@@ -559,7 +565,11 @@ var RICHIESTE_CONFIG = {
 
   try{
     var saved = JSON.parse(localStorage.getItem(NAME_KEY) || "null");
-    if(saved){ $("nome").value = saved.nome || ""; $("cognome").value = saved.cognome || ""; }
+    if(saved){
+      $("nome").value = saved.nome || "";
+      $("cognome").value = saved.cognome || "";
+      $("email").value = saved.email || "";
+    }
   }catch(e){}
 
   /* ---------- Invio ---------- */
@@ -580,6 +590,10 @@ var RICHIESTE_CONFIG = {
     if(!nome) missing.push($("nome"));
     if(!cognome) missing.push($("cognome"));
     if(missing.length) return fail("Scrivi nome e cognome.", missing);
+
+    var email = $("email").value.trim();
+    if(!email) return fail("Scrivi il tuo indirizzo email.", [$("email")]);
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return fail("L'indirizzo email non sembra corretto: controlla di averlo scritto per intero (es. nome@esempio.it).", [$("email")]);
 
     var voci = [];
     for(var i = 0; i < entries.length; i++){
@@ -616,17 +630,18 @@ var RICHIESTE_CONFIG = {
     var params = {
       subject: subject,
       dipendente: dipendente,
+      email: email,
       voci: righe.map(function(r){ return voci.length === 1 ? r[1] : r[0] + " – " + r[1]; }).join("\n"),
       totale: totale,
       note: note || "—",
       inviata_il: fmt(inviata) + " alle " + String(inviata.getHours()).padStart(2, "0") + ":" + String(inviata.getMinutes()).padStart(2, "0")
     };
 
-    var recap = [["Dipendente", dipendente]].concat(righe);
+    var recap = [["Dipendente", dipendente], ["Email", email]].concat(righe);
     if(voci.length > 1) recap.push(["Totale", totale]);
     recap.push(["Note", params.note]);
 
-    try{ localStorage.setItem(NAME_KEY, JSON.stringify({ nome: nome, cognome: cognome })); }catch(err){}
+    try{ localStorage.setItem(NAME_KEY, JSON.stringify({ nome: nome, cognome: cognome, email: email })); }catch(err){}
 
     if(!configured){
       showDone(recap, true);
