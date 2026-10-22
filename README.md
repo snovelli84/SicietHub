@@ -89,6 +89,8 @@ Destinatari, mittente, oggetto e testo si cambiano nel modello su EmailJS, senza
 
 Nello stesso punto di `richieste.html` si possono cambiare i tipi di richiesta (`tipi`) e quelli proposti a ore (`tipiAOre`). Se uno dei tre codici è vuoto il modulo funziona in prova: mostra il riepilogo ma non invia nulla.
 
+**Allegato .ics** – Ogni email ha in allegato un file `.ics` con tutte le voci della richiesta (variabile `{{ics}}`, creata da [`calendar.js`](calendar.js)): in Outlook classico, una volta approvata la richiesta, basta aprire l'allegato e premere **Salva e chiudi** (con più voci Outlook propone di importarle). Gli eventi sono segnati come Disponibile. Nel modello EmailJS, scheda **Attachments**: allegato di tipo **Variable Attachment**, parametro `ics`, nome file `richiesta.ics`, tipo `text/calendar`.
+
 **Aggiungi al calendario** – La email contiene il pulsante **Aggiungi al calendario**, che apre [`calendario.html`](calendario.html) con le voci della richiesta. Per ogni voce: **Aggiungi a Outlook** apre Outlook sul web / nuovo Outlook con l'evento compilato (titolo "Tipo – Cognome Nome"), **Scarica .ics** crea il file per Outlook classico (evento segnato come Disponibile). I dati viaggiano nel link dopo `#` (variabile `{{calendario}}`, codificata dal modulo); la pagina li controlla e li mostra solo come testo. Nel modello EmailJS l'indirizzo del pulsante è fisso:
 
 ```html

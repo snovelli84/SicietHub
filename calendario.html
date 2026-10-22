@@ -151,12 +151,12 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 
 <footer>SICIET HUB</footer>
 
+<script src="calendar.js"></script>
 <script>
 (function(){
   "use strict";
 
   var $ = function(id){ return document.getElementById(id); };
-  var OUTLOOK = "https://outlook.office.com/calendar/0/deeplink/compose";
 
   /* ---------- Lettura e controllo dei dati ---------- */
 
@@ -218,67 +218,14 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   function pad(n){ return String(n).padStart(2, "0"); }
   function fmtDay(d){ return WEEKDAYS[d.getDay()] + " " + pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear(); }
   function fmtTime(d){ return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
-  function isoDay(d){ return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
-  function nextDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1); }
-  // Ora in UTC, così Outlook la colloca correttamente qualunque sia il fuso.
-  function utc(d){ return d.toISOString().replace(/\.\d{3}Z$/, "Z"); }
 
   function when(ev){
     if(!ev.allDay) return fmtDay(ev.a) + ", dalle " + fmtTime(ev.a) + " alle " + fmtTime(ev.b);
     return +ev.a === +ev.b ? fmtDay(ev.a) + " (giornata intera)" : "dal " + fmtDay(ev.a) + " al " + fmtDay(ev.b);
   }
-  function title(ev, req){ return ev.t + " – " + req.n; }
-  function body(req){
-    return "Richiesta di " + req.n + (req.e ? " (" + req.e + ")" : "") + " inviata da SICIET HUB." +
-      (req.no ? "\nNote: " + req.no : "");
-  }
 
-  /* Link a Outlook sul web con l'evento compilato (fine esclusiva per le giornate intere). */
-  function outlookUrl(ev, req){
-    var q = {
-      path: "/calendar/action/compose",
-      rru: "addevent",
-      subject: title(ev, req),
-      body: body(req)
-    };
-    if(ev.allDay){
-      q.allday = "true";
-      q.startdt = isoDay(ev.a);
-      q.enddt = isoDay(nextDay(ev.b));
-    }else{
-      q.startdt = utc(ev.a);
-      q.enddt = utc(ev.b);
-    }
-    return OUTLOOK + "?" + Object.keys(q).map(function(k){
-      return k + "=" + encodeURIComponent(q[k]);
-    }).join("&");
-  }
-
-  /* File .ics (iCalendar) di un evento, per Outlook classico. */
-  function icsEscape(s){ return s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n"); }
-  function icsDate(d){ return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()); }
-  function icsUtc(d){ return utc(d).replace(/[-:]/g, ""); }
-  function ics(ev, req, i){
-    var lines = [
-      "BEGIN:VCALENDAR",
-      "VERSION:2.0",
-      "PRODID:-//SICIET//SICIET HUB//IT",
-      "METHOD:PUBLISH",
-      "BEGIN:VEVENT",
-      "UID:" + Date.now() + "-" + i + "@hub.siciet.it",
-      "DTSTAMP:" + icsUtc(new Date()),
-      ev.allDay ? "DTSTART;VALUE=DATE:" + icsDate(ev.a) : "DTSTART:" + icsUtc(ev.a),
-      ev.allDay ? "DTEND;VALUE=DATE:" + icsDate(nextDay(ev.b)) : "DTEND:" + icsUtc(ev.b),
-      "SUMMARY:" + icsEscape(title(ev, req)),
-      "DESCRIPTION:" + icsEscape(body(req)),
-      "TRANSP:TRANSPARENT",
-      "X-MICROSOFT-CDO-BUSYSTATUS:FREE",
-      "X-MICROSOFT-CDO-ALLDAYEVENT:" + (ev.allDay ? "TRUE" : "FALSE"),
-      "END:VEVENT",
-      "END:VCALENDAR"
-    ];
-    return lines.join("\r\n") + "\r\n";
-  }
+  var C = window.SicietCalendar;
+  function title(ev, req){ return C.title(ev, req.n); }
 
   function download(name, content){
     var url = URL.createObjectURL(new Blob([content], { type: "text/calendar;charset=utf-8" }));
@@ -291,7 +238,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
   }
   function fileName(ev, req){
-    return (ev.t + " " + req.n + " " + isoDay(ev.a)).replace(/[^\w\- àèéìòù]+/gi, "").replace(/\s+/g, "_") + ".ics";
+    return (ev.t + " " + req.n + " " + C.isoDay(ev.a)).replace(/[^\w\- àèéìòù]+/gi, "").replace(/\s+/g, "_") + ".ics";
   }
 
   /* ---------- Pagina ---------- */
@@ -324,14 +271,14 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     var actions = el("div", "event-actions");
 
     var web = el("a", "btn primary", "Aggiungi a Outlook");
-    web.href = outlookUrl(ev, req);
+    web.href = C.outlookUrl(ev, req.n, req.e, req.no);
     web.target = "_blank";
     web.rel = "noopener";
     web.addEventListener("click", function(){ web.classList.remove("primary"); web.classList.add("added"); web.textContent = "Aperto in Outlook ✓"; });
 
     var file = el("button", "btn", "Scarica .ics");
     file.type = "button";
-    file.addEventListener("click", function(){ download(fileName(ev, req), ics(ev, req, i)); });
+    file.addEventListener("click", function(){ download(fileName(ev, req), C.ics([ev], req.n, req.e, req.no)); });
 
     actions.appendChild(web);
     actions.appendChild(file);
