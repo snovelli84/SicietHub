@@ -89,4 +89,10 @@ Destinatari, mittente, oggetto e testo si cambiano nel modello su EmailJS, senza
 
 Nello stesso punto di `richieste.html` si possono cambiare i tipi di richiesta (`tipi`) e quelli proposti a ore (`tipiAOre`). Se uno dei tre codici è vuoto il modulo funziona in prova: mostra il riepilogo ma non invia nulla.
 
+**Aggiungi al calendario** – La email contiene il pulsante **Aggiungi al calendario**, che apre [`calendario.html`](calendario.html) con le voci della richiesta. Per ogni voce: **Aggiungi a Outlook** apre Outlook sul web / nuovo Outlook con l'evento compilato (titolo "Tipo – Cognome Nome"), **Scarica .ics** crea il file per Outlook classico (evento segnato come Disponibile). I dati viaggiano nel link dopo `#` (variabile `{{calendario}}`, codificata dal modulo); la pagina li controlla e li mostra solo come testo. Nel modello EmailJS l'indirizzo del pulsante è fisso:
+
+```html
+<p><a href="https://hub.siciet.it/calendario.html#{{calendario}}" style="display:inline-block;background:#005baa;color:#ffffff;text-decoration:none;font-weight:bold;padding:10px 18px;border-radius:8px">Aggiungi al calendario</a></p>
+```
+
 **Limiti** – Il modulo non verifica chi lo compila: chiunque abbia il link può inviare una richiesta con qualsiasi nome. Gli addetti devono quindi considerare l'email come una segnalazione da confermare con il dipendente. I giorni lavorativi indicati contano lunedì–venerdì e non tengono conto delle festività.

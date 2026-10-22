@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aggiungi al calendario – SICIET HUB</title>
+<meta name="theme-color" content="#005baa">
+<meta name="robots" content="noindex">
+<link rel="icon" href="icons/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<!--
+  Pagina aperta dal pulsante "Aggiungi al calendario" nella email di una
+  richiesta ferie/permessi. I dati arrivano nel link (dopo "#", creati da
+  richieste.html) e vengono controllati prima di essere mostrati: il link può
+  essere stato modificato da chiunque.
+-->
+<style>
+:root{
+  --brand:#005baa;
+  --bg:#f4f6f9;
+  --card:#ffffff;
+  --text:#1d2430;
+  --muted:#5d6878;
+  --border:#e3e7ee;
+  --chip:#e8eef6;
+  --shadow:0 2px 10px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#11161d;
+    --card:#1a212b;
+    --text:#e8edf3;
+    --muted:#9aa6b5;
+    --border:#2a3340;
+    --chip:#232c38;
+    --shadow:0 2px 10px rgba(0,0,0,.4);
+  }
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  line-height:1.45;
+}
+
+header{
+  background:var(--brand);
+  color:#fff;
+  padding:calc(16px + env(safe-area-inset-top)) 16px 48px;
+}
+.header-inner{max-width:720px;margin:0 auto}
+.back{color:#fff;text-decoration:none;font-size:15px;opacity:.9;display:inline-block;padding:4px 0}
+.back:hover{opacity:1;text-decoration:underline}
+header h1{font-size:24px;margin-top:10px;text-wrap:balance}
+header p{opacity:.9;margin-top:4px;font-size:15px}
+
+main{
+  max-width:720px;
+  margin:-32px auto 0;
+  padding:0 16px calc(24px + env(safe-area-inset-bottom));
+  display:grid;
+  gap:16px;
+}
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:18px;
+  box-shadow:var(--shadow);
+  padding:20px 16px;
+  display:grid;
+  gap:12px;
+}
+h2{font-size:17px}
+.muted{color:var(--muted);font-size:14px}
+
+dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;font-size:15px}
+dt{color:var(--muted)}
+dd{min-width:0;overflow-wrap:anywhere}
+
+.event{
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:14px;
+  display:grid;
+  gap:10px;
+}
+.event-title{font-weight:700;font-size:16px}
+.event-when{font-variant-numeric:tabular-nums;color:var(--muted);font-size:15px}
+.event-actions{display:flex;flex-wrap:wrap;gap:8px}
+.events-list{display:grid;gap:12px}
+
+.btn{
+  display:inline-block;
+  text-align:center;
+  text-decoration:none;
+  border:0;
+  border-radius:12px;
+  padding:12px 16px;
+  font:inherit;
+  font-size:15px;
+  font-weight:600;
+  cursor:pointer;
+  background:var(--chip);
+  color:var(--text);
+}
+.btn.primary{background:var(--brand);color:#fff}
+.btn:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+.btn.added{background:transparent;border:2px solid var(--border);color:var(--muted)}
+
+.tips{font-size:14px;color:var(--muted);display:grid;gap:6px;padding-left:18px}
+
+footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="header-inner">
+    <a class="back" href="./">‹ SICIET HUB</a>
+    <h1>Aggiungi al calendario</h1>
+    <p>Richiesta ferie e permessi</p>
+  </div>
+</header>
+
+<main>
+  <section class="card" id="invalid" hidden>
+    <h2>Link non valido</h2>
+    <p class="muted">Il link è incompleto o è stato modificato. Aprilo di nuovo dal pulsante "Aggiungi al calendario" nella email della richiesta.</p>
+  </section>
+
+  <section class="card" id="request" hidden>
+    <dl id="who"></dl>
+  </section>
+
+  <section class="card" id="events" hidden>
+    <h2 id="eventsTitle">Eventi da aggiungere</h2>
+    <p class="muted">Usa questi pulsanti dopo aver approvato la richiesta.</p>
+    <div class="events-list" id="list"></div>
+    <ul class="tips">
+      <li><b>Aggiungi a Outlook</b> apre Outlook sul web (o il nuovo Outlook) con l'evento già compilato: scegli il calendario e premi <b>Salva</b>.</li>
+      <li><b>Scarica .ics</b> è per Outlook classico: apri il file scaricato e premi <b>Salva e chiudi</b>.</li>
+      <li>Con il file .ics l'evento è segnato come <b>Disponibile</b>, per non occupare la tua agenda. Con Outlook sul web, se serve, imposta "Mostra come: Disponibile" prima di salvare.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>SICIET HUB</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  var $ = function(id){ return document.getElementById(id); };
+  var OUTLOOK = "https://outlook.office.com/calendar/0/deeplink/compose";
+
+  /* ---------- Lettura e controllo dei dati ---------- */
+
+  function decode(hash){
+    try{
+      var b64 = hash.replace(/-/g, "+").replace(/_/g, "/");
+      while(b64.length % 4) b64 += "=";
+      var bin = atob(b64);
+      var bytes = new Uint8Array(bin.length);
+      for(var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return JSON.parse(new TextDecoder().decode(bytes));
+    }catch(e){
+      return null;
+    }
+  }
+
+  function text(v, max){
+    return typeof v === "string" && v.length <= max ? v.replace(/[\u0000-\u001f]/g, " ").trim() : null;
+  }
+  function date(v){
+    var m = typeof v === "string" && /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+    if(!m) return null;
+    var d = new Date(+m[1], +m[2] - 1, +m[3]);
+    return d.getMonth() === +m[2] - 1 ? d : null;
+  }
+  function time(v){
+    var m = typeof v === "string" && /^([01]\d|2[0-3]):([0-5]\d)$/.exec(v);
+    return m ? +m[1] * 60 + +m[2] : null;
+  }
+
+  /* Restituisce la richiesta controllata, o null se qualcosa non torna. */
+  function validate(d){
+    if(!d || d.v !== 1 || !Array.isArray(d.x) || !d.x.length || d.x.length > 10) return null;
+    var r = { n: text(d.n, 120), e: text(d.e || "", 200), no: text(d.no || "", 1000), x: [] };
+    if(!r.n || r.e === null || r.no === null) return null;
+    for(var i = 0; i < d.x.length; i++){
+      var x = d.x[i] || {}, t = text(x.t, 60);
+      if(!t) return null;
+      if(x.a != null){
+        var a = date(x.a), b = date(x.b);
+        if(!a || !b || b < a) return null;
+        r.x.push({ t: t, allDay: true, a: a, b: b });
+      }else{
+        var g = date(x.g), da = time(x.da), aa = time(x.aa);
+        if(!g || da == null || aa == null || aa <= da) return null;
+        r.x.push({
+          t: t, allDay: false,
+          a: new Date(g.getFullYear(), g.getMonth(), g.getDate(), 0, da),
+          b: new Date(g.getFullYear(), g.getMonth(), g.getDate(), 0, aa)
+        });
+      }
+    }
+    return r;
+  }
+
+  /* ---------- Formati ---------- */
+
+  var WEEKDAYS = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
+  function pad(n){ return String(n).padStart(2, "0"); }
+  function fmtDay(d){ return WEEKDAYS[d.getDay()] + " " + pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear(); }
+  function fmtTime(d){ return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
+  function isoDay(d){ return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function nextDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1); }
+  // Ora in UTC, così Outlook la colloca correttamente qualunque sia il fuso.
+  function utc(d){ return d.toISOString().replace(/\.\d{3}Z$/, "Z"); }
+
+  function when(ev){
+    if(!ev.allDay) return fmtDay(ev.a) + ", dalle " + fmtTime(ev.a) + " alle " + fmtTime(ev.b);
+    return +ev.a === +ev.b ? fmtDay(ev.a) + " (giornata intera)" : "dal " + fmtDay(ev.a) + " al " + fmtDay(ev.b);
+  }
+  function title(ev, req){ return ev.t + " – " + req.n; }
+  function body(req){
+    return "Richiesta di " + req.n + (req.e ? " (" + req.e + ")" : "") + " inviata da SICIET HUB." +
+      (req.no ? "\nNote: " + req.no : "");
+  }
+
+  /* Link a Outlook sul web con l'evento compilato (fine esclusiva per le giornate intere). */
+  function outlookUrl(ev, req){
+    var q = {
+      path: "/calendar/action/compose",
+      rru: "addevent",
+      subject: title(ev, req),
+      body: body(req)
+    };
+    if(ev.allDay){
+      q.allday = "true";
+      q.startdt = isoDay(ev.a);
+      q.enddt = isoDay(nextDay(ev.b));
+    }else{
+      q.startdt = utc(ev.a);
+      q.enddt = utc(ev.b);
+    }
+    return OUTLOOK + "?" + Object.keys(q).map(function(k){
+      return k + "=" + encodeURIComponent(q[k]);
+    }).join("&");
+  }
+
+  /* File .ics (iCalendar) di un evento, per Outlook classico. */
+  function icsEscape(s){ return s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n"); }
+  function icsDate(d){ return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()); }
+  function icsUtc(d){ return utc(d).replace(/[-:]/g, ""); }
+  function ics(ev, req, i){
+    var lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//SICIET//SICIET HUB//IT",
+      "METHOD:PUBLISH",
+      "BEGIN:VEVENT",
+      "UID:" + Date.now() + "-" + i + "@hub.siciet.it",
+      "DTSTAMP:" + icsUtc(new Date()),
+      ev.allDay ? "DTSTART;VALUE=DATE:" + icsDate(ev.a) : "DTSTART:" + icsUtc(ev.a),
+      ev.allDay ? "DTEND;VALUE=DATE:" + icsDate(nextDay(ev.b)) : "DTEND:" + icsUtc(ev.b),
+      "SUMMARY:" + icsEscape(title(ev, req)),
+      "DESCRIPTION:" + icsEscape(body(req)),
+      "TRANSP:TRANSPARENT",
+      "X-MICROSOFT-CDO-BUSYSTATUS:FREE",
+      "X-MICROSOFT-CDO-ALLDAYEVENT:" + (ev.allDay ? "TRUE" : "FALSE"),
+      "END:VEVENT",
+      "END:VCALENDAR"
+    ];
+    return lines.join("\r\n") + "\r\n";
+  }
+
+  function download(name, content){
+    var url = URL.createObjectURL(new Blob([content], { type: "text/calendar;charset=utf-8" }));
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  }
+  function fileName(ev, req){
+    return (ev.t + " " + req.n + " " + isoDay(ev.a)).replace(/[^\w\- àèéìòù]+/gi, "").replace(/\s+/g, "_") + ".ics";
+  }
+
+  /* ---------- Pagina ---------- */
+
+  function el(tag, cls, txt){
+    var e = document.createElement(tag);
+    if(cls) e.className = cls;
+    if(txt != null) e.textContent = txt;
+    return e;
+  }
+
+  var req = validate(decode(location.hash.slice(1)));
+  if(!req){
+    $("invalid").hidden = false;
+    return;
+  }
+
+  [["Dipendente", req.n], ["Email", req.e], ["Note", req.no]].forEach(function(r){
+    if(!r[1]) return;
+    $("who").appendChild(el("dt", null, r[0]));
+    $("who").appendChild(el("dd", null, r[1]));
+  });
+  $("request").hidden = false;
+
+  $("eventsTitle").textContent = req.x.length === 1 ? "Evento da aggiungere" : req.x.length + " eventi da aggiungere";
+  req.x.forEach(function(ev, i){
+    var box = el("div", "event");
+    box.appendChild(el("div", "event-title", title(ev, req)));
+    box.appendChild(el("div", "event-when", when(ev)));
+    var actions = el("div", "event-actions");
+
+    var web = el("a", "btn primary", "Aggiungi a Outlook");
+    web.href = outlookUrl(ev, req);
+    web.target = "_blank";
+    web.rel = "noopener";
+    web.addEventListener("click", function(){ web.classList.remove("primary"); web.classList.add("added"); web.textContent = "Aperto in Outlook ✓"; });
+
+    var file = el("button", "btn", "Scarica .ics");
+    file.type = "button";
+    file.addEventListener("click", function(){ download(fileName(ev, req), ics(ev, req, i)); });
+
+    actions.appendChild(web);
+    actions.appendChild(file);
+    box.appendChild(actions);
+    $("list").appendChild(box);
+  });
+  $("events").hidden = false;
+})();
+</script>
+</body>
+</html>

@@ -351,7 +351,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
  * aziendale da cui partono le email. Destinatari, oggetto e testo sono nel
  * modello "richiesta_ferie" su EmailJS (vedi README).
  * Variabili passate al modello: subject, dipendente, email, voci, totale,
- * note, inviata_il.
+ * note, inviata_il, calendario (dati per il pulsante "Aggiungi al calendario").
  * I tre codici sono pubblici (non sono password). Se uno manca, il modulo
  * funziona in prova e non invia nulla.
  */
@@ -505,6 +505,7 @@ var RICHIESTE_CONFIG = {
       var wd = workingDays(a, b);
       return {
         inizio: a,
+        cal: { a: f.dal.value, b: f.al.value },
         giorni: wd,
         minuti: 0,
         testo: +a === +b ? fmt(a) : "dal " + fmt(a) + " al " + fmt(b),
@@ -521,6 +522,7 @@ var RICHIESTE_CONFIG = {
     if(aa <= da) return { error: "l'orario di fine deve essere dopo quello di inizio.", fields: [f.oraA] };
     return {
       inizio: new Date(g.getTime() + da * 60000),
+      cal: { g: f.giorno.value, da: f.oraDa.value, aa: f.oraA.value },
       giorni: 0,
       minuti: aa - da,
       testo: fmt(g) + ", dalle " + f.oraDa.value + " alle " + f.oraA.value,
@@ -579,6 +581,14 @@ var RICHIESTE_CONFIG = {
   watchFields($("note").closest("fieldset"));
 
   function clean(s){ return s.trim().replace(/\s+/g, " "); }
+
+  // JSON -> base64url (UTF-8): solo lettere, cifre, "-" e "_", sicuro in un link.
+  function encodeCalendar(obj){
+    var bytes = new TextEncoder().encode(JSON.stringify(obj));
+    var bin = "";
+    bytes.forEach(function(b){ bin += String.fromCharCode(b); });
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
   function unique(list){ return list.filter(function(x, i){ return list.indexOf(x) === i; }); }
 
   form.addEventListener("submit", function(e){
@@ -634,7 +644,20 @@ var RICHIESTE_CONFIG = {
       voci: righe.map(function(r){ return voci.length === 1 ? r[1] : r[0] + " – " + r[1]; }).join("\n"),
       totale: totale,
       note: note || "—",
-      inviata_il: fmt(inviata) + " alle " + String(inviata.getHours()).padStart(2, "0") + ":" + String(inviata.getMinutes()).padStart(2, "0")
+      inviata_il: fmt(inviata) + " alle " + String(inviata.getHours()).padStart(2, "0") + ":" + String(inviata.getMinutes()).padStart(2, "0"),
+      // Dati per calendario.html: nel modello il link è
+      // https://hub.siciet.it/calendario.html#{{calendario}}
+      calendario: encodeCalendar({
+        v: 1,
+        n: dipendente,
+        e: email,
+        no: note,
+        x: voci.map(function(v){
+          var c = { t: v.tipo };
+          Object.keys(v.cal).forEach(function(k){ c[k] = v.cal[k]; });
+          return c;
+        })
+      })
     };
 
     var recap = [["Dipendente", dipendente], ["Email", email]].concat(righe);
