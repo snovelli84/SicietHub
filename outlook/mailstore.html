@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MailStore SICIET</title>
+<!-- Pannello del componente aggiuntivo di Outlook (vedi manifest.xml) -->
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<style>
+:root{
+  --brand:#005baa;
+  --brand-dark:#00457f;
+  --bg:#ffffff;
+  --text:#1d2430;
+  --muted:#5d6878;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#1a212b;
+    --text:#e8edf3;
+    --muted:#9aa6b5;
+  }
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  padding:20px 16px;
+  background:var(--bg);
+  color:var(--text);
+  font:15px/1.45 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+  text-align:center;
+}
+img{width:64px;height:64px;margin:8px auto 12px;display:block}
+h1{font-size:18px;margin:0 0 6px}
+p{margin:0 0 18px;color:var(--muted)}
+.btn{
+  display:block;
+  padding:12px 16px;
+  border-radius:8px;
+  background:var(--brand);
+  color:#fff;
+  font-weight:600;
+  text-decoration:none;
+}
+.btn:hover,.btn:focus-visible{background:var(--brand-dark)}
+.note{margin-top:16px;font-size:13px}
+.note a{color:inherit}
+</style>
+</head>
+<body>
+<img src="icon-128.png" alt="">
+<h1>MailStore SICIET</h1>
+<p>Archivio della posta aziendale: ricerca e consultazione delle email archiviate.</p>
+<a class="btn" id="open" href="https://mailstore.siciet.it" target="_blank" rel="noopener">Apri archivio MailStore</a>
+<p class="note">Si apre in una nuova scheda. Dall'esterno è raggiungibile solo da connessioni italiane.<br>
+<a id="alt" href="https://mailstore.siciet.it:8462" target="_blank" rel="noopener">Sei in sede? Apri l'indirizzo interno</a></p>
+<script>
+if (window.Office) Office.onReady(function () {});
+
+/*
+ * In sede MailStore si raggiunge solo sulla porta 8462 (fuori sede il
+ * firewall inoltra la 443). Si riconosce la sede dall'IP pubblico.
+ * Tenere allineato con SICIET_OFFICE_IPS di apps.js.
+ */
+(function () {
+  var OFFICE_IPS = ["2.40.198.210"];
+  var URL_EXTERNAL = "https://mailstore.siciet.it";
+  var URL_OFFICE = "https://mailstore.siciet.it:8462";
+  var open = document.getElementById("open");
+  var alt = document.getElementById("alt");
+
+  function setOffice(inOffice) {
+    open.href = inOffice ? URL_OFFICE : URL_EXTERNAL;
+    alt.href = inOffice ? URL_EXTERNAL : URL_OFFICE;
+    alt.textContent = inOffice
+      ? "Sei fuori sede? Apri l'indirizzo esterno"
+      : "Sei in sede? Apri l'indirizzo interno";
+  }
+
+  if (!window.fetch) return;
+  var timeout = new Promise(function (resolve) { setTimeout(resolve, 3000, null); });
+  var lookup = fetch("https://api.ipify.org?format=json", { cache: "no-store" })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) { return d && d.ip; })
+    .catch(function () { return null; });
+  Promise.race([lookup, timeout]).then(function (ip) {
+    setOffice(!!ip && OFFICE_IPS.indexOf(ip) >= 0);
+  });
+})();
+</script>
+</body>
+</html>

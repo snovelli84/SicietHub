@@ -58,3 +58,17 @@ Tutto si configura in [`apps.js`](apps.js). Esempio:
 Con lo stesso schema si può far aprire qualsiasi programma: si sceglie uno scheme (es. `siciet-nomeprogramma:`), lo si registra nel `.reg` e lo si indica in `desktop.scheme`.
 
 **Limiti** – Il browser non dice se il programma si è aperto davvero: per questo dopo il click compare sempre un pannello con "Apri" e "Apri versione web" come riserva. Teams (`msteams:`) è documentato. Per Outlook si apre prima la versione web; in sede il pannello offre anche Outlook classico (`desktop.preferWeb`).
+
+## Pulsante MailStore in Outlook
+
+La cartella [`outlook/`](outlook/) contiene un componente aggiuntivo di Outlook che aggiunge il pulsante **MailStore** in Outlook Web e nel nuovo Outlook. Il pulsante apre un pannello con il collegamento a MailStore Web Access (`https://mailstore.siciet.it`). È un semplice collegamento: non richiede certificati o porte aperte su MailStore, perché il pannello è ospitato su questo sito.
+
+Installazione (una volta, da amministratore):
+
+1. Interfaccia di amministrazione di Microsoft 365 → **Impostazioni → App integrate → Carica app personalizzate**.
+2. Tipo di app: **Componente aggiuntivo di Office**; caricare il file `outlook/manifest.xml` (o indicare `https://hub.siciet.it/outlook/manifest.xml`).
+3. Assegnare l'app a tutta l'organizzazione o a un gruppo e confermare. Può servire fino a qualche ora prima che compaia.
+
+Uso: aprire un messaggio in Outlook → **App** (o i "…" della barra del messaggio) → **MailStore** → **Apri archivio MailStore**.
+
+Se si modifica `manifest.xml` aumentare `<Version>`, senza cambiare `<Id>`.
