@@ -158,36 +158,6 @@ main{
 
 .empty{text-align:center;color:var(--muted);padding:40px 0}
 
-/* Pulsante fisso "Richiesta ferie e permessi" */
-.request{
-  display:flex;
-  align-items:center;
-  gap:14px;
-  margin-top:12px;
-  padding:14px;
-  border-radius:18px;
-  background:var(--brand);
-  color:#fff;
-  text-decoration:none;
-  box-shadow:var(--shadow);
-  transition:transform .15s;
-}
-.request:active{transform:scale(.98)}
-@media (hover:hover){.request:hover{transform:translateY(-2px)}}
-.request:focus-visible{outline:3px solid var(--text);outline-offset:2px}
-.request-icon{
-  flex:none;
-  width:56px;height:56px;
-  border-radius:14px;
-  background:rgba(255,255,255,.18);
-  display:flex;align-items:center;justify-content:center;
-  font-size:28px;
-}
-.request-body{flex:1;min-width:0}
-.request-title{display:block;font-weight:700;font-size:17px}
-.request-desc{display:block;font-size:14px;margin-top:3px;opacity:.9;line-height:1.35}
-.request .chev{color:#fff;opacity:.8}
-
 footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 
 /* Pannello in basso */
@@ -242,15 +212,6 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     <span aria-hidden="true">🔍</span>
     <input id="q" type="search" placeholder="Cerca un'app…" autocomplete="off" aria-label="Cerca un'app">
   </label>
-
-  <a class="request" href="richieste.html">
-    <span class="request-icon" aria-hidden="true">🗓️</span>
-    <span class="request-body">
-      <span class="request-title">Richiesta ferie e permessi</span>
-      <span class="request-desc">Compila il modulo: la richiesta arriva agli addetti del personale.</span>
-    </span>
-    <span class="chev" aria-hidden="true">›</span>
-  </a>
 
   <div class="chips" id="chips" role="toolbar" aria-label="Categorie"></div>
 
@@ -469,7 +430,9 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   function onAppClick(app){
     // Servizi solo web (nessuna app da installare): si apre il sito.
     if(app.web && !app.ios && !app.android){
-      window.open(app.web, "_blank", "noopener");
+      // Le pagine del portale (indirizzo relativo) si aprono nella stessa scheda.
+      if(!/^[a-z][a-z0-9+.-]*:/i.test(app.web)) window.location.href = app.web;
+      else window.open(app.web, "_blank", "noopener");
       return;
     }
 

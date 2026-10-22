@@ -75,7 +75,7 @@ Se si modifica `manifest.xml` aumentare `<Version>`, senza cambiare `<Id>`.
 
 ## Richiesta ferie e permessi
 
-Il pulsante **Richiesta ferie e permessi** in cima al portale apre [`richieste.html`](richieste.html): un modulo con nome e cognome, una o più voci (Ferie, Permesso, Permesso L.104, Donazione sangue, Altro; ciascuna a giornate intere o a ore) e note. Con **+ Aggiungi un'altra voce** si chiedono più periodi o permessi diversi nella stessa richiesta (fino a 10): nell'email le voci sono in ordine di data, con il totale di giorni e ore. All'invio la richiesta arriva via email agli addetti del personale. Non serve un account o un'email aziendale: nome e cognome restano memorizzati sul dispositivo per le richieste successive.
+L'app **Ferie e permessi** (categoria Risorse umane, definita in `apps.js` come le altre) apre [`richieste.html`](richieste.html): un modulo con nome e cognome, una o più voci (Ferie, Permesso, Permesso L.104, Donazione sangue, Altro; ciascuna a giornate intere o a ore) e note. Con **+ Aggiungi un'altra voce** si chiedono più periodi o permessi diversi nella stessa richiesta (fino a 10): nell'email le voci sono in ordine di data, con il totale di giorni e ore. All'invio la richiesta arriva via email agli addetti del personale. Non serve un account o un'email aziendale: nome e cognome restano memorizzati sul dispositivo per le richieste successive.
 
 **Invio delle email** – Il sito è statico, quindi per spedire le email si usa [Web3Forms](https://web3forms.com) (gratuito fino a 250 invii al mese):
 
