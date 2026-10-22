@@ -162,6 +162,30 @@ input:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:1px}
 
 .hp{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
 
+/* Voci della richiesta */
+.entries{display:grid;gap:16px}
+.entry{
+  display:grid;
+  gap:14px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:14px;
+}
+.entry-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.entry-title{font-size:16px}
+.remove{
+  border:0;
+  background:transparent;
+  color:var(--error);
+  font:inherit;
+  font-size:14px;
+  padding:6px 4px;
+  cursor:pointer;
+}
+.remove:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.btn.add{background:transparent;border:2px dashed var(--border);color:var(--brand);font-weight:600}
+@media (prefers-color-scheme: dark){.btn.add{color:#6fb0ee}}
+
 /* Conferma */
 .done{display:grid;gap:14px;text-align:center}
 .done .badge{
@@ -214,48 +238,9 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
         </div>
       </fieldset>
 
-      <fieldset>
-        <legend>Tipo di richiesta</legend>
-        <div class="choices" id="tipi"></div>
-      </fieldset>
+      <div class="entries" id="entries"></div>
 
-      <fieldset>
-        <legend>Durata</legend>
-        <div class="choices">
-          <label class="choice"><input type="radio" name="durata" id="durataGiorni" value="giorni" checked><span>Giornate intere</span></label>
-          <label class="choice"><input type="radio" name="durata" id="durataOre" value="ore"><span>Alcune ore</span></label>
-        </div>
-
-        <div class="row" id="boxGiorni">
-          <div class="field">
-            <label for="dal">Dal</label>
-            <input type="date" id="dal" name="dal">
-          </div>
-          <div class="field">
-            <label for="al">Al <span class="hint">(compreso)</span></label>
-            <input type="date" id="al" name="al">
-          </div>
-        </div>
-
-        <div id="boxOre" hidden>
-          <div class="field">
-            <label for="giorno">Giorno</label>
-            <input type="date" id="giorno" name="giorno">
-          </div>
-          <div class="row" style="margin-top:12px">
-            <div class="field">
-              <label for="oraDa">Dalle</label>
-              <input type="time" id="oraDa" name="oraDa" step="900">
-            </div>
-            <div class="field">
-              <label for="oraA">Alle</label>
-              <input type="time" id="oraA" name="oraA" step="900">
-            </div>
-          </div>
-        </div>
-
-        <p class="summary" id="summary" aria-live="polite"></p>
-      </fieldset>
+      <button class="btn add" type="button" id="add">+ Aggiungi un'altra voce</button>
 
       <fieldset>
         <label class="label" for="note">Note <span class="hint">(facoltative)</span></label>
@@ -286,6 +271,59 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 
 <footer>SICIET HUB</footer>
 
+<!-- Una voce della richiesta (ferie, permesso…). I segnaposto "{n}" diventano il numero della voce. -->
+<template id="entryTpl">
+  <section class="entry">
+    <div class="entry-head">
+      <h2 class="entry-title"></h2>
+      <button class="remove" type="button">Rimuovi</button>
+    </div>
+
+    <fieldset>
+      <legend>Tipo</legend>
+      <div class="choices" data-role="tipi"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Durata</legend>
+      <div class="choices">
+        <label class="choice"><input type="radio" name="durata-{n}" value="giorni" data-role="durataGiorni" checked><span>Giornate intere</span></label>
+        <label class="choice"><input type="radio" name="durata-{n}" value="ore" data-role="durataOre"><span>Alcune ore</span></label>
+      </div>
+
+      <div class="row" data-role="boxGiorni">
+        <div class="field">
+          <label for="dal-{n}">Dal</label>
+          <input type="date" id="dal-{n}" data-role="dal">
+        </div>
+        <div class="field">
+          <label for="al-{n}">Al <span class="hint">(compreso)</span></label>
+          <input type="date" id="al-{n}" data-role="al">
+        </div>
+      </div>
+
+      <div data-role="boxOre" hidden>
+        <div class="field">
+          <label for="giorno-{n}">Giorno</label>
+          <input type="date" id="giorno-{n}" data-role="giorno">
+        </div>
+        <div class="row" style="margin-top:12px">
+          <div class="field">
+            <label for="oraDa-{n}">Dalle</label>
+            <input type="time" id="oraDa-{n}" step="900" data-role="oraDa">
+          </div>
+          <div class="field">
+            <label for="oraA-{n}">Alle</label>
+            <input type="time" id="oraA-{n}" step="900" data-role="oraA">
+          </div>
+        </div>
+      </div>
+
+      <p class="summary" data-role="summary" aria-live="polite"></p>
+    </fieldset>
+  </section>
+</template>
+
 <script>
 /*
  * CONFIGURAZIONE
@@ -296,9 +334,10 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
  */
 var RICHIESTE_CONFIG = {
   accessKey: "",
-  tipi: ["Ferie", "Permesso", "Permesso L.104", "Altro"],
+  tipi: ["Ferie", "Permesso", "Permesso L.104", "Donazione sangue", "Altro"],
   // Tipi che di solito si chiedono a ore: selezionandoli si passa a "Alcune ore".
-  tipiAOre: ["Permesso", "Permesso L.104"]
+  tipiAOre: ["Permesso", "Permesso L.104"],
+  maxVoci: 10
 };
 
 (function(){
@@ -310,47 +349,11 @@ var RICHIESTE_CONFIG = {
 
   var $ = function(id){ return document.getElementById(id); };
   var form = $("form");
+  var entriesEl = $("entries");
+  var entries = [];   // voci presenti, nell'ordine in cui compaiono
+  var counter = 0;    // per id univoci dei campi
 
-  /* ---------- Tipi di richiesta ---------- */
-
-  cfg.tipi.forEach(function(t, i){
-    var label = document.createElement("label");
-    label.className = "choice";
-    var input = document.createElement("input");
-    input.type = "radio";
-    input.name = "tipo";
-    input.value = t;
-    input.id = "tipo" + i;
-    if(i === 0) input.checked = true;
-    input.addEventListener("change", function(){
-      setDurata(cfg.tipiAOre.indexOf(t) >= 0 ? "ore" : "giorni");
-    });
-    var span = document.createElement("span");
-    span.textContent = t;
-    label.appendChild(input);
-    label.appendChild(span);
-    $("tipi").appendChild(label);
-  });
-
-  function tipo(){
-    var el = form.querySelector('input[name="tipo"]:checked');
-    return el ? el.value : "";
-  }
-
-  /* ---------- Durata ---------- */
-
-  function durata(){ return $("durataOre").checked ? "ore" : "giorni"; }
-
-  function setDurata(v){
-    $(v === "ore" ? "durataOre" : "durataGiorni").checked = true;
-    $("boxGiorni").hidden = v === "ore";
-    $("boxOre").hidden = v !== "ore";
-    updateSummary();
-  }
-  $("durataGiorni").addEventListener("change", function(){ setDurata("giorni"); });
-  $("durataOre").addEventListener("change", function(){ setDurata("ore"); });
-
-  /* ---------- Date ---------- */
+  /* ---------- Date e orari ---------- */
 
   function parseDate(v){
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || "");
@@ -376,52 +379,157 @@ var RICHIESTE_CONFIG = {
     }
     return n;
   }
+  function daysLabel(n){ return n + (n === 1 ? " giorno lavorativo" : " giorni lavorativi"); }
   function hoursLabel(min){
     var h = Math.floor(min / 60), m = min % 60;
     return (h ? h + (h === 1 ? " ora" : " ore") : "") + (h && m ? " e " : "") + (m ? m + " minuti" : "");
   }
 
-  // Dal → Al: se "Al" è vuoto o precedente, lo allinea a "Dal".
-  $("dal").addEventListener("change", function(){
-    var a = parseDate($("dal").value), b = parseDate($("al").value);
-    if(a && (!b || b < a)) $("al").value = $("dal").value;
-    updateSummary();
-  });
-  ["al", "giorno", "oraDa", "oraA"].forEach(function(id){
-    $(id).addEventListener("change", updateSummary);
-  });
+  /* ---------- Voci ---------- */
 
-  /* Descrizione del periodo, o un messaggio d'errore se incompleto/incoerente. */
-  function periodo(){
-    if(durata() === "giorni"){
-      var a = parseDate($("dal").value), b = parseDate($("al").value);
-      if(!a || !b) return { error: "Indica il primo e l'ultimo giorno.", fields: ["dal", "al"].filter(function(id){ return !$(id).value; }) };
-      if(b < a) return { error: "L'ultimo giorno è precedente al primo.", fields: ["al"] };
+  function addEntry(){
+    var n = ++counter;
+    var html = $("entryTpl").innerHTML.replace(/\{n\}/g, n);
+    var wrap = document.createElement("div");
+    wrap.innerHTML = html.trim();
+    var el = wrap.firstChild;
+    var f = {};
+    el.querySelectorAll("[data-role]").forEach(function(x){ f[x.getAttribute("data-role")] = x; });
+
+    var entry = { el: el, f: f };
+
+    cfg.tipi.forEach(function(t, i){
+      var label = document.createElement("label");
+      label.className = "choice";
+      var input = document.createElement("input");
+      input.type = "radio";
+      input.name = "tipo-" + n;
+      input.value = t;
+      if(i === 0) input.checked = true;
+      input.addEventListener("change", function(){
+        setDurata(entry, cfg.tipiAOre.indexOf(t) >= 0 ? "ore" : "giorni");
+      });
+      var span = document.createElement("span");
+      span.textContent = t;
+      label.appendChild(input);
+      label.appendChild(span);
+      f.tipi.appendChild(label);
+    });
+
+    f.durataGiorni.addEventListener("change", function(){ setDurata(entry, "giorni"); });
+    f.durataOre.addEventListener("change", function(){ setDurata(entry, "ore"); });
+
+    // Dal → Al: se "Al" è vuoto o precedente, lo allinea a "Dal".
+    f.dal.addEventListener("change", function(){
+      var a = parseDate(f.dal.value), b = parseDate(f.al.value);
+      if(a && (!b || b < a)) f.al.value = f.dal.value;
+      updateSummary(entry);
+    });
+    ["al", "giorno", "oraDa", "oraA"].forEach(function(k){
+      f[k].addEventListener("change", function(){ updateSummary(entry); });
+    });
+    watchFields(el);
+
+    el.querySelector(".remove").addEventListener("click", function(){
+      entries.splice(entries.indexOf(entry), 1);
+      el.remove();
+      renumber();
+      clearError();
+    });
+
+    entries.push(entry);
+    entriesEl.appendChild(el);
+    setDurata(entry, cfg.tipiAOre.indexOf(tipo(entry)) >= 0 ? "ore" : "giorni");
+    renumber();
+    return entry;
+  }
+
+  function renumber(){
+    var many = entries.length > 1;
+    entries.forEach(function(e, i){
+      e.el.querySelector(".entry-title").textContent = many ? "Voce " + (i + 1) : "Cosa chiedi";
+      e.el.querySelector(".remove").hidden = !many;
+    });
+    $("add").hidden = entries.length >= cfg.maxVoci;
+  }
+
+  function tipo(entry){
+    var el = entry.el.querySelector('input[name^="tipo-"]:checked');
+    return el ? el.value : "";
+  }
+  function durata(entry){ return entry.f.durataOre.checked ? "ore" : "giorni"; }
+
+  function setDurata(entry, v){
+    entry.f[v === "ore" ? "durataOre" : "durataGiorni"].checked = true;
+    entry.f.boxGiorni.hidden = v === "ore";
+    entry.f.boxOre.hidden = v !== "ore";
+    updateSummary(entry);
+  }
+
+  /* Dati della voce, o un messaggio d'errore se incompleta/incoerente. */
+  function periodo(entry){
+    var f = entry.f;
+    if(durata(entry) === "giorni"){
+      var a = parseDate(f.dal.value), b = parseDate(f.al.value);
+      if(!a || !b) return { error: "indica il primo e l'ultimo giorno.", fields: [f.dal, f.al].filter(function(x){ return !x.value; }) };
+      if(b < a) return { error: "l'ultimo giorno è precedente al primo.", fields: [f.al] };
       var wd = workingDays(a, b);
-      var testo = +a === +b ? fmt(a) : "dal " + fmt(a) + " al " + fmt(b);
       return {
-        testo: testo,
-        quantita: wd + (wd === 1 ? " giorno lavorativo" : " giorni lavorativi") + " (lun–ven)",
-        oggetto: +a === +b ? fmt(a) : fmt(a) + " – " + fmt(b)
+        inizio: a,
+        giorni: wd,
+        minuti: 0,
+        testo: +a === +b ? fmt(a) : "dal " + fmt(a) + " al " + fmt(b),
+        quantita: daysLabel(wd),
+        breve: +a === +b ? fmt(a) : fmt(a) + " – " + fmt(b)
       };
     }
-    var g = parseDate($("giorno").value), da = minutes($("oraDa").value), aa = minutes($("oraA").value);
+    var g = parseDate(f.giorno.value), da = minutes(f.oraDa.value), aa = minutes(f.oraA.value);
     var missing = [];
-    if(!g) missing.push("giorno");
-    if(da == null) missing.push("oraDa");
-    if(aa == null) missing.push("oraA");
-    if(missing.length) return { error: "Indica il giorno e l'orario.", fields: missing };
-    if(aa <= da) return { error: "L'orario di fine deve essere dopo quello di inizio.", fields: ["oraA"] };
+    if(!g) missing.push(f.giorno);
+    if(da == null) missing.push(f.oraDa);
+    if(aa == null) missing.push(f.oraA);
+    if(missing.length) return { error: "indica il giorno e l'orario.", fields: missing };
+    if(aa <= da) return { error: "l'orario di fine deve essere dopo quello di inizio.", fields: [f.oraA] };
     return {
-      testo: fmt(g) + ", dalle " + $("oraDa").value + " alle " + $("oraA").value,
+      inizio: new Date(g.getTime() + da * 60000),
+      giorni: 0,
+      minuti: aa - da,
+      testo: fmt(g) + ", dalle " + f.oraDa.value + " alle " + f.oraA.value,
       quantita: hoursLabel(aa - da),
-      oggetto: fmt(g) + " " + $("oraDa").value + "–" + $("oraA").value
+      breve: fmt(g) + " " + f.oraDa.value + "–" + f.oraA.value
     };
   }
 
-  function updateSummary(){
-    var p = periodo();
-    $("summary").textContent = p.error ? "" : p.testo + " · " + p.quantita;
+  function updateSummary(entry){
+    var p = periodo(entry);
+    entry.f.summary.textContent = p.error ? "" :
+      p.testo + " · " + p.quantita + (p.giorni || !p.minuti ? " (lun–ven)" : "");
+  }
+
+  $("add").addEventListener("click", function(){
+    var e = addEntry();
+    e.el.scrollIntoView({ behavior: "smooth", block: "start" });
+    var first = e.el.querySelector('input[name^="tipo-"]');
+    if(first) first.focus({ preventScroll: true });
+  });
+
+  /* ---------- Errori ---------- */
+
+  function clearError(){ $("error").textContent = ""; }
+
+  // Correggendo un campo spariscono l'evidenziazione e il messaggio d'errore.
+  function watchFields(root){
+    root.querySelectorAll("input,textarea").forEach(function(el){
+      function reset(){ el.classList.remove("invalid"); clearError(); }
+      el.addEventListener("input", reset);
+      el.addEventListener("change", reset);
+    });
+  }
+
+  function fail(msg, fields){
+    $("error").textContent = msg;
+    (fields || []).forEach(function(el){ el.classList.add("invalid"); });
+    if(fields && fields.length) fields[0].focus();
   }
 
   /* ---------- Nome ricordato su questo dispositivo ---------- */
@@ -434,61 +542,74 @@ var RICHIESTE_CONFIG = {
   /* ---------- Invio ---------- */
 
   if(!cfg.accessKey) $("notConfigured").hidden = false;
-
-  // Correggendo un campo spariscono l'evidenziazione e il messaggio d'errore.
-  form.querySelectorAll("input,textarea").forEach(function(el){
-    function reset(){
-      el.classList.remove("invalid");
-      $("error").textContent = "";
-    }
-    el.addEventListener("input", reset);
-    el.addEventListener("change", reset);
-  });
-
-  function fail(msg, fields){
-    $("error").textContent = msg;
-    (fields || []).forEach(function(id){ $(id).classList.add("invalid"); });
-    if(fields && fields.length) $(fields[0]).focus();
-  }
+  watchFields($("nome").closest("fieldset"));
+  watchFields($("note").closest("fieldset"));
 
   function clean(s){ return s.trim().replace(/\s+/g, " "); }
+  function unique(list){ return list.filter(function(x, i){ return list.indexOf(x) === i; }); }
 
   form.addEventListener("submit", function(e){
     e.preventDefault();
-    $("error").textContent = "";
+    clearError();
 
     var nome = clean($("nome").value), cognome = clean($("cognome").value);
     var missing = [];
-    if(!nome) missing.push("nome");
-    if(!cognome) missing.push("cognome");
+    if(!nome) missing.push($("nome"));
+    if(!cognome) missing.push($("cognome"));
     if(missing.length) return fail("Scrivi nome e cognome.", missing);
 
-    var p = periodo();
-    if(p.error) return fail(p.error, p.fields);
+    var voci = [];
+    for(var i = 0; i < entries.length; i++){
+      var p = periodo(entries[i]);
+      if(p.error){
+        var prefix = entries.length > 1 ? "Voce " + (i + 1) + ": " : "";
+        var msg = prefix + p.error;
+        return fail(msg.charAt(0).toUpperCase() + msg.slice(1), p.fields);
+      }
+      p.tipo = tipo(entries[i]);
+      voci.push(p);
+    }
+    // Nell'email le voci compaiono in ordine di data.
+    voci.sort(function(a, b){ return a.inizio - b.inizio; });
 
     if($("botcheck").checked) return; // bot
 
     var dipendente = cognome + " " + nome;
     var note = $("note").value.trim();
     var inviata = new Date();
+    var giorni = voci.reduce(function(s, v){ return s + v.giorni; }, 0);
+    var min = voci.reduce(function(s, v){ return s + v.minuti; }, 0);
+    var totale = [giorni ? daysLabel(giorni) + " (lun–ven)" : "", min ? hoursLabel(min) : ""].filter(Boolean).join(" + ");
+
+    var subject = voci.length === 1
+      ? "Richiesta " + voci[0].tipo + " – " + dipendente + " – " + voci[0].breve
+      : "Richiesta " + unique(voci.map(function(v){ return v.tipo; })).join(", ") + " – " + dipendente + " – " + voci.length + " voci";
 
     // I nomi dei campi diventano le etichette nella email.
     var data = {
       access_key: cfg.accessKey,
-      subject: "Richiesta " + tipo() + " – " + dipendente + " – " + p.oggetto,
+      subject: subject,
       from_name: "SICIET HUB",
-      "Dipendente": dipendente,
-      "Tipo": tipo(),
-      "Periodo": p.testo,
-      "Durata": p.quantita,
-      "Note": note || "—",
-      "Inviata il": fmt(inviata) + " alle " + String(inviata.getHours()).padStart(2, "0") + ":" + String(inviata.getMinutes()).padStart(2, "0")
+      "Dipendente": dipendente
     };
+    var righe = [];
+    voci.forEach(function(v, i){
+      var key = voci.length === 1 ? "Richiesta" : "Voce " + (i + 1);
+      data[key] = v.tipo + ": " + v.testo + " · " + v.quantita;
+      righe.push([key, data[key]]);
+    });
+    if(voci.length > 1) data["Totale"] = totale;
+    data["Note"] = note || "—";
+    data["Inviata il"] = fmt(inviata) + " alle " + String(inviata.getHours()).padStart(2, "0") + ":" + String(inviata.getMinutes()).padStart(2, "0");
+
+    var recap = [["Dipendente", dipendente]].concat(righe);
+    if(voci.length > 1) recap.push(["Totale", totale]);
+    recap.push(["Note", data["Note"]]);
 
     try{ localStorage.setItem(NAME_KEY, JSON.stringify({ nome: nome, cognome: cognome })); }catch(err){}
 
     if(!cfg.accessKey){
-      showDone(data, true);
+      showDone(recap, true);
       return;
     }
 
@@ -504,7 +625,7 @@ var RICHIESTE_CONFIG = {
       .then(function(r){ return r.json().catch(function(){ return { success: false }; }); })
       .then(function(res){
         if(!res.success) throw new Error(res.message || "invio non riuscito");
-        showDone(data, false);
+        showDone(recap, false);
       })
       .catch(function(){
         fail("La richiesta non è partita. Controlla la connessione e riprova; se il problema continua avvisa direttamente l'ufficio del personale.");
@@ -515,12 +636,12 @@ var RICHIESTE_CONFIG = {
       });
   });
 
-  function showDone(data, prova){
+  function showDone(rows, prova){
     var recap = $("recap");
     recap.innerHTML = "";
-    ["Dipendente", "Tipo", "Periodo", "Durata", "Note"].forEach(function(k){
-      var dt = document.createElement("dt"); dt.textContent = k;
-      var dd = document.createElement("dd"); dd.textContent = data[k];
+    rows.forEach(function(r){
+      var dt = document.createElement("dt"); dt.textContent = r[0];
+      var dd = document.createElement("dd"); dd.textContent = r[1];
       recap.appendChild(dt); recap.appendChild(dd);
     });
     $("doneTitle").textContent = prova ? "Riepilogo (prova, nessuna email inviata)" : "Richiesta inviata";
@@ -533,13 +654,15 @@ var RICHIESTE_CONFIG = {
   }
 
   $("again").addEventListener("click", function(){
-    ["dal", "al", "giorno", "oraDa", "oraA", "note"].forEach(function(id){ $(id).value = ""; });
-    updateSummary();
+    entries.forEach(function(e){ e.el.remove(); });
+    entries = [];
+    addEntry();
+    $("note").value = "";
     $("done").hidden = true;
     form.hidden = false;
   });
 
-  setDurata(cfg.tipiAOre.indexOf(tipo()) >= 0 ? "ore" : "giorni");
+  addEntry();
 })();
 </script>
 </body>
