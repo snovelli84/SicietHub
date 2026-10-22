@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Richiesta ferie e permessi – SICIET HUB</title>
+<meta name="theme-color" content="#005baa">
+<meta name="robots" content="noindex">
+<link rel="icon" href="icons/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+<style>
+:root{
+  --brand:#005baa;
+  --bg:#f4f6f9;
+  --card:#ffffff;
+  --text:#1d2430;
+  --muted:#5d6878;
+  --border:#e3e7ee;
+  --chip:#e8eef6;
+  --field:#f8fafc;
+  --error:#b3261e;
+  --ok:#1e7d3c;
+  --ok-bg:#e3f4e8;
+  --warn-bg:#fff4d6;
+  --warn:#7a5600;
+  --shadow:0 2px 10px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#11161d;
+    --card:#1a212b;
+    --text:#e8edf3;
+    --muted:#9aa6b5;
+    --border:#2a3340;
+    --chip:#232c38;
+    --field:#141a22;
+    --error:#f2b8b5;
+    --ok:#7fd59a;
+    --ok-bg:#16301f;
+    --warn-bg:#3a3018;
+    --warn:#f1d38a;
+    --shadow:0 2px 10px rgba(0,0,0,.4);
+  }
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  -webkit-tap-highlight-color:transparent;
+}
+
+header{
+  background:var(--brand);
+  color:#fff;
+  padding:calc(16px + env(safe-area-inset-top)) 16px 48px;
+}
+.header-inner{max-width:720px;margin:0 auto}
+.back{color:#fff;text-decoration:none;font-size:15px;opacity:.9;display:inline-block;padding:4px 0}
+.back:hover{opacity:1;text-decoration:underline}
+header h1{font-size:24px;margin-top:10px;text-wrap:balance}
+header p{opacity:.9;margin-top:4px;font-size:15px}
+
+main{
+  max-width:720px;
+  margin:-32px auto 0;
+  padding:0 16px calc(24px + env(safe-area-inset-bottom));
+}
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:18px;
+  box-shadow:var(--shadow);
+  padding:20px 16px;
+}
+
+form{display:grid;gap:20px}
+fieldset{border:0;display:grid;gap:10px;min-width:0}
+legend,.label{font-weight:600;font-size:15px;margin-bottom:2px}
+.hint{color:var(--muted);font-size:13px;font-weight:400}
+
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:420px){.row{grid-template-columns:1fr}}
+.field{display:grid;gap:6px;min-width:0}
+.field label{font-size:14px;color:var(--muted)}
+
+input[type=text],input[type=email],input[type=date],input[type=time],textarea{
+  width:100%;
+  font:inherit;
+  font-size:16px; /* 16px evita lo zoom automatico su iOS */
+  color:var(--text);
+  background:var(--field);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:12px;
+  min-height:48px;
+}
+textarea{min-height:90px;resize:vertical}
+input:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:1px}
+@media (prefers-color-scheme: dark){input,textarea{color-scheme:dark}}
+.invalid{border-color:var(--error)!important}
+
+/* Scelte a pulsante (tipo di richiesta, durata) */
+.choices{display:flex;flex-wrap:wrap;gap:8px}
+.choice{position:relative}
+.choice input{position:absolute;opacity:0;pointer-events:none}
+.choice span{
+  display:inline-block;
+  padding:10px 16px;
+  border-radius:999px;
+  background:var(--chip);
+  font-size:15px;
+  cursor:pointer;
+  border:2px solid transparent;
+}
+.choice input:checked + span{background:var(--brand);color:#fff}
+.choice input:focus-visible + span{border-color:var(--text)}
+
+.summary{
+  background:var(--chip);
+  border-radius:12px;
+  padding:10px 12px;
+  font-size:14px;
+  font-variant-numeric:tabular-nums;
+}
+.summary:empty{display:none}
+
+.error{color:var(--error);font-size:14px}
+.error:empty{display:none}
+
+.notice{
+  background:var(--warn-bg);
+  color:var(--warn);
+  border-radius:12px;
+  padding:12px;
+  font-size:14px;
+  line-height:1.4;
+}
+
+.btn{
+  display:block;
+  width:100%;
+  text-align:center;
+  text-decoration:none;
+  border:0;
+  border-radius:12px;
+  padding:14px;
+  font:inherit;
+  font-size:16px;
+  font-weight:600;
+  cursor:pointer;
+  background:var(--chip);
+  color:var(--text);
+}
+.btn.primary{background:var(--brand);color:#fff}
+.btn:disabled{opacity:.6;cursor:wait}
+.btn:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+
+.hp{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
+
+/* Voci della richiesta */
+.entries{display:grid;gap:16px}
+.entry{
+  display:grid;
+  gap:14px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:14px;
+}
+.entry-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.entry-title{font-size:16px}
+.remove{
+  border:0;
+  background:transparent;
+  color:var(--error);
+  font:inherit;
+  font-size:14px;
+  padding:6px 4px;
+  cursor:pointer;
+}
+.remove:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.btn.add{background:transparent;border:2px dashed var(--border);color:var(--brand);font-weight:600}
+@media (prefers-color-scheme: dark){.btn.add{color:#6fb0ee}}
+
+.disclaimer{
+  border-left:4px solid var(--brand);
+  background:var(--chip);
+  border-radius:0 12px 12px 0;
+  padding:12px 14px;
+  font-size:14px;
+  line-height:1.45;
+}
+.disclaimer strong{display:block;margin-bottom:2px}
+
+/* Conferma */
+.done{display:grid;gap:14px;text-align:center}
+.done .badge{
+  justify-self:center;
+  width:56px;height:56px;border-radius:50%;
+  background:var(--ok-bg);color:var(--ok);
+  display:flex;align-items:center;justify-content:center;
+  font-size:28px;font-weight:700;
+}
+.done h2{font-size:20px}
+.done p{color:var(--muted);line-height:1.4}
+.recap{text-align:left;display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;font-size:15px;background:var(--chip);border-radius:12px;padding:12px}
+.recap dt{color:var(--muted)}
+.recap dd{min-width:0;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.actions{display:grid;gap:10px}
+
+footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="header-inner">
+    <a class="back" href="./">‹ SICIET HUB</a>
+    <h1>Richiesta ferie e permessi</h1>
+    <p>La richiesta arriva via email agli addetti del personale.</p>
+  </div>
+</header>
+
+<main>
+  <div class="card">
+
+    <form id="form" novalidate>
+      <p class="notice" id="notConfigured" hidden>
+        Modulo in prova: l'invio non è ancora attivo. Compilando e premendo "Invia" vedrai il riepilogo, ma nessuna email verrà spedita.
+      </p>
+
+      <fieldset>
+        <legend>Chi fa la richiesta</legend>
+        <div class="row">
+          <div class="field">
+            <label for="nome">Nome</label>
+            <input type="text" id="nome" name="nome" autocomplete="given-name" required>
+          </div>
+          <div class="field">
+            <label for="cognome">Cognome</label>
+            <input type="text" id="cognome" name="cognome" autocomplete="family-name" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="email">Email <span class="hint">(anche personale: gli addetti potranno risponderti qui)</span></label>
+          <input type="email" id="email" name="email" autocomplete="email" inputmode="email" required>
+        </div>
+      </fieldset>
+
+      <div class="entries" id="entries"></div>
+
+      <button class="btn add" type="button" id="add">+ Aggiungi un'altra voce</button>
+
+      <fieldset>
+        <label class="label" for="note">Note <span class="hint">(facoltative)</span></label>
+        <textarea id="note" name="note" maxlength="1000" placeholder="Es. motivo, reperibilità, accordi con il responsabile…"></textarea>
+      </fieldset>
+
+      <!-- Campo trappola per i bot: le persone non lo vedono. -->
+      <label class="hp" aria-hidden="true">Non compilare<input type="checkbox" id="botcheck" tabindex="-1" autocomplete="off"></label>
+
+      <p class="disclaimer">
+        <strong>La richiesta non si intende accettata automaticamente.</strong>
+        Verrà valutata dagli addetti del personale, che ti contatteranno in caso di necessità.
+      </p>
+
+      <p class="error" id="error" role="alert"></p>
+
+      <button class="btn primary" type="submit" id="submit">Invia richiesta</button>
+    </form>
+
+    <div class="done" id="done" hidden>
+      <div class="badge" aria-hidden="true">✓</div>
+      <h2 id="doneTitle">Richiesta inviata</h2>
+      <p id="doneText">Gli addetti del personale hanno ricevuto la tua richiesta. Non si intende accettata automaticamente: verrà valutata e, in caso di necessità, ti contatteranno.</p>
+      <dl class="recap" id="recap"></dl>
+      <div class="actions">
+        <button class="btn primary" type="button" id="again">Nuova richiesta</button>
+        <a class="btn" href="./">Torna a SICIET HUB</a>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<footer>SICIET HUB</footer>
+
+<!-- Una voce della richiesta (ferie, permesso…). I segnaposto "{n}" diventano il numero della voce. -->
+<template id="entryTpl">
+  <section class="entry">
+    <div class="entry-head">
+      <h2 class="entry-title"></h2>
+      <button class="remove" type="button">Rimuovi</button>
+    </div>
+
+    <fieldset>
+      <legend>Tipo</legend>
+      <div class="choices" data-role="tipi"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Durata</legend>
+      <div class="choices">
+        <label class="choice"><input type="radio" name="durata-{n}" value="giorni" data-role="durataGiorni" checked><span>Giornate intere</span></label>
+        <label class="choice"><input type="radio" name="durata-{n}" value="ore" data-role="durataOre"><span>Alcune ore</span></label>
+      </div>
+
+      <div class="row" data-role="boxGiorni">
+        <div class="field">
+          <label for="dal-{n}">Dal</label>
+          <input type="date" id="dal-{n}" data-role="dal">
+        </div>
+        <div class="field">
+          <label for="al-{n}">Al <span class="hint">(compreso)</span></label>
+          <input type="date" id="al-{n}" data-role="al">
+        </div>
+      </div>
+
+      <div data-role="boxOre" hidden>
+        <div class="field">
+          <label for="giorno-{n}">Giorno</label>
+          <input type="date" id="giorno-{n}" data-role="giorno">
+        </div>
+        <div class="row" style="margin-top:12px">
+          <div class="field">
+            <label for="oraDa-{n}">Dalle</label>
+            <input type="time" id="oraDa-{n}" step="900" data-role="oraDa">
+          </div>
+          <div class="field">
+            <label for="oraA-{n}">Alle</label>
+            <input type="time" id="oraA-{n}" step="900" data-role="oraA">
+          </div>
+        </div>
+      </div>
+
+      <p class="summary" data-role="summary" aria-live="polite"></p>
+    </fieldset>
+  </section>
+</template>
+
+<script src="calendar.js"></script>
+<script>
+/*
+ * CONFIGURAZIONE
+ * --------------
+ * L'invio usa EmailJS (https://www.emailjs.com), collegato alla casella
+ * aziendale da cui partono le email. Destinatari, oggetto e testo sono nel
+ * modello "richiesta_ferie" su EmailJS (vedi README).
+ * Variabili passate al modello: subject, dipendente, email, voci, totale,
+ * note, inviata_il, calendario (dati per il pulsante "Aggiungi al calendario"),
+ * ics (allegato .ics con le voci, solo se allegatoIcs è true).
+ * I tre codici sono pubblici (non sono password). Se uno manca, il modulo
+ * funziona in prova e non invia nulla.
+ */
+var RICHIESTE_CONFIG = {
+  emailjs: {
+    serviceId: "siciet_hub",
+    templateId: "richiesta_ferie",
+    publicKey: "TGJiGEsjcOFoW3tB6"
+  },
+  tipi: ["Ferie", "Permesso", "Permesso L.104", "Donazione sangue", "Altro"],
+  // Tipi che di solito si chiedono a ore: selezionandoli si passa a "Alcune ore".
+  tipiAOre: ["Permesso", "Permesso L.104"],
+  maxVoci: 10,
+  // Allegato .ics nella email: richiede un piano EmailJS a pagamento
+  // (allegato variabile "ics" nel modello). Con false si usa solo il
+  // pulsante "Aggiungi al calendario".
+  allegatoIcs: false
+};
+
+(function(){
+  "use strict";
+
+  var cfg = RICHIESTE_CONFIG;
+  var ENDPOINT = "https://api.emailjs.com/api/v1.0/email/send";
+  var ejs = cfg.emailjs || {};
+  var configured = !!(ejs.serviceId && ejs.templateId && ejs.publicKey);
+  var NAME_KEY = "siciet-richieste-nome";
+
+  var $ = function(id){ return document.getElementById(id); };
+  var form = $("form");
+  var entriesEl = $("entries");
+  var entries = [];   // voci presenti, nell'ordine in cui compaiono
+  var counter = 0;    // per id univoci dei campi
+
+  /* ---------- Date e orari ---------- */
+
+  function parseDate(v){
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || "");
+    return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+  }
+  var WEEKDAYS = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
+  function fmt(d){
+    return WEEKDAYS[d.getDay()] + " " +
+      String(d.getDate()).padStart(2, "0") + "/" +
+      String(d.getMonth() + 1).padStart(2, "0") + "/" + d.getFullYear();
+  }
+  function minutes(v){
+    var m = /^(\d{2}):(\d{2})/.exec(v || "");
+    return m ? +m[1] * 60 + +m[2] : null;
+  }
+  // Giorni da lunedì a venerdì nel periodo (le festività non sono considerate).
+  function workingDays(a, b){
+    var n = 0, d = new Date(a);
+    while(d <= b){
+      var w = d.getDay();
+      if(w !== 0 && w !== 6) n++;
+      d.setDate(d.getDate() + 1);
+    }
+    return n;
+  }
+  function daysLabel(n){ return n + (n === 1 ? " giorno lavorativo" : " giorni lavorativi"); }
+  function hoursLabel(min){
+    var h = Math.floor(min / 60), m = min % 60;
+    return (h ? h + (h === 1 ? " ora" : " ore") : "") + (h && m ? " e " : "") + (m ? m + " minuti" : "");
+  }
+
+  /* ---------- Voci ---------- */
+
+  function addEntry(){
+    var n = ++counter;
+    var html = $("entryTpl").innerHTML.replace(/\{n\}/g, n);
+    var wrap = document.createElement("div");
+    wrap.innerHTML = html.trim();
+    var el = wrap.firstChild;
+    var f = {};
+    el.querySelectorAll("[data-role]").forEach(function(x){ f[x.getAttribute("data-role")] = x; });
+
+    var entry = { el: el, f: f };
+
+    cfg.tipi.forEach(function(t, i){
+      var label = document.createElement("label");
+      label.className = "choice";
+      var input = document.createElement("input");
+      input.type = "radio";
+      input.name = "tipo-" + n;
+      input.value = t;
+      if(i === 0) input.checked = true;
+      input.addEventListener("change", function(){
+        setDurata(entry, cfg.tipiAOre.indexOf(t) >= 0 ? "ore" : "giorni");
+      });
+      var span = document.createElement("span");
+      span.textContent = t;
+      label.appendChild(input);
+      label.appendChild(span);
+      f.tipi.appendChild(label);
+    });
+
+    f.durataGiorni.addEventListener("change", function(){ setDurata(entry, "giorni"); });
+    f.durataOre.addEventListener("change", function(){ setDurata(entry, "ore"); });
+
+    // Dal → Al: se "Al" è vuoto o precedente, lo allinea a "Dal".
+    f.dal.addEventListener("change", function(){
+      var a = parseDate(f.dal.value), b = parseDate(f.al.value);
+      if(a && (!b || b < a)) f.al.value = f.dal.value;
+      updateSummary(entry);
+    });
+    ["al", "giorno", "oraDa", "oraA"].forEach(function(k){
+      f[k].addEventListener("change", function(){ updateSummary(entry); });
+    });
+    watchFields(el);
+
+    el.querySelector(".remove").addEventListener("click", function(){
+      entries.splice(entries.indexOf(entry), 1);
+      el.remove();
+      renumber();
+      clearError();
+    });
+
+    entries.push(entry);
+    entriesEl.appendChild(el);
+    setDurata(entry, cfg.tipiAOre.indexOf(tipo(entry)) >= 0 ? "ore" : "giorni");
+    renumber();
+    return entry;
+  }
+
+  function renumber(){
+    var many = entries.length > 1;
+    entries.forEach(function(e, i){
+      e.el.querySelector(".entry-title").textContent = many ? "Voce " + (i + 1) : "Cosa chiedi";
+      e.el.querySelector(".remove").hidden = !many;
+    });
+    $("add").hidden = entries.length >= cfg.maxVoci;
+  }
+
+  function tipo(entry){
+    var el = entry.el.querySelector('input[name^="tipo-"]:checked');
+    return el ? el.value : "";
+  }
+  function durata(entry){ return entry.f.durataOre.checked ? "ore" : "giorni"; }
+
+  function setDurata(entry, v){
+    entry.f[v === "ore" ? "durataOre" : "durataGiorni"].checked = true;
+    entry.f.boxGiorni.hidden = v === "ore";
+    entry.f.boxOre.hidden = v !== "ore";
+    updateSummary(entry);
+  }
+
+  /* Dati della voce, o un messaggio d'errore se incompleta/incoerente. */
+  function periodo(entry){
+    var f = entry.f;
+    if(durata(entry) === "giorni"){
+      var a = parseDate(f.dal.value), b = parseDate(f.al.value);
+      if(!a || !b) return { error: "indica il primo e l'ultimo giorno.", fields: [f.dal, f.al].filter(function(x){ return !x.value; }) };
+      if(b < a) return { error: "l'ultimo giorno è precedente al primo.", fields: [f.al] };
+      var wd = workingDays(a, b);
+      return {
+        inizio: a,
+        cal: { a: f.dal.value, b: f.al.value },
+        giorni: wd,
+        minuti: 0,
+        testo: +a === +b ? fmt(a) : "dal " + fmt(a) + " al " + fmt(b),
+        quantita: daysLabel(wd),
+        breve: +a === +b ? fmt(a) : fmt(a) + " – " + fmt(b)
+      };
+    }
+    var g = parseDate(f.giorno.value), da = minutes(f.oraDa.value), aa = minutes(f.oraA.value);
+    var missing = [];
+    if(!g) missing.push(f.giorno);
+    if(da == null) missing.push(f.oraDa);
+    if(aa == null) missing.push(f.oraA);
+    if(missing.length) return { error: "indica il giorno e l'orario.", fields: missing };
+    if(aa <= da) return { error: "l'orario di fine deve essere dopo quello di inizio.", fields: [f.oraA] };
+    return {
+      inizio: new Date(g.getTime() + da * 60000),
+      cal: { g: f.giorno.value, da: f.oraDa.value, aa: f.oraA.value },
+      giorni: 0,
+      minuti: aa - da,
+      testo: fmt(g) + ", dalle " + f.oraDa.value + " alle " + f.oraA.value,
+      quantita: hoursLabel(aa - da),
+      breve: fmt(g) + " " + f.oraDa.value + "–" + f.oraA.value
+    };
+  }
+
+  function updateSummary(entry){
+    var p = periodo(entry);
+    entry.f.summary.textContent = p.error ? "" :
+      p.testo + " · " + p.quantita + (p.giorni || !p.minuti ? " (lun–ven)" : "");
+  }
+
+  $("add").addEventListener("click", function(){
+    var e = addEntry();
+    e.el.scrollIntoView({ behavior: "smooth", block: "start" });
+    var first = e.el.querySelector('input[name^="tipo-"]');
+    if(first) first.focus({ preventScroll: true });
+  });
+
+  /* ---------- Errori ---------- */
+
+  function clearError(){ $("error").textContent = ""; }
+
+  // Correggendo un campo spariscono l'evidenziazione e il messaggio d'errore.
+  function watchFields(root){
+    root.querySelectorAll("input,textarea").forEach(function(el){
+      function reset(){ el.classList.remove("invalid"); clearError(); }
+      el.addEventListener("input", reset);
+      el.addEventListener("change", reset);
+    });
+  }
+
+  function fail(msg, fields){
+    $("error").textContent = msg;
+    (fields || []).forEach(function(el){ el.classList.add("invalid"); });
+    if(fields && fields.length) fields[0].focus();
+  }
+
+  /* ---------- Nome ricordato su questo dispositivo ---------- */
+
+  try{
+    var saved = JSON.parse(localStorage.getItem(NAME_KEY) || "null");
+    if(saved){
+      $("nome").value = saved.nome || "";
+      $("cognome").value = saved.cognome || "";
+      $("email").value = saved.email || "";
+    }
+  }catch(e){}
+
+  /* ---------- Invio ---------- */
+
+  if(!configured) $("notConfigured").hidden = false;
+  watchFields($("nome").closest("fieldset"));
+  watchFields($("note").closest("fieldset"));
+
+  function clean(s){ return s.trim().replace(/\s+/g, " "); }
+
+  // JSON -> base64url (UTF-8): solo lettere, cifre, "-" e "_", sicuro in un link.
+  function encodeCalendar(obj){
+    return SicietCalendar.base64(JSON.stringify(obj)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  /* Eventi per l'allegato .ics (vedi calendar.js). */
+  function calendarEvents(voci){
+    return voci.map(function(v){
+      if(v.cal.a) return { t: v.tipo, allDay: true, a: parseDate(v.cal.a), b: parseDate(v.cal.b) };
+      return { t: v.tipo, allDay: false, a: v.inizio, b: new Date(v.inizio.getTime() + v.minuti * 60000) };
+    });
+  }
+  function unique(list){ return list.filter(function(x, i){ return list.indexOf(x) === i; }); }
+
+  form.addEventListener("submit", function(e){
+    e.preventDefault();
+    clearError();
+
+    var nome = clean($("nome").value), cognome = clean($("cognome").value);
+    var missing = [];
+    if(!nome) missing.push($("nome"));
+    if(!cognome) missing.push($("cognome"));
+    if(missing.length) return fail("Scrivi nome e cognome.", missing);
+
+    var email = $("email").value.trim();
+    if(!email) return fail("Scrivi il tuo indirizzo email.", [$("email")]);
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return fail("L'indirizzo email non sembra corretto: controlla di averlo scritto per intero (es. nome@esempio.it).", [$("email")]);
+
+    var voci = [];
+    for(var i = 0; i < entries.length; i++){
+      var p = periodo(entries[i]);
+      if(p.error){
+        var prefix = entries.length > 1 ? "Voce " + (i + 1) + ": " : "";
+        var msg = prefix + p.error;
+        return fail(msg.charAt(0).toUpperCase() + msg.slice(1), p.fields);
+      }
+      p.tipo = tipo(entries[i]);
+      voci.push(p);
+    }
+    // Nell'email le voci compaiono in ordine di data.
+    voci.sort(function(a, b){ return a.inizio - b.inizio; });
+
+    if($("botcheck").checked) return; // bot
+
+    var dipendente = cognome + " " + nome;
+    var note = $("note").value.trim();
+    var inviata = new Date();
+    var giorni = voci.reduce(function(s, v){ return s + v.giorni; }, 0);
+    var min = voci.reduce(function(s, v){ return s + v.minuti; }, 0);
+    var totale = [giorni ? daysLabel(giorni) + " (lun–ven)" : "", min ? hoursLabel(min) : ""].filter(Boolean).join(" + ");
+
+    var subject = voci.length === 1
+      ? "Richiesta " + voci[0].tipo + " – " + dipendente + " – " + voci[0].breve
+      : "Richiesta " + unique(voci.map(function(v){ return v.tipo; })).join(", ") + " – " + dipendente + " – " + voci.length + " voci";
+
+    var righe = voci.map(function(v, i){
+      return [voci.length === 1 ? "Richiesta" : "Voce " + (i + 1), v.tipo + ": " + v.testo + " · " + v.quantita];
+    });
+
+    // Variabili del modello EmailJS: {{subject}}, {{dipendente}}, {{voci}}…
+    var params = {
+      subject: subject,
+      dipendente: dipendente,
+      email: email,
+      voci: righe.map(function(r){ return voci.length === 1 ? r[1] : r[0] + " – " + r[1]; }).join("\n"),
+      totale: totale,
+      note: note || "—",
+      inviata_il: fmt(inviata) + " alle " + String(inviata.getHours()).padStart(2, "0") + ":" + String(inviata.getMinutes()).padStart(2, "0"),
+      // Dati per calendario.html: nel modello il link è
+      // https://hub.siciet.it/calendario.html#{{calendario}}
+      calendario: encodeCalendar({
+        v: 1,
+        n: dipendente,
+        e: email,
+        no: note,
+        x: voci.map(function(v){
+          var c = { t: v.tipo };
+          Object.keys(v.cal).forEach(function(k){ c[k] = v.cal[k]; });
+          return c;
+        })
+      })
+    };
+
+    // Allegato .ics con tutte le voci (allegato "variabile" nel modello EmailJS).
+    if(cfg.allegatoIcs){
+      params.ics = "data:text/calendar;base64," + SicietCalendar.base64(
+        SicietCalendar.ics(calendarEvents(voci), dipendente, email, note)
+      );
+    }
+
+    var recap = [["Dipendente", dipendente], ["Email", email]].concat(righe);
+    if(voci.length > 1) recap.push(["Totale", totale]);
+    recap.push(["Note", params.note]);
+
+    try{ localStorage.setItem(NAME_KEY, JSON.stringify({ nome: nome, cognome: cognome, email: email })); }catch(err){}
+
+    if(!configured){
+      showDone(recap, true);
+      return;
+    }
+
+    var btn = $("submit");
+    btn.disabled = true;
+    btn.textContent = "Invio in corso…";
+
+    fetch(ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        service_id: ejs.serviceId,
+        template_id: ejs.templateId,
+        user_id: ejs.publicKey,
+        template_params: params
+      })
+    })
+      .then(function(r){
+        if(r.ok) return showDone(recap, false);
+        return r.text().then(function(t){ throw new Error("EmailJS " + r.status + ": " + t); });
+      })
+      .catch(function(err){
+        // Il dettaglio tecnico aiuta chi gestisce il portale a capire il problema.
+        var detail = err && err.message && err.message.indexOf("EmailJS") === 0 ? " (" + err.message + ")" : "";
+        fail("La richiesta non è partita. Controlla la connessione e riprova; se il problema continua avvisa direttamente l'ufficio del personale." + detail);
+      })
+      .then(function(){
+        btn.disabled = false;
+        btn.textContent = "Invia richiesta";
+      });
+  });
+
+  function showDone(rows, prova){
+    var recap = $("recap");
+    recap.innerHTML = "";
+    rows.forEach(function(r){
+      var dt = document.createElement("dt"); dt.textContent = r[0];
+      var dd = document.createElement("dd"); dd.textContent = r[1];
+      recap.appendChild(dt); recap.appendChild(dd);
+    });
+    $("doneTitle").textContent = prova ? "Riepilogo (prova, nessuna email inviata)" : "Richiesta inviata";
+    $("doneText").textContent = prova
+      ? "Questo è ciò che riceverebbero gli addetti quando l'invio sarà attivo."
+      : "Gli addetti del personale hanno ricevuto la tua richiesta. Non si intende accettata automaticamente: verrà valutata e, in caso di necessità, ti contatteranno.";
+    form.hidden = true;
+    $("done").hidden = false;
+    window.scrollTo(0, 0);
+  }
+
+  $("again").addEventListener("click", function(){
+    entries.forEach(function(e){ e.el.remove(); });
+    entries = [];
+    addEntry();
+    $("note").value = "";
+    $("done").hidden = true;
+    form.hidden = false;
+  });
+
+  addEntry();
+})();
+</script>
+</body>
+</html>
