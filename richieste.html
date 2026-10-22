@@ -186,6 +186,16 @@ input:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:1px}
 .btn.add{background:transparent;border:2px dashed var(--border);color:var(--brand);font-weight:600}
 @media (prefers-color-scheme: dark){.btn.add{color:#6fb0ee}}
 
+.disclaimer{
+  border-left:4px solid var(--brand);
+  background:var(--chip);
+  border-radius:0 12px 12px 0;
+  padding:12px 14px;
+  font-size:14px;
+  line-height:1.45;
+}
+.disclaimer strong{display:block;margin-bottom:2px}
+
 /* Conferma */
 .done{display:grid;gap:14px;text-align:center}
 .done .badge{
@@ -250,6 +260,11 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
       <!-- Campo trappola per i bot: le persone non lo vedono. -->
       <label class="hp" aria-hidden="true">Non compilare<input type="checkbox" id="botcheck" tabindex="-1" autocomplete="off"></label>
 
+      <p class="disclaimer">
+        <strong>La richiesta non si intende accettata automaticamente.</strong>
+        Verrà valutata dagli addetti del personale, che ti contatteranno in caso di necessità.
+      </p>
+
       <p class="error" id="error" role="alert"></p>
 
       <button class="btn primary" type="submit" id="submit">Invia richiesta</button>
@@ -258,7 +273,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     <div class="done" id="done" hidden>
       <div class="badge" aria-hidden="true">✓</div>
       <h2 id="doneTitle">Richiesta inviata</h2>
-      <p id="doneText">Gli addetti del personale hanno ricevuto la tua richiesta e ti risponderanno.</p>
+      <p id="doneText">Gli addetti del personale hanno ricevuto la tua richiesta. Non si intende accettata automaticamente: verrà valutata e, in caso di necessità, ti contatteranno.</p>
       <dl class="recap" id="recap"></dl>
       <div class="actions">
         <button class="btn primary" type="button" id="again">Nuova richiesta</button>
@@ -647,7 +662,7 @@ var RICHIESTE_CONFIG = {
     $("doneTitle").textContent = prova ? "Riepilogo (prova, nessuna email inviata)" : "Richiesta inviata";
     $("doneText").textContent = prova
       ? "Questo è ciò che riceverebbero gli addetti quando l'invio sarà attivo."
-      : "Gli addetti del personale hanno ricevuto la tua richiesta e ti risponderanno.";
+      : "Gli addetti del personale hanno ricevuto la tua richiesta. Non si intende accettata automaticamente: verrà valutata e, in caso di necessità, ti contatteranno.";
     form.hidden = true;
     $("done").hidden = false;
     window.scrollTo(0, 0);
