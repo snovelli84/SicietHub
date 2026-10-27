@@ -147,5 +147,21 @@ window.SICIET_APPS = [
     web: "https://eu.ninjarmm.com/auth/#/mlogin?region=europe",
     iconStoreId: "1416138607", // icona dell'app NinjaOne Mobile
     verified: true
+  },
+  {
+    id: "splashtop",
+    name: "Splashtop SOS",
+    description: "Assistenza remota sullo smartphone: apri l'app e comunica al tecnico il codice che compare.",
+    category: "IT",
+    emoji: "🛟",
+    // Scheme non pubblicato da Splashtop: si apre la pagina dello store,
+    // che mostra "Apri" se l'app è già installata.
+    ios: {
+      store: "https://apps.apple.com/it/app/splashtop-sos/id1230853703"
+    },
+    android: {
+      package: "com.splashtop.sos"
+    },
+    verified: true
   }
 ];
