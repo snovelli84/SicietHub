@@ -432,6 +432,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     if(app.web && !app.ios && !app.android){
       // Le pagine del portale (indirizzo relativo) si aprono nella stessa scheda.
       if(!/^[a-z][a-z0-9+.-]*:/i.test(app.web)) window.location.href = app.web;
+      else if(app.webSede) openWebSede(app);
       else window.open(app.web, "_blank", "noopener");
       return;
     }
@@ -468,6 +469,21 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     );
   }
 
+  /* In sede si apre "webSede", fuori sede "web". */
+  function openWebSede(app){
+    L.isOfficeNetwork().then(function(inOffice){
+      var url = inOffice ? app.webSede : app.web;
+      // Con "noopener" window.open restituisce sempre null: si azzera opener a mano.
+      var w = window.open(url, "_blank");
+      if(w){ try{ w.opener = null; }catch(e){} return; }
+      // Apertura bloccata dal browser: pannello con entrambi gli indirizzi.
+      openSheet(app.name, app.description, [
+        { label: inOffice ? "Apri (rete aziendale)" : "Apri", primary: true, href: url, newTab: true },
+        { label: inOffice ? "Indirizzo esterno" : "Indirizzo interno (in sede)", href: inOffice ? app.web : app.webSede, newTab: true }
+      ]);
+    });
+  }
+
   function showDesktopSheet(app){
     var actions = [];
     if(app.web) actions.push({ label: "Apri versione web", primary: true, href: app.web, newTab: true });
@@ -479,6 +495,9 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
       actions
     );
   }
+
+  // Se qualche app ha un indirizzo per la sede, si verifica subito la rete.
+  if(apps.some(function(a){ return a.webSede; })) L.isOfficeNetwork();
 
   qEl.addEventListener("input", renderList);
   renderChips();

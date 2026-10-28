@@ -27,11 +27,22 @@
  *                direttamente il sito su qualsiasi dispositivo. Un indirizzo
  *                relativo (es. "richieste.html") è una pagina di questo portale
  *                e si apre nella stessa scheda.
+ *   webSede      (opzionale) indirizzo web da usare quando si è nella rete
+ *                aziendale (vedi SICIET_OFFICE_IPS), al posto di "web".
  *   iconStoreId  (opzionale) ID App Store da cui prendere l'icona ufficiale,
  *                utile per i servizi solo web che hanno comunque un'app.
  *
  *   verified     true se lo scheme è documentato/testato, false se è un tentativo
  */
+/*
+ * IP pubblici della rete aziendale. Se il dispositivo esce su Internet con
+ * uno di questi indirizzi è considerato "in sede" (es. MailStore usa webSede).
+ * Tenere allineato con OFFICE_IPS di outlook/mailstore.html.
+ */
+window.SICIET_OFFICE_IPS = [
+  "2.40.198.210"
+];
+
 window.SICIET_APPS = [
   {
     id: "perfetto",
@@ -102,7 +113,9 @@ window.SICIET_APPS = [
     emoji: "🗄️",
     icon: "icons/mailstore.svg", // simbolo ricavato dal logo ufficiale MailStore
     // Solo web (MailStore Web Access). Raggiungibile da fuori solo da IP italiani.
+    // In sede risponde solo sulla porta 8462 (fuori sede il firewall inoltra la 443).
     web: "https://mailstore.siciet.it",
+    webSede: "https://mailstore.siciet.it:8462",
     verified: true
   },
   {

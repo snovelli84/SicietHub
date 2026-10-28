@@ -22,6 +22,9 @@
   "use strict";
 
   var IOS_FALLBACK_MS = 2500;
+  var IP_LOOKUP_URL = "https://api.ipify.org?format=json";
+  var IP_LOOKUP_TIMEOUT_MS = 3000;
+  var officeCheck = null;
 
   function detectPlatform() {
     var ua = navigator.userAgent || "";
@@ -78,6 +81,29 @@
   }
 
   /*
+   * Promise<boolean>: true se il dispositivo esce su Internet da un IP della sede.
+   * La verifica viene fatta una sola volta per pagina.
+   */
+  function isOfficeNetwork() {
+    if (officeCheck) return officeCheck;
+    var ips = window.SICIET_OFFICE_IPS || [];
+    if (!ips.length || !window.fetch) return (officeCheck = Promise.resolve(false));
+
+    var timeout = new Promise(function (resolve) {
+      setTimeout(function () { resolve(null); }, IP_LOOKUP_TIMEOUT_MS);
+    });
+    var lookup = fetch(IP_LOOKUP_URL, { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { return d && d.ip; })
+      .catch(function () { return null; });
+
+    officeCheck = Promise.race([lookup, timeout]).then(function (ip) {
+      return !!ip && ips.indexOf(ip) >= 0;
+    });
+    return officeCheck;
+  }
+
+  /*
    * Avvia l'app. Restituisce un oggetto che descrive cosa è stato fatto,
    * così l'interfaccia può mostrare i pulsanti di riserva corretti.
    */
@@ -108,6 +134,7 @@
   window.SicietLauncher = {
     detectPlatform: detectPlatform,
     launch: launch,
+    isOfficeNetwork: isOfficeNetwork,
     storeUrl: storeUrl,
     storeName: storeName,
     playStoreUrl: playStoreUrl,
