@@ -16,7 +16,11 @@
  *   In ogni caso compare un pannello con i pulsanti manuali come riserva.
  *
  * PC
- *   Non viene avviato nulla: l'interfaccia mostra versione web e link agli store.
+ *   Si controlla l'IP pubblico: se è uno di quelli della sede (SICIET_OFFICE_IPS)
+ *   e l'app ha "desktop.scheme", si apre il programma installato sul PC.
+ *   Altrimenti si apre la versione web (se c'è) o si mostra un pannello con i
+ *   link agli store. Il browser non permette di sapere se il programma si è
+ *   aperto: per questo compare sempre un pannello con la versione web di riserva.
  */
 (function () {
   "use strict";
@@ -103,6 +107,11 @@
     return officeCheck;
   }
 
+  /* Apre un programma desktop tramite il suo scheme (es. "msteams:"). */
+  function launchDesktop(app) {
+    window.location.href = app.desktop.scheme;
+  }
+
   /*
    * Avvia l'app. Restituisce un oggetto che descrive cosa è stato fatto,
    * così l'interfaccia può mostrare i pulsanti di riserva corretti.
@@ -135,6 +144,7 @@
     detectPlatform: detectPlatform,
     launch: launch,
     isOfficeNetwork: isOfficeNetwork,
+    launchDesktop: launchDesktop,
     storeUrl: storeUrl,
     storeName: storeName,
     playStoreUrl: playStoreUrl,

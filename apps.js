@@ -32,14 +32,25 @@
  *   iconStoreId  (opzionale) ID App Store da cui prendere l'icona ufficiale,
  *                utile per i servizi solo web che hanno comunque un'app.
  *
+ *   desktop.scheme  (opzionale) indirizzo che apre il programma installato sul PC
+ *                   (es. "msteams:"). Viene usato SOLO da PC e SOLO dentro la
+ *                   rete aziendale (vedi SICIET_OFFICE_IPS); fuori sede si
+ *                   apre la versione web, se c'è.
+ *   desktop.name    (opzionale) nome del programma desktop, se diverso da "name"
+ *   desktop.preferWeb (opzionale) true per aprire prima la versione web: in sede
+ *                   il programma desktop resta disponibile come pulsante
  *   soloMobile   (opzionale) true per le app pensate solo per lo smartphone:
  *                da PC non vengono mostrate.
+ *   soloDesktop  (opzionale) true per le app che esistono solo sul PC:
+ *                su smartphone non vengono mostrate.
  *
  *   verified     true se lo scheme è documentato/testato, false se è un tentativo
  */
+
 /*
  * IP pubblici della rete aziendale. Se il dispositivo esce su Internet con
- * uno di questi indirizzi è considerato "in sede" (es. MailStore usa webSede).
+ * uno di questi indirizzi è considerato "in sede": si aprono le app desktop
+ * e si usa webSede (es. MailStore).
  * Tenere allineato con OFFICE_IPS di outlook/mailstore.html.
  */
 window.SICIET_OFFICE_IPS = [
@@ -109,6 +120,12 @@ window.SICIET_APPS = [
       scheme: "ms-outlook"
     },
     web: "https://outlook.office.com/mail/",
+    // Da PC si apre prima la versione web; in sede il pannello offre anche
+    // Outlook classico (scheme "siciet-outlook:", vedi desktop/protocolli-siciet.reg).
+    desktop: {
+      scheme: "siciet-outlook:",
+      preferWeb: true
+    },
     verified: true
   },
   {
@@ -139,6 +156,9 @@ window.SICIET_APPS = [
       scheme: "msteams"
     },
     web: "https://teams.microsoft.com/",
+    desktop: {
+      scheme: "msteams:"
+    },
     verified: true
   },
   {

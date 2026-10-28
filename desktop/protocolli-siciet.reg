@@ -1,0 +1,21 @@
+Windows Registry Editor Version 5.00
+
+; SICIET HUB - configurazione dei PC aziendali (distribuire via GPO o Intune).
+
+; 1) "siciet-outlook:" apre Outlook classico (app Microsoft 365, 64 bit).
+;    Per Office a 32 bit il percorso e' "C:\Program Files (x86)\Microsoft Office\root\Office16\OUTLOOK.EXE".
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\siciet-outlook]
+@="URL:Outlook (SICIET HUB)"
+"URL Protocol"=""
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\siciet-outlook\shell\open\command]
+@="\"C:\\Program Files\\Microsoft Office\\root\\Office16\\OUTLOOK.EXE\""
+
+; 2) Evita la domanda "Aprire ...?" del browser, solo per hub.siciet.it.
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge]
+"AutoLaunchProtocolsFromOrigins"="[{\"protocol\":\"siciet-outlook\",\"allowed_origins\":[\"https://hub.siciet.it\"]},{\"protocol\":\"msteams\",\"allowed_origins\":[\"https://hub.siciet.it\"]}]"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome]
+"AutoLaunchProtocolsFromOrigins"="[{\"protocol\":\"siciet-outlook\",\"allowed_origins\":[\"https://hub.siciet.it\"]},{\"protocol\":\"msteams\",\"allowed_origins\":[\"https://hub.siciet.it\"]}]"
