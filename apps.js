@@ -22,7 +22,7 @@
  *                    se assente, si apre la pagina del Play Store, che mostra
  *                    il pulsante "Apri" se l'app è già installata.
  *
- *   web          (opzionale) versione web, usata da PC o come alternativa.
+ *   web          (opzionale) versione web: da PC si apre direttamente.
  *                Se un'app ha SOLO "web" (niente ios/android), al tocco si apre
  *                direttamente il sito su qualsiasi dispositivo. Un indirizzo
  *                relativo (es. "richieste.html") è una pagina di questo portale
@@ -31,6 +31,9 @@
  *                aziendale (vedi SICIET_OFFICE_IPS), al posto di "web".
  *   iconStoreId  (opzionale) ID App Store da cui prendere l'icona ufficiale,
  *                utile per i servizi solo web che hanno comunque un'app.
+ *
+ *   soloMobile   (opzionale) true per le app pensate solo per lo smartphone:
+ *                da PC non vengono mostrate.
  *
  *   verified     true se lo scheme è documentato/testato, false se è un tentativo
  */
@@ -60,6 +63,7 @@ window.SICIET_APPS = [
     android: {
       package: "it.antos.perfettoapp"
     },
+    soloMobile: true,
     verified: false
   },
   {
@@ -76,6 +80,8 @@ window.SICIET_APPS = [
       package: "com.zucchetti.hr.hrsuite",
       scheme: "zconnect" // da verificare: se errato si apre il Play Store
     },
+    // Da PC si apre il portale HR via web.
+    web: "https://cnagrosseto.errepicloud.it/hrportal/jsp/login.jsp",
     verified: false
   },
   {
@@ -175,6 +181,7 @@ window.SICIET_APPS = [
     android: {
       package: "com.splashtop.sos"
     },
+    soloMobile: true,
     verified: true
   }
 ];
