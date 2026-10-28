@@ -4,8 +4,8 @@ Portale web con l'elenco delle app aziendali. Toccando un'app:
 
 - **se è installata** sul telefono, viene aperta;
 - **se non è installata**, l'utente viene portato allo store (App Store su iOS, Play Store su Android);
-- **da PC in sede** (rete aziendale) si apre il programma installato sul PC, se configurato (es. Teams, Mago4; per Outlook prima la versione web, poi l'app);
-- **da PC fuori sede** si apre la versione web, se esiste (es. ZConnect → portale HR); altrimenti compare un pannello con i link agli store. Le app solo per smartphone (MyPerfetto, AuthPoint, Splashtop SOS) da PC non compaiono; Mago4 compare solo da PC.
+- **da PC in sede** (rete aziendale) si apre il programma installato sul PC, se configurato (es. Teams; per Outlook prima la versione web, poi l'app);
+- **da PC fuori sede** si apre la versione web, se esiste (es. ZConnect → portale HR); altrimenti compare un pannello con i link agli store. Le app solo per smartphone (MyPerfetto, AuthPoint, Splashtop SOS) da PC non compaiono.
 
 Dopo il tocco compare sempre anche un pannello con i pulsanti "Apri" e "Scarica", come riserva nel caso l'apertura automatica non funzioni.
 
@@ -32,7 +32,7 @@ Tutto si configura in [`apps.js`](apps.js). Esempio:
 
 - `android.package`: è il valore `id=` nell'indirizzo della pagina Play Store dell'app.
 - `ios.store`: l'indirizzo della pagina App Store.
-- `soloMobile: true`: l'app non compare quando il portale è aperto da PC (es. MyPerfetto, AuthPoint, Splashtop SOS). `soloDesktop: true`: compare solo da PC (es. Mago4).
+- `soloMobile: true`: l'app non compare quando il portale è aperto da PC (es. MyPerfetto, AuthPoint, Splashtop SOS). `soloDesktop: true`: compare solo da PC.
 - `web`: da PC si apre direttamente questo indirizzo (es. ZConnect apre il portale HR); senza `web`, da PC compare un pannello con i link agli store.
 - Servizi solo web (es. NinjaOne): basta indicare `web` senza `ios`/`android`; al tocco si apre il sito su qualsiasi dispositivo. Con `webSede` si indica un indirizzo diverso da usare quando si è nella rete aziendale: la sede si riconosce dall'IP pubblico (`SICIET_OFFICE_IPS` in `apps.js`, verificato tramite `api.ipify.org`). Es. MailStore: in sede `https://mailstore.siciet.it:8462`, fuori sede `https://mailstore.siciet.it`. Con `iconStoreId` si può usare l'icona dell'eventuale app sull'App Store.
 - Icona: viene presa in automatico dall'App Store (icona ufficiale), usando l'ID nel link `ios.store`. Viene salvata nel browser per 7 giorni. Se non è disponibile si usa l'`emoji`. Per forzare un'immagine diversa si può indicare `icon: "https://..."`.
@@ -53,11 +53,10 @@ Tutto si configura in [`apps.js`](apps.js). Esempio:
 
 **Configurazione dei PC** – Il file [`desktop/protocolli-siciet.reg`](desktop/protocolli-siciet.reg) (da distribuire via GPO o Intune):
 
-1. registra lo scheme `siciet-mago4:`, che apre con Esplora risorse il collegamento ClickOnce di Mago4 in `C:\ProgramData\SICIET\Mago4.appref-ms`. Quel file va copiato sui PC (è il collegamento "Microarea Mago4 (Sicietw19appli)" del desktop, uguale per tutti; via GPO: *Preferenze → File*). Non si usano cmd o PowerShell perché Sophos blocca un browser che li avvia;
-2. registra lo scheme `siciet-outlook:`, che apre Outlook classico di Microsoft 365 (`OUTLOOK.EXE` in `C:\Program Files\Microsoft Office\root\Office16`);
-3. imposta la policy di Edge e Chrome `AutoLaunchProtocolsFromOrigins`, così il browser non chiede "Aprire Microsoft Teams?" ogni volta, solo per `https://hub.siciet.it`.
+1. registra lo scheme `siciet-outlook:`, che apre Outlook classico di Microsoft 365 (`OUTLOOK.EXE` in `C:\Program Files\Microsoft Office\root\Office16`);
+2. imposta la policy di Edge e Chrome `AutoLaunchProtocolsFromOrigins`, così il browser non chiede "Aprire Microsoft Teams?" ogni volta, solo per `https://hub.siciet.it`.
 
-Con lo stesso schema si può far aprire qualsiasi programma: si sceglie uno scheme (es. `siciet-nomeprogramma:`), lo si registra nel `.reg` e lo si indica in `desktop.scheme`.
+Con lo stesso schema si può far aprire altri programmi: si sceglie uno scheme (es. `siciet-nomeprogramma:`), lo si registra nel `.reg` e lo si indica in `desktop.scheme`. Attenzione: Sophos blocca il browser quando avvia cmd, PowerShell o Esplora risorse (per questo Mago4, che è un'applicazione ClickOnce, non è stato aggiunto); il comando registrato deve avviare direttamente l'eseguibile del programma.
 
 **Limiti** – Il browser non dice se il programma si è aperto davvero: per questo dopo il click compare sempre un pannello con "Apri" e "Apri versione web" come riserva. Teams (`msteams:`) è documentato. Per Outlook si apre prima la versione web; in sede il pannello offre anche Outlook classico (`desktop.preferWeb`).
 

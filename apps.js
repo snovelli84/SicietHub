@@ -78,20 +78,6 @@ window.SICIET_APPS = [
     verified: false
   },
   {
-    id: "mago4",
-    name: "Mago4",
-    description: "Gestionale Zucchetti Microarea.",
-    category: "Operatività",
-    emoji: "📦",
-    // Programma installato sui PC, raggiungibile solo dalla rete aziendale.
-    // Lo scheme "siciet-mago4:" va registrato sui PC: vedi desktop/protocolli-siciet.reg
-    desktop: {
-      scheme: "siciet-mago4:"
-    },
-    soloDesktop: true,
-    verified: false
-  },
-  {
     id: "zconnect",
     name: "ZConnect",
     description: "Visualizzazione Cedolini Buste Paga",
