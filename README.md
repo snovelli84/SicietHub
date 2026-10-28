@@ -32,7 +32,7 @@ Tutto si configura in [`apps.js`](apps.js). Esempio:
 
 - `android.package`: è il valore `id=` nell'indirizzo della pagina Play Store dell'app.
 - `ios.store`: l'indirizzo della pagina App Store.
-- Servizi solo web (es. NinjaOne): basta indicare `web` senza `ios`/`android`; al tocco si apre il sito su qualsiasi dispositivo. Con `iconStoreId` si può usare l'icona dell'eventuale app sull'App Store.
+- Servizi solo web (es. NinjaOne): basta indicare `web` senza `ios`/`android`; al tocco si apre il sito su qualsiasi dispositivo. Con `webSede` si indica un indirizzo diverso da usare quando si è nella rete aziendale: la sede si riconosce dall'IP pubblico (`SICIET_OFFICE_IPS` in `apps.js`, verificato tramite `api.ipify.org`). Es. MailStore: in sede `https://mailstore.siciet.it:8462`, fuori sede `https://mailstore.siciet.it`. Con `iconStoreId` si può usare l'icona dell'eventuale app sull'App Store.
 - Icona: viene presa in automatico dall'App Store (icona ufficiale), usando l'ID nel link `ios.store`. Viene salvata nel browser per 7 giorni. Se non è disponibile si usa l'`emoji`. Per forzare un'immagine diversa si può indicare `icon: "https://..."`.
 - `desktop.scheme`: l'indirizzo che apre il programma sul PC (es. `msteams:`). Si usa solo da PC in sede. `desktop.name` serve se il programma ha un nome diverso (es. MyPerfetto da PC apre Mago4).
 - `scheme`: l'indirizzo "speciale" che apre l'app (es. `msteams://`). Va chiesto al fornitore dell'app o cercato nella sua documentazione.

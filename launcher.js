@@ -85,7 +85,7 @@
   }
 
   /*
-   * Promise<boolean>: true se il PC esce su Internet da un IP della sede.
+   * Promise<boolean>: true se il dispositivo esce su Internet da un IP della sede.
    * La verifica viene fatta una sola volta per pagina.
    */
   function isOfficeNetwork() {
