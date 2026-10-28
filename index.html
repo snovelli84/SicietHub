@@ -235,9 +235,14 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 (function(){
   "use strict";
 
-  var apps = window.SICIET_APPS || [];
   var L = window.SicietLauncher;
   var platform = L.detectPlatform();
+  // Da PC non si mostrano le app solo per smartphone, e viceversa.
+  var apps = (window.SICIET_APPS || []).filter(function(a){
+    if(a.soloMobile && platform === "desktop") return false;
+    if(a.soloDesktop && platform !== "desktop") return false;
+    return true;
+  });
 
   var listEl = document.getElementById("list");
   var chipsEl = document.getElementById("chips");
@@ -514,16 +519,6 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     );
   }
 
-  function openWebOrSheet(app){
-    // window.open può essere bloccato dal browser: in quel caso resta il pannello.
-    // (Con "noopener" window.open restituisce sempre null: si azzera opener a mano.)
-    if(app.web){
-      var w = window.open(app.web, "_blank");
-      if(w){ try{ w.opener = null; }catch(e){} return; }
-    }
-    showDesktopSheet(app);
-  }
-
   /* In sede si apre "webSede", fuori sede "web". */
   function openWebSede(app){
     L.isOfficeNetwork().then(function(inOffice){
@@ -539,6 +534,17 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     });
   }
 
+  /* Da PC: si apre la versione web, se c'è; altrimenti il pannello. */
+  function openWebOrSheet(app){
+    // Con "noopener" window.open restituisce sempre null: si azzera opener a mano.
+    if(app.web){
+      var w = window.open(app.web, "_blank");
+      if(w){ try{ w.opener = null; }catch(e){} return; }
+    }
+    // Nessuna versione web, o apertura bloccata dal browser.
+    showDesktopSheet(app);
+  }
+
   function showDesktopSheet(app){
     var actions = [];
     if(app.web) actions.push({ label: "Apri versione web", primary: true, href: app.web, newTab: true });
@@ -546,7 +552,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     if(app.android) actions.push({ label: "Play Store (Android)", href: L.playStoreUrl(app.android.package), newTab: true });
     var text = app.description;
     if(app.desktop && app.desktop.scheme && !app.web){
-      text += " Da PC " + (app.desktop.name || app.name) + " si apre solo dalla rete aziendale; da smartphone puoi usare l'app.";
+      text += " Si apre solo dai PC nella rete aziendale.";
     }else if(!app.web){
       text += " Apri questa pagina dallo smartphone per installare o aprire l'app.";
     }

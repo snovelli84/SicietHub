@@ -22,7 +22,7 @@
  *                    se assente, si apre la pagina del Play Store, che mostra
  *                    il pulsante "Apri" se l'app è già installata.
  *
- *   web          (opzionale) versione web, usata da PC o come alternativa.
+ *   web          (opzionale) versione web: da PC si apre direttamente.
  *                Se un'app ha SOLO "web" (niente ios/android), al tocco si apre
  *                direttamente il sito su qualsiasi dispositivo. Un indirizzo
  *                relativo (es. "richieste.html") è una pagina di questo portale
@@ -39,6 +39,10 @@
  *   desktop.name    (opzionale) nome del programma desktop, se diverso da "name"
  *   desktop.preferWeb (opzionale) true per aprire prima la versione web: in sede
  *                   il programma desktop resta disponibile come pulsante
+ *   soloMobile   (opzionale) true per le app pensate solo per lo smartphone:
+ *                da PC non vengono mostrate.
+ *   soloDesktop  (opzionale) true per le app che esistono solo sul PC:
+ *                su smartphone non vengono mostrate.
  *
  *   verified     true se lo scheme è documentato/testato, false se è un tentativo
  */
@@ -70,12 +74,21 @@ window.SICIET_APPS = [
     android: {
       package: "it.antos.perfettoapp"
     },
-    // Da PC in sede si apre invece Mago4 (Zucchetti Microarea). Lo scheme
-    // "siciet-mago4:" va registrato sui PC: vedi desktop/protocolli-siciet.reg
+    soloMobile: true,
+    verified: false
+  },
+  {
+    id: "mago4",
+    name: "Mago4",
+    description: "Gestionale Zucchetti Microarea.",
+    category: "Operatività",
+    emoji: "📦",
+    // Programma installato sui PC, raggiungibile solo dalla rete aziendale.
+    // Lo scheme "siciet-mago4:" va registrato sui PC: vedi desktop/protocolli-siciet.reg
     desktop: {
-      scheme: "siciet-mago4:",
-      name: "Mago4"
+      scheme: "siciet-mago4:"
     },
+    soloDesktop: true,
     verified: false
   },
   {
@@ -176,6 +189,7 @@ window.SICIET_APPS = [
       package: "com.watchguard.authpoint",
       scheme: "authpoint" // da verificare: se errato si apre il Play Store
     },
+    soloMobile: true,
     verified: false
   },
   {
@@ -202,6 +216,7 @@ window.SICIET_APPS = [
     android: {
       package: "com.splashtop.sos"
     },
+    soloMobile: true,
     verified: true
   }
 ];
