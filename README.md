@@ -4,7 +4,7 @@ Portale web con l'elenco delle app aziendali. Toccando un'app:
 
 - **se è installata** sul telefono, viene aperta;
 - **se non è installata**, l'utente viene portato allo store (App Store su iOS, Play Store su Android);
-- **da PC** compare un pannello con la versione web (se esiste) e i link agli store.
+- **da PC** si apre la versione web, se esiste (es. ZConnect → portale HR); altrimenti compare un pannello con i link agli store. Le app solo per smartphone (MyPerfetto, AuthPoint, Splashtop SOS) da PC non compaiono.
 
 Dopo il tocco compare sempre anche un pannello con i pulsanti "Apri" e "Scarica", come riserva nel caso l'apertura automatica non funzioni.
 
@@ -31,6 +31,8 @@ Tutto si configura in [`apps.js`](apps.js). Esempio:
 
 - `android.package`: è il valore `id=` nell'indirizzo della pagina Play Store dell'app.
 - `ios.store`: l'indirizzo della pagina App Store.
+- `soloMobile: true`: l'app non compare quando il portale è aperto da PC (es. MyPerfetto, AuthPoint, Splashtop SOS).
+- `web`: da PC si apre direttamente questo indirizzo (es. ZConnect apre il portale HR); senza `web`, da PC compare un pannello con i link agli store.
 - Servizi solo web (es. NinjaOne): basta indicare `web` senza `ios`/`android`; al tocco si apre il sito su qualsiasi dispositivo. Con `webSede` si indica un indirizzo diverso da usare quando si è nella rete aziendale: la sede si riconosce dall'IP pubblico (`SICIET_OFFICE_IPS` in `apps.js`, verificato tramite `api.ipify.org`). Es. MailStore: in sede `https://mailstore.siciet.it:8462`, fuori sede `https://mailstore.siciet.it`. Con `iconStoreId` si può usare l'icona dell'eventuale app sull'App Store.
 - Icona: viene presa in automatico dall'App Store (icona ufficiale), usando l'ID nel link `ios.store`. Viene salvata nel browser per 7 giorni. Se non è disponibile si usa l'`emoji`. Per forzare un'immagine diversa si può indicare `icon: "https://..."`.
 - `scheme`: l'indirizzo "speciale" che apre l'app (es. `msteams://`). Va chiesto al fornitore dell'app o cercato nella sua documentazione.

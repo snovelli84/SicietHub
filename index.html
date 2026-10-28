@@ -235,9 +235,12 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 (function(){
   "use strict";
 
-  var apps = window.SICIET_APPS || [];
   var L = window.SicietLauncher;
   var platform = L.detectPlatform();
+  // Da PC non si mostrano le app pensate solo per lo smartphone.
+  var apps = (window.SICIET_APPS || []).filter(function(a){
+    return !(a.soloMobile && platform === "desktop");
+  });
 
   var listEl = document.getElementById("list");
   var chipsEl = document.getElementById("chips");
@@ -438,7 +441,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     }
 
     if(platform === "desktop"){
-      showDesktopSheet(app);
+      openWebOrSheet(app);
       return;
     }
 
@@ -482,6 +485,17 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
         { label: inOffice ? "Indirizzo esterno" : "Indirizzo interno (in sede)", href: inOffice ? app.web : app.webSede, newTab: true }
       ]);
     });
+  }
+
+  /* Da PC: si apre la versione web, se c'è; altrimenti il pannello. */
+  function openWebOrSheet(app){
+    // Con "noopener" window.open restituisce sempre null: si azzera opener a mano.
+    if(app.web){
+      var w = window.open(app.web, "_blank");
+      if(w){ try{ w.opener = null; }catch(e){} return; }
+    }
+    // Nessuna versione web, o apertura bloccata dal browser.
+    showDesktopSheet(app);
   }
 
   function showDesktopSheet(app){
