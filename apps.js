@@ -155,6 +155,7 @@ window.SICIET_APPS = [
       package: "com.watchguard.authpoint",
       scheme: "authpoint" // da verificare: se errato si apre il Play Store
     },
+    soloMobile: true,
     verified: false
   },
   {
