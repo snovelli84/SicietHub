@@ -6,9 +6,9 @@ Per ogni componente di una commessa si crea una scheda identificata da **JOB** e
 
 **Uso in cantiere**
 
-1. **+ Nuovo componente** → JOB (viene ricordato l'ultimo usato) e TAG. Con **📷 Leggi** si fotografa la targhetta, si riquadra il TAG col dito e il testo viene letto in automatico (OCR con [Tesseract.js](https://tesseract.projectnaptha.com), direttamente sul telefono): va sempre controllato. La foto della targhetta viene allegata alla scheda.
-2. Dati facoltativi (descrizione, fornitore, posizione, DDT), stato iniziale e note → **Crea scheda**.
-3. Nella scheda: si sceglie la fase (Ricevimento, Installazione, Collaudo, Non conformità…) e si scattano le foto; si aggiungono note (con eventuale cambio di stato: Da verificare / Conforme / Non conforme) e documenti (DDT, certificati, schede tecniche, verbali).
+1. **Rilevamento del TAG** – **+ Nuovo componente** → JOB (viene ricordato l'ultimo usato) → **📷 Fotografa la targhetta**: si riquadra il TAG col dito e il testo viene letto in automatico (OCR con [Tesseract.js](https://tesseract.projectnaptha.com), direttamente sul telefono). Il TAG va sempre controllato; se la lettura non riesce lo si scrive a mano (**Scrivo a mano**). La foto della targhetta viene comunque salvata nella scheda (fase "Targhetta"). Descrizione, fornitore, posizione, DDT, stato e note sono in **Altri dati**, facoltativi. → **Crea scheda**.
+2. **Aggiungi foto** – Nella scheda si sceglie la fase (Ricevimento, Installazione, Collaudo, Non conformità…), si scattano una o più foto (o si prendono dalla galleria), si controllano nell'anteprima togliendo quelle venute male, si scrive una nota facoltativa e si preme **Salva foto**. La nota compare nello storico della scheda e sotto ogni foto quando la si ingrandisce.
+3. **Note e stato, documenti** – Note generali con cambio di stato (Da verificare / Conforme / Non conforme) e documenti (DDT, certificati, schede tecniche, verbali).
 4. **🏷️ Etichetta QR** → **Stampa** (formato dell'etichetta in `QUALITA_CONFIG.etichetta`, di base 62×40 mm) oppure **Scarica PNG** per le app delle stampanti di etichette. Per l'esterno conviene un'etichetta in poliestere/vinile resistente agli agenti atmosferici.
 
 In un secondo momento si torna alla scheda inquadrando il QR, oppure da **Tutti i JOB → JOB → TAG**, e si aggiungono altre foto, note e documenti. Le foto vengono ridotte (lato massimo 2560 px) e salvate prima sul telefono: se manca la rete restano **in attesa di invio** e partono appena torna (senza chiudere il browser si riprova ogni minuto, o con **Riprova ora**).

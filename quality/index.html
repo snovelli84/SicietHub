@@ -175,6 +175,19 @@ input:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:1px}
 .msg:empty{display:none}
 .queue{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--chip);border-radius:12px;padding:10px 12px;font-size:14px}
 
+.step{border:1px solid var(--border);border-radius:14px;padding:14px}
+.targhetta{display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:start}
+.targhetta img{width:120px;height:120px;object-fit:cover;border-radius:10px;background:var(--chip)}
+.targhetta-azioni{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.targhetta-azioni .hint{flex-basis:100%}
+.altri summary{cursor:pointer;font-weight:600;font-size:15px;padding:6px 0}
+.altri-body{display:grid;gap:16px;margin-top:12px}
+.add-foto{gap:14px}
+.sel{position:relative}
+.sel .thumb{cursor:default}
+.sel .togli{position:absolute;top:4px;right:4px;width:30px;height:30px;border-radius:50%;border:0;background:rgba(0,0,0,.65);color:#fff;font-size:16px;cursor:pointer}
+.lightbox-nota{display:block;white-space:pre-wrap;margin-top:4px;opacity:.9}
+
 /* Elenchi JOB / TAG */
 .list{display:grid;gap:8px;list-style:none}
 .list a{
@@ -302,23 +315,39 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
         <input type="text" class="big" id="job" list="jobList" autocomplete="off" autocapitalize="characters" required>
         <datalist id="jobList"></datalist>
       </div>
-      <div class="field">
-        <label for="tag">TAG del componente</label>
-        <div class="with-btn">
-          <input type="text" class="big" id="tag" autocomplete="off" autocapitalize="characters" required>
-          <button class="btn" type="button" id="ocrBtn" title="Leggi il TAG da una foto">📷 Leggi</button>
+      <fieldset class="step">
+        <legend>1. Foto della targhetta</legend>
+        <p class="hint">Fotografa la targhetta del componente: il TAG viene letto in automatico e la foto viene salvata nella scheda.</p>
+        <button class="btn primary block" type="button" id="ocrBtn">📷 Fotografa la targhetta</button>
+        <div class="targhetta" id="targhetta" hidden>
+          <img id="targhettaImg" alt="Foto della targhetta">
+          <div class="targhetta-azioni">
+            <span class="hint">Foto salvata con la scheda</span>
+            <button class="btn small" type="button" id="targhettaRileggi">Rileggi TAG</button>
+            <button class="btn small" type="button" id="targhettaCambia">Cambia foto</button>
+            <button class="btn small" type="button" id="targhettaTogli">Togli</button>
+          </div>
         </div>
-        <span class="hint" id="ocrHint">Con "📷 Leggi" scatti una foto della targhetta e il TAG viene letto in automatico (controllalo sempre).</span>
-      </div>
-      <div class="row" id="campiNuovo"></div>
-      <fieldset>
-        <legend>Stato</legend>
-        <div class="choices" id="statiNuovo"></div>
       </fieldset>
-      <div class="field">
-        <label for="notaNuovo">Note <span class="hint">(facoltative)</span></label>
-        <textarea id="notaNuovo" maxlength="4000"></textarea>
-      </div>
+      <fieldset class="step">
+        <legend>2. TAG del componente</legend>
+        <input type="text" class="big" id="tag" aria-label="TAG del componente" autocomplete="off" autocapitalize="characters" required>
+        <span class="hint" id="ocrHint">Letto dalla foto oppure scritto a mano: controllalo sempre.</span>
+      </fieldset>
+      <details class="altri">
+        <summary>Altri dati <span class="hint">(facoltativi: descrizione, fornitore, stato, note…)</span></summary>
+        <div class="altri-body">
+          <div class="row" id="campiNuovo"></div>
+          <fieldset>
+            <legend>Stato</legend>
+            <div class="choices" id="statiNuovo"></div>
+          </fieldset>
+          <div class="field">
+            <label for="notaNuovo">Note</label>
+            <textarea id="notaNuovo" maxlength="4000"></textarea>
+          </div>
+        </div>
+      </details>
       <p class="msg error" id="nuovoErr" role="alert"></p>
       <button class="btn primary block" type="submit" id="nuovoSubmit">Crea scheda</button>
     </form>
@@ -351,17 +380,30 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     </div>
 
     <div class="card" style="margin-top:16px">
-      <h3>Foto</h3>
-      <fieldset>
-        <legend class="hint">Fase delle prossime foto</legend>
-        <div class="choices" id="fasi"></div>
-      </fieldset>
-      <div class="btns">
-        <button class="btn primary" type="button" id="fotoCamera">📷 Scatta foto</button>
-        <button class="btn" type="button" id="fotoGalleria">🖼️ Dalla galleria</button>
-      </div>
-      <input type="file" id="fotoCameraInput" accept="image/*" capture="environment" hidden>
-      <input type="file" id="fotoGalleriaInput" accept="image/*" multiple hidden>
+      <h3>Aggiungi foto</h3>
+      <form id="fotoForm" class="add-foto">
+        <fieldset>
+          <legend class="hint">Fase</legend>
+          <div class="choices" id="fasi"></div>
+        </fieldset>
+        <div class="btns">
+          <button class="btn primary" type="button" id="fotoCamera">📷 Scatta foto</button>
+          <button class="btn" type="button" id="fotoGalleria">🖼️ Dalla galleria</button>
+        </div>
+        <input type="file" id="fotoCameraInput" accept="image/*" capture="environment" hidden>
+        <input type="file" id="fotoGalleriaInput" accept="image/*" multiple hidden>
+        <div class="gallery" id="selezione"></div>
+        <div class="field" id="fotoNotaBox" hidden>
+          <label for="fotoNota">Nota sulle foto <span class="hint">(facoltativa)</span></label>
+          <textarea id="fotoNota" maxlength="4000" placeholder="Es. imballo integro, graffio sul lato sinistro, flange montate…"></textarea>
+        </div>
+        <p class="msg error" id="fotoErr" role="alert"></p>
+        <button class="btn primary block" type="submit" id="fotoSalva" hidden>Salva foto</button>
+      </form>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Foto della scheda</h3>
       <div id="galleria"></div>
     </div>
 
@@ -399,13 +441,12 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     <p class="hint">Trascina il dito per riquadrare solo il TAG, poi premi "Leggi testo". Senza riquadro viene letta tutta la foto.</p>
     <div class="crop-wrap"><canvas id="ocrCanvas"></canvas></div>
     <div class="btns">
-      <button class="btn" type="button" id="ocrAnnulla">Annulla</button>
+      <button class="btn" type="button" id="ocrAnnulla">Scrivo a mano</button>
       <button class="btn" type="button" id="ocrAltra">Altra foto</button>
       <button class="btn primary" type="button" id="ocrLeggi">Leggi testo</button>
     </div>
     <p class="hint" id="ocrStato" aria-live="polite"></p>
     <div class="choices" id="ocrRisultati"></div>
-    <label class="hint"><input type="checkbox" id="ocrAllega" checked> Allega questa foto alla scheda (fase "<span id="ocrFase"></span>")</label>
   </div>
 </div>
 <input type="file" id="ocrInput" accept="image/*" capture="environment" hidden>
@@ -413,7 +454,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 <!-- Foto ingrandita -->
 <div class="overlay lightbox" id="lightbox" hidden>
   <div class="dialog" role="dialog" aria-modal="true" aria-label="Foto">
-    <div class="bar"><span id="lightboxText"></span><span><a class="btn small" id="lightboxApri" target="_blank" rel="noopener">Apri originale</a> <button class="btn small" type="button" id="lightboxChiudi">Chiudi</button></span></div>
+    <div class="bar"><span><span id="lightboxText"></span><span class="lightbox-nota" id="lightboxNota"></span></span><span><a class="btn small" id="lightboxApri" target="_blank" rel="noopener">Apri originale</a> <button class="btn small" type="button" id="lightboxChiudi">Chiudi</button></span></div>
     <img id="lightboxImg" alt="">
   </div>
 </div>
