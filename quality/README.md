@@ -49,7 +49,7 @@ JOB e TAG diventano nomi di cartella in maiuscolo; i caratteri non ammessi da On
 
 **Accesso: nessuno, solo il nome dell'operatore** – Chi usa la pagina non accede a nulla. Al primo uso sul telefono si scrive **nome e cognome dell'operatore** (si cambia con **Cambia** in alto), che resta memorizzato e finisce nelle note, in Scheda.txt e nel nome delle foto.
 
-**Come funziona il salvataggio** – La pagina manda foto e dati al **servizio** in [`api/`](api/) (un Cloudflare Worker gratuito; in alternativa una Azure Function), che scrive nella cartella **Schede componenti** del team **SICIET Qualità** con le credenziali dell'app **SICIET Quality** registrata in Entra ID, che può accedere solo a quel sito. Le credenziali restano nelle impostazioni del servizio, mai nella pagina.
+**Come funziona il salvataggio** – La pagina manda foto e dati al **servizio** in [`api/`](api/) (un Cloudflare Worker, piano gratuito), che scrive nella cartella **Schede componenti** del team **SICIET Qualità** con le credenziali dell'app **SICIET Quality** registrata in Entra ID, che può accedere solo a quel sito. Le credenziali restano nelle impostazioni del servizio, mai nella pagina.
 
 Senza accesso, **chiunque abbia il link** (o inquadri un QR in cantiere) può vedere le schede e aggiungere foto, note e documenti. Per limitare i danni il servizio ammette scritture solo dentro `<COMMESSA>/<JOB>/<TAG>/` e solo per i file della pagina: foto (solo immagini, max 25 MB) e documenti (niente eseguibili né pagine web, max 50 MB) non sovrascrivono mai file esistenti; `scheda.json` deve essere una scheda valida per quel percorso. Le versioni precedenti dei file restano nella cronologia versioni di SharePoint. Non si può cancellare nulla dalla pagina. Se servisse più protezione basta impostare la variabile `PIN` del servizio: la pagina chiederà il PIN una volta per telefono, senza modifiche al codice.
 
@@ -83,7 +83,6 @@ Finché `api` in `QUALITA_CONFIG` (all'inizio di [`quality.js`](quality.js)) è 
    Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo (*Modifica codice* → incolla → *Distribuisci*). Foto e dati passano dal worker (non vengono conservati) e arrivano su SharePoint.
 3. In `quality.js` impostare `api: "https://<indirizzo del worker>/api"` e aumentare `?v=` in `index.html`.
 
-**In alternativa, Azure Functions** (a pagamento a consumo, costo minimo): App per le funzioni con piano **Consumo**, Node.js 20, Windows; le stesse variabili d'ambiente; *Configurazione → Credenziali di pubblicazione di autenticazione di base SCM* attivate; profilo di pubblicazione nel segreto GitHub `AZURE_FUNCTIONAPP_PUBLISH_PROFILE` e nome dell'app nella variabile `AZURE_FUNCTIONAPP_NAME`; poi *Actions* → **SICIET Quality – servizio** → **Run workflow**. In questo caso `api` è `https://<dominio predefinito>/api`.
 
 Verifica: `https://<indirizzo del servizio>/api/ping` aperto nel browser risponde `{"ok":true}`; se risponde "Servizio non configurato" manca una variabile d'ambiente. (Facoltativo: variabile `PIN` per chiedere un PIN aziendale.)
 

@@ -6,7 +6,7 @@
  * "SICIET Quality" registrata in Entra ID (permesso applicazione di Microsoft
  * Graph, limitato al sito SICIET Qualità). Vedi quality/README.md.
  *
- * Funziona su Azure Functions (index.js) e, così com'è, su Cloudflare Workers.
+ * È un Cloudflare Worker: il file si incolla così com'è nell'editor di Cloudflare.
  *
  * Senza PIN chiunque abbia il link può usare la pagina: per questo le
  * scritture sono ammesse solo dentro <COMMESSA>/<JOB>/<TAG>/ e solo per i
