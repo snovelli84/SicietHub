@@ -28,6 +28,7 @@ Schede componenti/                        (sito SharePoint "SICIET Qualità")
         Scheda.txt                        dati e storico delle note, leggibile
         Etichetta QR.png
         Foto/2026-10-30 14.32.05 Installazione - Mario Rossi.jpg
+        Foto/2026-11-02 09.10.40 Risoluzione - Conforme - Mario Rossi.jpg   (foto di un cambio di stato: c'è il nuovo stato)
         Documenti/DDT 1234.pdf
 ```
 

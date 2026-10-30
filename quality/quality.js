@@ -108,11 +108,18 @@ var QUALITA_CONFIG = {
     return d.getFullYear() + "-" + due(d.getMonth() + 1) + "-" + due(d.getDate()) + " " +
       due(d.getHours()) + "." + due(d.getMinutes()) + "." + due(d.getSeconds());
   }
-  // "2026-10-30 14.32.05 Installazione 2 - Mario Rossi.jpg" → { data, fase, operatore }
+  // Nomi delle foto, divisi da " - ":
+  //   "2026-10-30 14.32.05 Installazione 2 - Mario Rossi.jpg"          → { data, fase, operatore }
+  //   "2026-10-30 14.32.05 Risoluzione - Conforme - Mario Rossi.jpg"   → { data, fase, stato, operatore }
+  // (le foto di un cambio di stato riportano il nuovo stato).
   function leggiNomeFoto(nome){
-    var m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2})\.(\d{2})\.(\d{2}) (.+?)(?: \d+)?(?: - (.+?))?\.[a-z0-9]+$/i.exec(nome);
+    var m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2})\.(\d{2})\.(\d{2}) (.+)\.[a-z0-9]+$/i.exec(nome);
     if(!m) return { data: null, fase: "Altro" };
-    return { data: new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]), fase: m[7], operatore: m[8] };
+    var parti = m[7].split(" - "), r = { data: new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) };
+    r.fase = parti[0].replace(/ \d+$/, "");
+    if(parti.length >= 3){ r.stato = parti[1]; r.operatore = parti.slice(2).join(" - "); }
+    else if(parti.length === 2) r.operatore = parti[1];
+    return r;
   }
 
   function percorso(parti){ return parti.filter(Boolean).join("/"); }
@@ -539,8 +546,10 @@ var QUALITA_CONFIG = {
   };
 
   // Nomi dei file: "2026-10-30 14.32.05 Installazione 2 - Mario Rossi.jpg".
-  function nomiFoto(base, fase, n){
+  // statoNuovo: solo per le foto di un cambio di stato (vedi leggiNomeFoto).
+  function nomiFoto(base, fase, n, statoNuovo){
     var out = [], op = cfg.chiediOperatore && operatore() ? " - " + nomeFile(operatore()) : "";
+    if(statoNuovo) op = " - " + nomeFile(statoNuovo) + " - " + nomeFile(autore());
     for(var i = 0; i < n; i++) out.push(timbro(base) + " " + nomeFile(fase) + (n > 1 ? " " + (i + 1) : "") + op + ".jpg");
     return out;
   }
@@ -1526,7 +1535,7 @@ var QUALITA_CONFIG = {
     stato.scheda.note.forEach(function(n){ (n.foto || []).forEach(function(f){ noteFoto[f] = n.testo; }); });
     foto.forEach(function(f){
       var i = leggiNomeFoto(f.name);
-      (gruppi[i.fase] = gruppi[i.fase] || []).push({ f: f, data: i.data || new Date(f.modified), op: i.operatore || f.by });
+      (gruppi[i.fase] = gruppi[i.fase] || []).push({ f: f, data: i.data || new Date(f.modified), op: (i.stato ? i.stato + " – " : "") + (i.operatore || f.by || "") });
     });
     inCoda.forEach(function(c){
       var i = leggiNomeFoto(c.nome);
@@ -1633,7 +1642,7 @@ var QUALITA_CONFIG = {
     try{
       var base = new Date(), nomi = [];
       if(t && fotoStato.sel.length){
-        nomi = nomiFoto(base, t.fase, fotoStato.sel.length);
+        nomi = nomiFoto(base, t.fase, fotoStato.sel.length, t.nuovo);
         await accodaFoto(cartellaScheda(s), fotoStato.sel.map(function(x){ return x.file; }), nomi);
       }
       stato.scheda = await aggiornaScheda(s, function(d){
