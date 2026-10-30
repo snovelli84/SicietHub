@@ -21,7 +21,7 @@
  */
 var QUALITA_CONFIG = {
   // Indirizzo del servizio quality/api, es. "https://siciet-quality.azurewebsites.net/api".
-  api: "",
+  api: "https://siciet-quality.amministrazione-c44.workers.dev/api",
 
   // Chiede il nome di chi usa l'app (memorizzato sul dispositivo): finisce
   // nelle note e nei nomi delle foto.
