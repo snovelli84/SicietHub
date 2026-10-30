@@ -645,47 +645,96 @@ var QUALITA_CONFIG = {
     });
   })();
 
-  // Ritaglio in scala di grigi con contrasto aumentato: Tesseract legge meglio.
-  function ritaglioOcr(){
+  /*
+   * Tesseract legge bene testo scuro su fondo bianco, nitido, alto qualche
+   * decina di pixel, con margine attorno. Il ritaglio viene quindi
+   * ridimensionato in base alla sua altezza, portato in bianco e nero (soglia
+   * di Otsu, con il fondo sempre bianco anche per scritte chiare su targhe
+   * scure) e circondato da un bordo bianco.
+   */
+  function ritaglioOcr(altezza){
     var img = ocr.img, k = 1 / ocr.scala;
     var r = ocr.sel ? { x: ocr.sel.x * k, y: ocr.sel.y * k, w: ocr.sel.w * k, h: ocr.sel.h * k }
                     : { x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight };
-    var z = Math.min(3, 1800 / r.w, 1800 / r.h);
-    if(z > 1 && r.w * z < 600) z = Math.min(3, 600 / r.w);
+    var z = Math.min(altezza / r.h, 2400 / r.w);
+    var W = Math.max(1, Math.round(r.w * z)), H = Math.max(1, Math.round(r.h * z)), pad = Math.round(Math.max(20, H * 0.15));
     var c = document.createElement("canvas");
-    c.width = Math.round(r.w * z);
-    c.height = Math.round(r.h * z);
+    c.width = W + 2 * pad;
+    c.height = H + 2 * pad;
     var g = c.getContext("2d");
-    g.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, c.width, c.height);
-    var d = g.getImageData(0, 0, c.width, c.height), p = d.data, min = 255, max = 0, i, v;
-    for(i = 0; i < p.length; i += 4){
-      v = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2];
-      p[i] = v;
-      if(v < min) min = v;
-      if(v > max) max = v;
+    g.imageSmoothingQuality = "high";
+    g.drawImage(img, r.x, r.y, r.w, r.h, pad, pad, W, H);
+    var d = g.getImageData(pad, pad, W, H), p = d.data, n = W * H, grigi = new Uint8Array(n), hist = new Array(256).fill(0), i, v;
+    for(i = 0; i < n; i++){
+      v = (0.299 * p[4 * i] + 0.587 * p[4 * i + 1] + 0.114 * p[4 * i + 2]) | 0;
+      grigi[i] = v;
+      hist[v]++;
     }
-    var span = Math.max(1, max - min);
-    for(i = 0; i < p.length; i += 4){
-      v = (p[i] - min) * 255 / span;
-      p[i] = p[i + 1] = p[i + 2] = v;
+    var somma = 0, sB = 0, wB = 0, best = -1, soglia = 127;
+    for(i = 0; i < 256; i++) somma += i * hist[i];
+    for(i = 0; i < 256; i++){
+      wB += hist[i];
+      if(!wB) continue;
+      var wF = n - wB;
+      if(!wF) break;
+      sB += i * hist[i];
+      var dm = sB / wB - (somma - sB) / wF, sep = wB * wF * dm * dm;
+      if(sep > best){ best = sep; soglia = i; }
     }
-    g.putImageData(d, 0, 0);
+    var scuri = 0;
+    for(i = 0; i < n; i++) if(grigi[i] <= soglia) scuri++;
+    var inverti = scuri > n / 2; // il fondo è la parte più estesa: deve diventare bianco
+    for(i = 0; i < n; i++){
+      v = (grigi[i] <= soglia) !== inverti ? 0 : 255;
+      p[4 * i] = p[4 * i + 1] = p[4 * i + 2] = v;
+      p[4 * i + 3] = 255;
+    }
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, c.width, c.height);
+    g.putImageData(d, pad, pad);
     return c;
   }
 
-  // Righe lette → possibili TAG, prima quelle con lettere e numeri.
-  function candidatiTag(testo){
-    var seen = {}, out = [];
-    testo.split(/\n+/).forEach(function(riga){
-      var t = riga.toUpperCase().replace(/\s+/g, " ").replace(/^[^A-Z0-9]+|[^A-Z0-9]+$/g, "").trim();
-      [t, t.replace(/ /g, "")].forEach(function(x){
-        if(x.length >= 2 && x.length <= 40 && !seen[x]){ seen[x] = 1; out.push(x); }
-      });
-    });
-    function punti(x){ return (/[A-Z]/.test(x) && /\d/.test(x) ? 2 : 0) + (/[-\/.]/.test(x) ? 1 : 0) - (x.indexOf(" ") >= 0 ? 1 : 0); }
-    return out.sort(function(a, b){ return punti(b) - punti(a); }).slice(0, 8);
+  // Punteggio di un possibile TAG: lettere e numeri, trattini, lettura
+  // sicura e scritta grande (sulle targhette il TAG è di solito la più grande).
+  var FORMA_TAG = /^[A-Z0-9]{1,8}(?:[-\/. ]?[A-Z0-9]{1,8}){0,5}$/;
+  function puntiTag(t, conf, alt, maxAlt){
+    var s = conf / 100 + 0.8 * alt / maxAlt;
+    if(/\d/.test(t)) s += 0.6;
+    if(/[A-Z]/.test(t) && /\d/.test(t)) s += 0.4;
+    if(/[-\/.]/.test(t)) s += 0.3;
+    if(!FORMA_TAG.test(t)) s -= 1;
+    if(t.length < 3) s -= 0.8;
+    return s;
   }
 
+  // Possibili TAG da una lettura: il testo dopo la scritta "TAG", le righe
+  // intere, le singole parole e le coppie di parole vicine.
+  function candidatiTag(data, out){
+    var righe = data.lines || [], maxAlt = 1;
+    righe.forEach(function(l){ l.words.forEach(function(w){ maxAlt = Math.max(maxAlt, w.bbox.y1 - w.bbox.y0); }); });
+    function aggiungi(t, conf, alt, bonus){
+      t = t.toUpperCase().replace(/\s+/g, " ").replace(/^[^A-Z0-9]+|[^A-Z0-9]+$/g, "").trim();
+      if(t.length < 2 || t.length > 30) return;
+      var s = puntiTag(t, conf, alt, maxAlt) + (bonus || 0);
+      if(!(t in out) || out[t] < s) out[t] = s;
+    }
+    righe.forEach(function(l){
+      var w = l.words.filter(function(x){ return x.text.trim(); });
+      if(!w.length) return;
+      var alt = Math.max.apply(null, w.map(function(x){ return x.bbox.y1 - x.bbox.y0; }));
+      var conf = w.reduce(function(a, x){ return a + x.confidence; }, 0) / w.length;
+      var testo = w.map(function(x){ return x.text; }).join(" ");
+      var m = /\bTAG\s*(?:N[O0]?\.?|NR\.?)?\s*[:.]?\s*(.+)$/i.exec(testo);
+      if(m) aggiungi(m[1], conf, alt, 1.2);
+      aggiungi(testo, conf, alt);
+      if(w.length > 1) w.forEach(function(x){ aggiungi(x.text, x.confidence, x.bbox.y1 - x.bbox.y0, -0.2); });
+      for(var i = 0; i + 1 < w.length; i++) aggiungi(w[i].text + w[i + 1].text, (w[i].confidence + w[i + 1].confidence) / 2, alt, -0.1);
+    });
+  }
+
+  // Più letture a dimensioni diverse (riquadro largo e basso = una riga sola);
+  // ci si ferma appena una lettura è abbastanza sicura.
   async function leggiTesto(){
     var btn = $("ocrLeggi");
     btn.disabled = true;
@@ -695,19 +744,32 @@ var QUALITA_CONFIG = {
         $("ocrStato").textContent = "Preparazione della lettura (solo la prima volta può richiedere qualche secondo)…";
         await caricaScript(TESSERACT_URL);
         ocr.worker = await Tesseract.createWorker("eng");
-        await ocr.worker.setParameters({
-          tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_/. ",
-          preserve_interword_spaces: "1"
-        });
       }
-      $("ocrStato").textContent = "Lettura in corso…";
-      var r = await ocr.worker.recognize(ritaglioOcr());
-      var cand = candidatiTag(r.data.text || "");
+      var sel = ocr.sel, tentativi;
+      if(!sel) tentativi = [{ alt: 1600, psm: "11" }];
+      else if(sel.w / sel.h > 2.2) tentativi = [{ alt: 90, psm: "7" }, { alt: 160, psm: "6" }, { alt: 300, psm: "6" }];
+      else tentativi = [{ alt: 250, psm: "6" }, { alt: 500, psm: "6" }, { alt: 900, psm: "11" }];
+      var punti = {}, ordina = function(){ return Object.keys(punti).sort(function(a, b){ return punti[b] - punti[a]; }); };
+      for(var i = 0; i < tentativi.length; i++){
+        $("ocrStato").textContent = "Lettura in corso…" + (i ? " (tentativo " + (i + 1) + ")" : "");
+        await ocr.worker.setParameters({
+          tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-/. ",
+          preserve_interword_spaces: "1",
+          tessedit_pageseg_mode: tentativi[i].psm,
+          user_defined_dpi: "300"
+        });
+        var r = await ocr.worker.recognize(ritaglioOcr(tentativi[i].alt));
+        candidatiTag(r.data, punti);
+        var primo = ordina()[0];
+        if(primo && punti[primo] > 2.6) break;
+      }
+      var cand = ordina().slice(0, 6);
       $("ocrStato").textContent = cand.length
-        ? "Tocca il TAG corretto (potrai comunque correggerlo):"
-        : "Nessun testo riconosciuto. Prova a riquadrare solo il TAG, con più luce, oppure scrivilo a mano.";
-      cand.forEach(function(x){
-        $("ocrRisultati").appendChild(el("button", { type: "button", class: "btn small", text: x, onclick: function(){ scegliTag(x); } }));
+        ? "Tocca il TAG corretto (il primo è il più probabile; potrai comunque correggerlo):"
+        : "Nessun testo riconosciuto. Riquadra solo il TAG, con più luce e la foto dritta, oppure scrivilo a mano.";
+      if(cand.length && !sel) $("ocrStato").textContent += " Per una lettura migliore riquadra solo il TAG.";
+      cand.forEach(function(x, k){
+        $("ocrRisultati").appendChild(el("button", { type: "button", class: "btn small" + (k ? "" : " primary"), text: x, onclick: function(){ scegliTag(x); } }));
       });
     }catch(e){
       $("ocrStato").textContent = "Lettura non riuscita: " + (e.message || e);
