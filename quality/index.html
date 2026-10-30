@@ -273,6 +273,31 @@ input:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:1px}
 }
 
 footer{text-align:center;padding:24px 16px 88px;color:var(--muted);font-size:12px}
+.toast{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:20;
+  width:min(520px,calc(100% - 32px));
+  background:var(--ok);color:#fff;border-radius:14px;padding:14px 16px;
+  font-weight:600;font-size:15px;line-height:1.35;box-shadow:0 6px 20px rgba(0,0,0,.3);
+  transition:opacity .4s;
+}
+@media (prefers-color-scheme: dark){.toast{background:#1e7d3c}}
+.toast.via{opacity:0}
+.sub-title{font-size:14px;color:var(--muted);font-weight:600;margin-top:4px}
+.nota-form{border:1px solid var(--border);border-radius:14px;padding:14px}
+.conferma-btn{min-height:56px;font-size:17px}
+.conferma-btn.cambio{background:var(--ok)}
+@media (prefers-color-scheme: dark){.conferma-btn.cambio{background:#1e7d3c}}
+.storico{list-style:none;display:grid;gap:0;counter-reset:passo}
+.storico .passo{position:relative;padding:0 0 14px 22px;display:grid;gap:3px}
+.storico .passo::before{content:"";position:absolute;left:5px;top:6px;width:10px;height:10px;border-radius:50%;background:var(--muted)}
+.storico .passo::after{content:"";position:absolute;left:9px;top:18px;bottom:0;width:2px;background:var(--border)}
+.storico .passo:last-child::after{display:none}
+.storico .passo.ok::before{background:var(--ok)}
+.storico .passo.warn::before{background:#c79a00}
+.storico .passo.ko::before{background:var(--error)}
+.storico .badge{justify-self:start}
+.storico .who{font-size:13px;color:var(--muted)}
+.storico .txt{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.4}
 .home-fab{
   position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:5;
   width:56px;height:56px;border-radius:50%;
@@ -488,19 +513,31 @@ footer{text-align:center;padding:24px 16px 88px;color:var(--muted);font-size:12p
     </div>
 
     <div class="card" style="margin-top:16px">
-      <h3>Note e stato</h3>
-      <ul class="notes" id="note"></ul>
-      <form id="notaForm" class="modifica-solo">
+      <h3>Stato e note</h3>
+      <div id="storicoBox" hidden>
+        <h4 class="sub-title">Storico stato</h4>
+        <ol class="storico" id="storico"></ol>
+      </div>
+      <form id="notaForm" class="modifica-solo nota-form">
+        <h4 class="sub-title">Cambia stato o aggiungi una nota</h4>
         <fieldset>
           <legend class="hint">Stato</legend>
           <div class="choices" id="statiNota"></div>
         </fieldset>
         <div class="field">
-          <label for="notaTesto">Nuova nota</label>
+          <label for="notaTesto" id="notaLabel">Nuova nota</label>
           <textarea id="notaTesto" maxlength="4000"></textarea>
         </div>
-        <button class="btn primary block" type="submit" id="notaSubmit">Aggiungi nota</button>
+        <div id="notaFotoBox" class="add-foto" hidden>
+          <span class="label"><span id="notaFotoTitolo">Foto</span> <span class="hint">(facoltative)</span></span>
+          <div class="add-foto" id="fotoNota"></div>
+        </div>
+        <p class="msg error" id="notaErr" role="alert"></p>
+        <button class="btn primary block conferma-btn" type="submit" id="notaSubmit">✅ Aggiungi nota</button>
+        <p class="msg ok" id="notaOk" role="status" hidden></p>
       </form>
+      <h4 class="sub-title">Tutte le note</h4>
+      <ul class="notes" id="note"></ul>
     </div>
 
     <div class="card" style="margin-top:16px" id="docBox">
@@ -513,7 +550,9 @@ footer{text-align:center;padding:24px 16px 88px;color:var(--muted);font-size:12p
   </section>
 </main>
 
-<footer>SICIET Quality · versione 17</footer>
+<footer>SICIET Quality · versione 18</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <a class="home-fab" id="homeFab" href="?" data-vai aria-label="Torna alla pagina iniziale" title="Pagina iniziale" hidden>🏠</a>
 
@@ -563,6 +602,6 @@ footer{text-align:center;padding:24px 16px 88px;color:var(--muted);font-size:12p
 
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
 <!-- Aumentare ?v= a ogni modifica di quality.js, altrimenti i telefoni usano la versione in cache. -->
-<script src="quality.js?v=17"></script>
+<script src="quality.js?v=18"></script>
 </body>
 </html>

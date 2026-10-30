@@ -42,7 +42,7 @@ var QUALITA_CONFIG = {
   ],
   // Fasi delle foto: finiscono nel nome del file. La prima è usata per la
   // foto della targhetta scattata con "Leggi TAG".
-  fasi: ["Targhetta", "Ricevimento", "Installazione", "Collaudo", "Non conformità", "Altro"],
+  fasi: ["Targhetta", "Ricevimento", "Installazione", "Collaudo", "Non conformità", "Risoluzione", "Altro"],
   // Le foto vengono ridotte a questo lato massimo (pixel) e qualità JPEG.
   foto: { latoMax: 2560, qualita: 0.85 },
   // Etichetta per stampanti a nastro Brother con nastro TZe da 24 mm: l'area
@@ -141,6 +141,16 @@ var QUALITA_CONFIG = {
       document.head.appendChild(s);
     });
     return caricaScript.p[src];
+  }
+
+  // Avviso di conferma in basso, per qualche secondo.
+  function conferma(testo){
+    var t = $("toast");
+    t.textContent = "✓ " + testo;
+    t.hidden = false;
+    t.classList.remove("via");
+    clearTimeout(conferma.timer);
+    conferma.timer = setTimeout(function(){ t.classList.add("via"); setTimeout(function(){ t.hidden = true; }, 400); }, 5000);
   }
 
   function mostraErrore(e){
@@ -313,7 +323,7 @@ var QUALITA_CONFIG = {
     r.push("", "NOTE", "");
     if(!s.note.length) r.push("(nessuna)");
     s.note.forEach(function(n){
-      r.push(fmtData(n.il) + " – " + n.da + (n.stato ? "  [Stato: " + n.stato + "]" : "") +
+      r.push(fmtData(n.il) + " – " + n.da + (n.stato ? "  [Stato: " + (n.statoPrecedente ? n.statoPrecedente + " → " : "") + n.stato + "]" : "") +
         (n.foto ? "  [" + n.foto.length + " foto" + (n.fase ? ", " + n.fase : "") + "]" : ""));
       if(n.testo) r.push(n.testo);
       r.push("");
@@ -464,8 +474,10 @@ var QUALITA_CONFIG = {
   // Riquadro per aggiungere foto: fase, scatto/galleria, anteprima (con "×" per
   // togliere le foto venute male) e nota facoltativa. Usato nel nuovo
   // componente e nella scheda.
-  function PannelloFoto(box, onCambio){
+  // opts: { senzaFase: true (la fase la decide chi lo usa), senzaNota: true }
+  function PannelloFoto(box, onCambio, opts){
     var self = this, n = ++PannelloFoto.n;
+    opts = opts || {};
     this.sel = [];
     this.onCambio = onCambio || function(){};
     this.fasi = el("div", { class: "choices" });
@@ -493,10 +505,10 @@ var QUALITA_CONFIG = {
     ]);
     box.textContent = "";
     [
-      el("fieldset", null, [el("legend", { class: "hint", text: "Fase" }), this.fasi]),
+      opts.senzaFase ? null : el("fieldset", null, [el("legend", { class: "hint", text: "Fase" }), this.fasi]),
       el("div", { class: "btns" }, [this.btnCam, el("button", { type: "button", class: "btn", text: "🖼️ Dalla galleria", onclick: function(){ gal.click(); } })]),
-      cam, gal, this.griglia, this.notaBox
-    ].forEach(function(x){ box.appendChild(x); });
+      cam, gal, this.griglia, opts.senzaNota ? null : this.notaBox
+    ].forEach(function(x){ if(x) box.appendChild(x); });
     this.reset();
   }
   PannelloFoto.n = 0;
@@ -560,6 +572,7 @@ var QUALITA_CONFIG = {
         disegnaScheda();
         caricaFileScheda();
       }
+      conferma((nomi.length === 1 ? "1 foto salvata" : nomi.length + " foto salvate") + " (" + fase + ")" + (testo ? ", con la nota" : "") + ".");
     }catch(e){
       $("fotoErr").textContent = (salvate ? "Foto salvate, ma la nota no: " : "") + (e.message || e);
       if(salvate) p.nota.value = testo;
@@ -1443,7 +1456,51 @@ var QUALITA_CONFIG = {
       ul.appendChild(li);
     });
     sceltaStati($("statiNota"), "statoNota", s.stato);
+    disegnaStorico();
+    aggiornaFormNota();
   }
+
+  // Storico dello stato: solo i passaggi, dal primo (creazione) all'ultimo.
+  function disegnaStorico(){
+    var ol = $("storico"), passi = stato.scheda.note.filter(function(n){ return n.stato; });
+    ol.textContent = "";
+    passi.forEach(function(n, i){
+      var li = el("li", { class: "passo " + statoInfo(n.stato).tipo }, [
+        el("span", { class: "badge " + statoInfo(n.stato).tipo, text: n.stato }),
+        el("span", { class: "who", text: fmtData(n.il) + " – " + n.da + (i === 0 ? " · scheda creata" : "") +
+          (n.foto ? " · 📷 " + (n.foto.length === 1 ? "1 foto" : n.foto.length + " foto") : "") })
+      ]);
+      if(n.testo && !(i === 0 && n.testo === "Scheda creata.")) li.appendChild(el("span", { class: "txt", text: n.testo }));
+      ol.appendChild(li);
+    });
+    $("storicoBox").hidden = !passi.length;
+  }
+
+  /*
+   * Nuova nota o cambio di stato. Un cambio di stato richiede sempre la
+   * motivazione; da "Non conforme" a "Conforme" la domanda è "Come è stata
+   * risolta?". Si possono aggiungere foto (fase Risoluzione o Non conformità).
+   */
+  var fotoStato;
+  function tipoCambio(){
+    var s = stato.scheda, nuovo = valoreScelto($("statiNota"));
+    if(!s || !nuovo || nuovo === s.stato) return null;
+    var da = statoInfo(s.stato).tipo, a = statoInfo(nuovo).tipo;
+    if(a === "ok" && da === "ko") return { nuovo: nuovo, fase: "Risoluzione", domanda: "Come è stata risolta la non conformità?", esempio: "Es. flangia sostituita con una nuova, verificata la tenuta." };
+    if(a === "ko") return { nuovo: nuovo, fase: "Non conformità", domanda: "Descrivi la non conformità", esempio: "Es. flangia lato mandata danneggiata durante il trasporto." };
+    return { nuovo: nuovo, fase: "Altro", domanda: "Motivo del cambio di stato", esempio: "Es. verifica completata, nessun difetto." };
+  }
+  function aggiornaFormNota(){
+    var t = tipoCambio();
+    $("notaLabel").textContent = t ? t.domanda + " (obbligatorio)" : "Nuova nota";
+    $("notaTesto").placeholder = t ? t.esempio : "";
+    $("notaFotoBox").hidden = !t;
+    $("notaFotoTitolo").textContent = t && t.fase === "Risoluzione" ? "Foto della risoluzione" : "Foto";
+    $("notaSubmit").textContent = t ? "✅ Conferma: stato " + t.nuovo : "✅ Aggiungi nota";
+    $("notaSubmit").classList.toggle("cambio", !!t);
+    $("notaErr").textContent = "";
+  }
+  $("statiNota").addEventListener("change", function(){ $("notaOk").hidden = true; aggiornaFormNota(); });
 
   async function caricaFileScheda(){
     var s = stato.scheda;
@@ -1537,6 +1594,7 @@ var QUALITA_CONFIG = {
       await mostraCoda();
       caricaFileScheda();
       svuotaCoda();
+      conferma(files.length === 1 ? "Documento caricato: " + files[0].name : files.length + " documenti caricati.");
     }catch(e){ mostraErrore(e); }
   }
   $("docInput").addEventListener("change", function(){
@@ -1558,23 +1616,49 @@ var QUALITA_CONFIG = {
 
   $("notaForm").addEventListener("submit", async function(ev){
     ev.preventDefault();
-    var s = stato.scheda, testo = $("notaTesto").value.trim(), nuovo = valoreScelto($("statiNota"));
+    var s = stato.scheda, testo = $("notaTesto").value.trim(), t = tipoCambio();
     if(!s || solaLettura()) return;
-    var cambio = nuovo && nuovo !== s.stato;
-    if(!testo && !cambio){ $("notaTesto").focus(); return; }
-    var btn = $("notaSubmit");
+    $("notaOk").hidden = true;
+    if(!testo){
+      $("notaErr").textContent = t ? "Scrivi il motivo del cambio di stato: è obbligatorio e resta nello storico." : "Scrivi la nota.";
+      $("notaTesto").classList.add("invalid");
+      $("notaTesto").focus();
+      return;
+    }
+    $("notaTesto").classList.remove("invalid");
+    $("notaErr").textContent = "";
+    var btn = $("notaSubmit"), testoBtn = btn.textContent, precedente = s.stato;
     btn.disabled = true;
+    btn.textContent = "Salvataggio…";
     try{
+      var base = new Date(), nomi = [];
+      if(t && fotoStato.sel.length){
+        nomi = nomiFoto(base, t.fase, fotoStato.sel.length);
+        await accodaFoto(cartellaScheda(s), fotoStato.sel.map(function(x){ return x.file; }), nomi);
+      }
       stato.scheda = await aggiornaScheda(s, function(d){
-        var n = { il: new Date().toISOString(), da: autore() };
-        if(nuovo && nuovo !== d.stato){ n.stato = nuovo; d.stato = nuovo; }
-        if(testo) n.testo = testo;
+        var n = { il: base.toISOString(), da: autore(), testo: testo };
+        if(t && t.nuovo !== d.stato){ n.statoPrecedente = d.stato; n.stato = t.nuovo; d.stato = t.nuovo; }
+        if(nomi.length){ n.foto = nomi; n.fase = t.fase; }
         d.note.push(n);
       });
       $("notaTesto").value = "";
+      fotoStato.reset();
       disegnaScheda();
-    }catch(e){ mostraErrore(e); }
-    finally{ btn.disabled = false; }
+      if(nomi.length){ await mostraCoda(); caricaFileScheda(); svuotaCoda(); }
+      var msg = t
+        ? "Stato cambiato da «" + precedente + "» a «" + t.nuovo + "»" + (nomi.length ? " con " + (nomi.length === 1 ? "1 foto" : nomi.length + " foto") : "") + ". Registrato nello storico il " + fmtData(base.toISOString()) + " da " + autore() + "."
+        : "Nota aggiunta il " + fmtData(base.toISOString()) + " da " + autore() + ".";
+      $("notaOk").textContent = "✓ " + msg;
+      $("notaOk").hidden = false;
+      conferma(msg);
+    }catch(e){
+      $("notaErr").textContent = "Non salvato: " + (e.message || e) + " Riprova.";
+    }finally{
+      btn.disabled = false;
+      btn.textContent = testoBtn;
+      aggiornaFormNota();
+    }
   });
 
   $("modificaBtn").addEventListener("click", function(){
@@ -1596,6 +1680,7 @@ var QUALITA_CONFIG = {
   /* ---------- Avvio ---------- */
 
   fotoNuovo = new PannelloFoto($("fotoNuovo"));
+  fotoStato = new PannelloFoto($("fotoNota"), null, { senzaFase: true, senzaNota: true });
   fotoScheda = new PannelloFoto($("fotoScheda"), function(n){
     $("fotoSalva").hidden = !n;
     $("fotoSalva").textContent = n === 1 ? "Salva 1 foto" : "Salva " + n + " foto";
