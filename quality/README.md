@@ -49,7 +49,7 @@ Nella stessa configurazione si cambiano i dati aggiuntivi (`campi`), gli stati (
 **Limiti**
 
 - Per aprire la scheda dal QR serve un account Microsoft 365 aziendale con accesso alla cartella: un cliente o un fornitore esterno vede solo la richiesta di accesso. Per loro si può condividere da OneDrive la singola cartella del TAG.
-- La lettura del TAG funziona bene con targhette pulite e ben illuminate e scritte stampate; con incisioni, riflessi o caratteri piccoli può sbagliare o non leggere nulla, e il TAG si scrive a mano. La prima lettura scarica circa 10 MB (motore e dati della lingua), poi resta nella cache del browser.
+- La lettura del TAG dà i risultati migliori riquadrando **solo il TAG**, con la foto dritta e ben illuminata: il riquadro viene ingrandito in base alla sua altezza, portato in bianco e nero (anche per scritte chiare su targhe scure) e letto più volte; tra le righe lette si preferisce il testo dopo "TAG" e la scritta più grande. Su targhette di prova lette con il riquadro, il TAG giusto è il primo proposto in circa 3 casi su 4. Sbaglia ancora con incisioni poco contrastate, riflessi e caratteri simili (B/8, I/1, O/0): il TAG va sempre controllato. In alternativa, su iPhone, toccando il campo TAG si può usare **Scansiona testo** (riconoscimento di Apple, di solito più preciso). La prima lettura scarica circa 10 MB (motore e dati della lingua), poi resta nella cache del browser.
 - Le librerie (MSAL per l'accesso Microsoft, Tesseract.js, generatore di QR) sono caricate da `cdn.jsdelivr.net`: deve essere raggiungibile dalla rete aziendale e dai telefoni.
 - Le foto in attesa di invio restano nel browser in cui sono state scattate: se si cancellano i dati del browser prima dell'invio vanno perse.
 

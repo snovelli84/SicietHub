@@ -344,6 +344,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
         <legend>2. TAG del componente</legend>
         <input type="text" class="big" id="tag" aria-label="TAG del componente" autocomplete="off" autocapitalize="characters" required>
         <span class="hint" id="ocrHint">Letto dalla foto oppure scritto a mano: controllalo sempre.</span>
+        <span class="hint">Su iPhone puoi anche toccare il campo e scegliere <strong>Scansiona testo</strong> per inquadrare il TAG con la fotocamera.</span>
       </fieldset>
       <details class="altri step">
         <summary>3. Altri dati <span class="hint">(facoltativi: descrizione, fornitore, stato, note…)</span></summary>
@@ -437,13 +438,13 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   </section>
 </main>
 
-<footer>SICIET Quality · versione 5</footer>
+<footer>SICIET Quality · versione 6</footer>
 
 <!-- Lettura del TAG da foto -->
 <div class="overlay" id="ocrDlg" hidden>
   <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="ocrTitle">
     <h2 id="ocrTitle">Leggi il TAG</h2>
-    <p class="hint">Trascina il dito per riquadrare solo il TAG, poi premi "Leggi testo". Senza riquadro viene letta tutta la foto.</p>
+    <p class="hint">Trascina il dito per riquadrare <strong>solo il TAG</strong> (senza le altre scritte), poi premi "Leggi testo". Senza riquadro viene letta tutta la foto, con risultati meno precisi.</p>
     <div class="crop-wrap"><canvas id="ocrCanvas"></canvas></div>
     <div class="btns">
       <button class="btn" type="button" id="ocrAnnulla">Scrivo a mano</button>
@@ -482,6 +483,6 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
 <!-- Aumentare ?v= a ogni modifica di quality.js, altrimenti i telefoni usano la versione in cache. -->
-<script src="quality.js?v=5"></script>
+<script src="quality.js?v=6"></script>
 </body>
 </html>
