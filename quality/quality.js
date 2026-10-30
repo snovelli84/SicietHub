@@ -938,6 +938,8 @@ var QUALITA_CONFIG = {
 
   function soloVista(id){
     ["viewPin", "viewAccesso", "viewOperatore", "viewElenco", "viewNuovo", "viewScheda"].forEach(function(v){ $(v).hidden = v !== id; });
+    // Pulsante fisso per tornare all'inizio: non nella pagina iniziale né nelle richieste di accesso.
+    $("homeFab").hidden = (id === "viewElenco" && !stato.c) || ["viewPin", "viewAccesso", "viewOperatore"].indexOf(id) >= 0;
   }
 
   function mostra(){
@@ -1079,7 +1081,7 @@ var QUALITA_CONFIG = {
     var cr = $("elencoCrumbs");
     cr.textContent = "";
     if(c){
-      cr.appendChild(link("?", "Tutte le commesse"));
+      cr.appendChild(link("?", "🏠 Inizio"));
       cr.appendChild(document.createTextNode(" › "));
       if(job){
         cr.appendChild(link(qs(c), "Commessa " + c));
@@ -1385,7 +1387,7 @@ var QUALITA_CONFIG = {
     soloVista("viewScheda");
     var cr = $("schedaCrumbs");
     cr.textContent = "";
-    cr.appendChild(link("?", "Tutte le commesse"));
+    cr.appendChild(link("?", "🏠 Inizio"));
     cr.appendChild(document.createTextNode(" › "));
     cr.appendChild(link(qs(c), "Commessa " + c));
     cr.appendChild(document.createTextNode(" › "));
