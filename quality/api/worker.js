@@ -24,6 +24,9 @@
  *                  scheda e indice.json), fuori dalle cartelle che usano le persone;
  *                  di base "SICIET Quality - dati (non modificare)" nella raccolta Documenti
  *   ORIGIN         (facoltativo) sito autorizzato a chiamare il servizio, es. https://hub.siciet.it
+ *   PASSWORD_LETTURA  (facoltativo) password dei tecnici per vedere le schede entrando
+ *                  dal QR di un'etichetta
+ *   PASSWORD_MODIFICA (facoltativo) password dei tecnici per modificare, sempre dal QR
  *   APP_URL        (facoltativo) indirizzo della pagina, per i link nei riepiloghi;
  *                  di base ORIGIN + "/quality/"
  *
@@ -36,6 +39,8 @@
  *   GET /aggiorna?path=C/J/T       aggiorna i riepiloghi Excel per una scheda
  *   GET /aggiorna?azzera=1         svuota l'indice (prima di ricostruire tutti i riepiloghi)
  *   GET /schede                    elenco sintetico di tutte le schede (ricerca nella pagina)
+ *   GET /verifica?livello=lettura|modifica   controlla la password dei tecnici
+ *                                  (intestazione X-Password); { protetto: false } se non impostata
  *
  * La pagina legge e scrive <C>/<J>/<T>/scheda.json, ma il file sta in
  * FOLDER_DATI/<C>/<J>/<T>/scheda.json (lo stesso per indice.json): così nelle
@@ -66,7 +71,7 @@ function cors(env){
   return {
     "Access-Control-Allow-Origin": env.ORIGIN || "*",
     "Access-Control-Allow-Methods": "GET, PUT, OPTIONS",
-    "Access-Control-Allow-Headers": "X-Pin, Content-Type, If-Match",
+    "Access-Control-Allow-Headers": "X-Pin, X-Password, Content-Type, If-Match",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin"
   };
@@ -520,6 +525,19 @@ export async function handle(request, env, ctx){
     const parti = percorsoValido(url.searchParams.get("path"));
 
     if(request.method === "GET" && azione === "ping") return json(env, 200, { ok: true });
+
+    // Password dei tecnici per chi entra dal QR. La pagina libera resta libera:
+    // è un filtro per chi inquadra l'etichetta, non una protezione dei dati.
+    if(request.method === "GET" && azione === "verifica"){
+      const livello = url.searchParams.get("livello") === "modifica" ? "modifica" : "lettura";
+      const attesa = livello === "modifica" ? env.PASSWORD_MODIFICA : env.PASSWORD_LETTURA;
+      if(!attesa) return json(env, 200, { ok: true, protetto: false });
+      if(!pinUguale(request.headers.get("X-Password"), attesa)){
+        await new Promise(r => setTimeout(r, 800)); // rallenta i tentativi
+        throw new Errore(403, "Password non corretta.");
+      }
+      return json(env, 200, { ok: true, protetto: true });
+    }
 
     if(request.method === "GET" && azione === "list"){
       const v = await elenco(env, parti);
