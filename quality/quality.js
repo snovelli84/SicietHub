@@ -365,7 +365,8 @@ var QUALITA_CONFIG = {
     r.push("", "NOTE", "");
     if(!s.note.length) r.push("(nessuna)");
     s.note.forEach(function(n){
-      r.push(fmtData(n.il) + " – " + n.da + (n.stato ? "  [Stato: " + n.stato + "]" : ""));
+      r.push(fmtData(n.il) + " – " + n.da + (n.stato ? "  [Stato: " + n.stato + "]" : "") +
+        (n.foto ? "  [" + n.foto.length + " foto" + (n.fase ? ", " + n.fase : "") + "]" : ""));
       if(n.testo) r.push(n.testo);
       r.push("");
     });
@@ -477,52 +478,95 @@ var QUALITA_CONFIG = {
     return (await canvasBlob(c, "image/jpeg", cfg.foto.qualita)) || file;
   }
 
-  // Foto scelte ma non ancora salvate: si possono togliere e accompagnare con una nota.
-  function aggiungiSelezione(files){
-    files.forEach(function(f){ stato.selezione.push({ file: f, url: URL.createObjectURL(f) }); });
-    disegnaSelezione();
-  }
-
-  function disegnaSelezione(){
-    var box = $("selezione"), n = stato.selezione.length;
+  // Riquadro per aggiungere foto: fase, scatto/galleria, anteprima (con "×" per
+  // togliere le foto venute male) e nota facoltativa. Usato nel nuovo
+  // componente e nella scheda.
+  function PannelloFoto(box, onCambio){
+    var self = this, n = ++PannelloFoto.n;
+    this.sel = [];
+    this.onCambio = onCambio || function(){};
+    this.fasi = el("div", { class: "choices" });
+    cfg.fasi.forEach(function(f){
+      self.fasi.appendChild(el("label", { class: "choice" }, [
+        el("input", { type: "radio", name: "fase-" + n, value: f }),
+        el("span", { text: f })
+      ]));
+    });
+    var cam = el("input", { type: "file", accept: "image/*", capture: "environment", hidden: "" });
+    var gal = el("input", { type: "file", accept: "image/*", multiple: "", hidden: "" });
+    [cam, gal].forEach(function(inp){
+      inp.addEventListener("change", function(){
+        Array.prototype.slice.call(this.files).forEach(function(f){ self.sel.push({ file: f, url: URL.createObjectURL(f) }); });
+        this.value = "";
+        self.disegna();
+      });
+    });
+    this.btnCam = el("button", { type: "button", class: "btn primary", text: "📷 Scatta foto", onclick: function(){ cam.click(); } });
+    this.griglia = el("div", { class: "gallery" });
+    this.nota = el("textarea", { id: "fotoNota-" + n, maxlength: "4000", placeholder: "Es. imballo integro, graffio sul lato sinistro, flange montate…" });
+    this.notaBox = el("div", { class: "field", hidden: "" }, [
+      el("label", { for: "fotoNota-" + n }, ["Nota sulle foto ", el("span", { class: "hint", text: "(facoltativa)" })]),
+      this.nota
+    ]);
     box.textContent = "";
-    stato.selezione.forEach(function(x, i){
-      box.appendChild(el("div", { class: "sel" }, [
+    [
+      el("fieldset", null, [el("legend", { class: "hint", text: "Fase" }), this.fasi]),
+      el("div", { class: "btns" }, [this.btnCam, el("button", { type: "button", class: "btn", text: "🖼️ Dalla galleria", onclick: function(){ gal.click(); } })]),
+      cam, gal, this.griglia, this.notaBox
+    ].forEach(function(x){ box.appendChild(x); });
+    this.reset();
+  }
+  PannelloFoto.n = 0;
+  PannelloFoto.prototype.disegna = function(){
+    var self = this, n = this.sel.length;
+    this.griglia.textContent = "";
+    this.sel.forEach(function(x, i){
+      self.griglia.appendChild(el("div", { class: "sel" }, [
         el("span", { class: "thumb" }, [el("img", { src: x.url, alt: "Foto " + (i + 1) })]),
         el("button", { type: "button", class: "togli", "aria-label": "Togli la foto " + (i + 1), text: "×", onclick: function(){
-          stato.selezione.splice(i, 1);
-          disegnaSelezione();
+          self.sel.splice(i, 1);
+          self.disegna();
         } })
       ]));
     });
-    $("fotoNotaBox").hidden = !n;
-    $("fotoSalva").hidden = !n;
-    $("fotoSalva").textContent = n === 1 ? "Salva 1 foto" : "Salva " + n + " foto";
-    $("fotoCamera").textContent = n ? "📷 Scatta un'altra foto" : "📷 Scatta foto";
+    this.notaBox.hidden = !n;
+    this.btnCam.textContent = n ? "📷 Scatta un'altra foto" : "📷 Scatta foto";
+    this.onCambio(n);
+  };
+  PannelloFoto.prototype.fase = function(){ return valoreScelto(this.fasi); };
+  PannelloFoto.prototype.testo = function(){ return this.nota.value.trim(); };
+  PannelloFoto.prototype.reset = function(){
+    this.sel = [];
+    this.nota.value = "";
+    var r = this.fasi.querySelectorAll("input");
+    r[r.length > 1 ? 1 : 0].checked = true;
+    this.disegna();
+  };
+
+  // Nomi dei file: "2026-10-30 14.32.05 Installazione 2.jpg".
+  function nomiFoto(base, fase, n){
+    var out = [];
+    for(var i = 0; i < n; i++) out.push(timbro(base) + " " + nomeFile(fase) + (n > 1 ? " " + (i + 1) : "") + ".jpg");
+    return out;
+  }
+  async function accodaFoto(job, tag, files, nomi){
+    for(var i = 0; i < files.length; i++) await accoda(job, tag, "Foto", nomi[i], await comprimi(files[i]));
   }
 
-  function svuotaSelezione(){
-    stato.selezione = [];
-    $("fotoNota").value = "";
-    $("fotoErr").textContent = "";
-    disegnaSelezione();
-  }
+  var fotoNuovo, fotoScheda;
 
-  // Salva le foto scelte (in coda di invio) e, se c'è, la nota che le accompagna.
+  // Salva le foto scelte nella scheda (in coda di invio) e, se c'è, la nota che le accompagna.
   async function salvaFoto(){
-    var s = stato.scheda, sel = stato.selezione, fase = valoreScelto($("fasi")), testo = $("fotoNota").value.trim();
-    if(!s || !sel.length) return;
-    var btn = $("fotoSalva");
+    var s = stato.scheda, p = fotoScheda, fase = p.fase(), testo = p.testo();
+    if(!s || !p.sel.length) return;
+    var btn = $("fotoSalva"), salvate = false;
     btn.disabled = true;
     $("fotoErr").textContent = "";
     try{
-      var base = new Date(), nomi = [];
-      for(var i = 0; i < sel.length; i++){
-        var nome = timbro(base) + " " + nomeFile(fase) + (sel.length > 1 ? " " + (i + 1) : "") + ".jpg";
-        await accoda(s.job, s.tag, "Foto", nome, await comprimi(sel[i].file));
-        nomi.push(nome);
-      }
-      svuotaSelezione();
+      var base = new Date(), nomi = nomiFoto(base, fase, p.sel.length);
+      await accodaFoto(s.job, s.tag, p.sel.map(function(x){ return x.file; }), nomi);
+      salvate = true;
+      p.reset();
       await mostraCoda();
       caricaFileScheda();
       svuotaCoda();
@@ -534,8 +578,8 @@ var QUALITA_CONFIG = {
         caricaFileScheda();
       }
     }catch(e){
-      $("fotoErr").textContent = (testo && !stato.selezione.length ? "Foto salvate, ma la nota no: " : "") + (e.message || e);
-      if(testo && !stato.selezione.length) $("fotoNota").value = testo;
+      $("fotoErr").textContent = (salvate ? "Foto salvate, ma la nota no: " : "") + (e.message || e);
+      if(salvate) p.nota.value = testo;
     }finally{
       btn.disabled = false;
     }
@@ -778,7 +822,7 @@ var QUALITA_CONFIG = {
 
   /* ---------- Navigazione ---------- */
 
-  var stato = { vista: null, job: null, tag: null, scheda: null, fotoTarghetta: null, selezione: [] };
+  var stato = { vista: null, job: null, tag: null, scheda: null, fotoTarghetta: null };
 
   function vai(query){
     history.pushState(null, "", location.pathname + query);
@@ -918,6 +962,7 @@ var QUALITA_CONFIG = {
     $("tag").value = "";
     $("ocrHint").textContent = "Letto dalla foto oppure scritto a mano: controllalo sempre.";
     document.querySelector("#viewNuovo details").open = false;
+    fotoNuovo.reset();
     mostraTarghetta();
     campiForm($("campiNuovo"), "n-");
     sceltaStati($("statiNuovo"), "statoNuovo");
@@ -939,14 +984,16 @@ var QUALITA_CONFIG = {
     err.textContent = "";
     var btn = $("nuovoSubmit");
     btn.disabled = true;
-    btn.textContent = "Creazione…";
+    btn.textContent = "Salvataggio…";
     try{
       if(await B.readJson(percorso([job, tag, "scheda.json"]))){
         err.textContent = "Esiste già una scheda per il TAG " + tag + " nel JOB " + job + ": la apro, puoi aggiungere foto e note.";
         setTimeout(function(){ vai("?job=" + encodeURIComponent(job) + "&tag=" + encodeURIComponent(tag)); }, 1800);
         return;
       }
-      var adesso = new Date().toISOString(), chi = B.userName();
+      var ora = new Date(), adesso = ora.toISOString(), chi = B.userName();
+      var fasePrima = fotoNuovo.fase(), filePrima = fotoNuovo.sel.map(function(x){ return x.file; });
+      var nomiPrima = nomiFoto(new Date(ora.getTime() + 1000), fasePrima, filePrima.length), notaFoto = fotoNuovo.testo();
       var tagScritto = $("tag").value.trim(), statoIniz = valoreScelto($("statiNuovo")), nota = $("notaNuovo").value.trim();
       var s = {
         versione: 1,
@@ -957,6 +1004,7 @@ var QUALITA_CONFIG = {
         creata: { il: adesso, da: chi },
         note: [{ il: adesso, da: chi, stato: statoIniz, testo: nota || "Scheda creata." }]
       };
+      if(filePrima.length) s.note.push({ il: adesso, da: chi, fase: fasePrima, foto: nomiPrima, testo: notaFoto || undefined });
       if(tagScritto.toUpperCase() !== tag) s.tagOriginale = tagScritto;
       await scriviScheda(s);
       storage(function(){ localStorage.setItem(LAST_JOB_KEY, job); });
@@ -967,13 +1015,15 @@ var QUALITA_CONFIG = {
         await accoda(job, tag, "Foto", timbro(new Date()) + " " + nomeFile(cfg.fasi[0]) + ".jpg", await comprimi(stato.fotoTarghetta));
         stato.fotoTarghetta = null;
       }
+      await accodaFoto(job, tag, filePrima, nomiPrima);
+      fotoNuovo.reset();
       vai("?job=" + encodeURIComponent(job) + "&tag=" + encodeURIComponent(tag));
       svuotaCoda();
     }catch(e){
       err.textContent = e.message || String(e);
     }finally{
       btn.disabled = false;
-      btn.textContent = "Crea scheda";
+      btn.textContent = "Salva scheda";
     }
   });
 
@@ -998,9 +1048,8 @@ var QUALITA_CONFIG = {
     $("galleria").textContent = "";
     $("documenti").textContent = "";
     $("modificaForm").hidden = true;
-    svuotaSelezione();
+    fotoScheda.reset();
     $("cartellaBtn").hidden = true;
-    disegnaFasi();
     sceltaStati($("statiNota"), "statoNota");
     try{
       var r = await B.readJson(percorso([job, tag, "scheda.json"]));
@@ -1041,18 +1090,6 @@ var QUALITA_CONFIG = {
       ul.appendChild(li);
     });
     sceltaStati($("statiNota"), "statoNota", s.stato);
-  }
-
-  function disegnaFasi(){
-    var box = $("fasi"), attuale = valoreScelto(box) || cfg.fasi[1] || cfg.fasi[0];
-    box.textContent = "";
-    cfg.fasi.forEach(function(f){
-      box.appendChild(el("label", { class: "choice" }, [
-        el("input", { type: "radio", name: "fase", value: f }),
-        el("span", { text: f })
-      ]));
-    });
-    box.querySelector("input[value=\"" + attuale.replace(/"/g, "") + "\"]").checked = true;
   }
 
   async function caricaFileScheda(){
@@ -1136,16 +1173,6 @@ var QUALITA_CONFIG = {
   $("lightboxChiudi").addEventListener("click", function(){ $("lightbox").hidden = true; $("lightboxImg").removeAttribute("src"); });
   $("lightbox").addEventListener("click", function(ev){ if(ev.target === this) $("lightboxChiudi").click(); });
 
-  $("fotoCamera").addEventListener("click", function(){ $("fotoCameraInput").click(); });
-  $("fotoGalleria").addEventListener("click", function(){ $("fotoGalleriaInput").click(); });
-  ["fotoCameraInput", "fotoGalleriaInput"].forEach(function(id){
-    $(id).addEventListener("change", function(){
-      var files = Array.prototype.slice.call(this.files);
-      this.value = "";
-      aggiungiSelezione(files);
-    });
-  });
-
   $("fotoForm").addEventListener("submit", function(ev){ ev.preventDefault(); salvaFoto(); });
 
   $("docBtn").addEventListener("click", function(){ $("docInput").click(); });
@@ -1199,6 +1226,12 @@ var QUALITA_CONFIG = {
   });
 
   /* ---------- Avvio ---------- */
+
+  fotoNuovo = new PannelloFoto($("fotoNuovo"));
+  fotoScheda = new PannelloFoto($("fotoScheda"), function(n){
+    $("fotoSalva").hidden = !n;
+    $("fotoSalva").textContent = n === 1 ? "Salva 1 foto" : "Salva " + n + " foto";
+  });
 
   $("queueRetry").addEventListener("click", svuotaCoda);
   $("login").addEventListener("click", function(){ B.login().catch(mostraErrore); });

@@ -182,7 +182,7 @@ input:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:1px}
 .targhetta-azioni .hint{flex-basis:100%}
 .altri summary{cursor:pointer;font-weight:600;font-size:15px;padding:6px 0}
 .altri-body{display:grid;gap:16px;margin-top:12px}
-.add-foto{gap:14px}
+.add-foto{display:grid;gap:14px}
 .sel{position:relative}
 .sel .thumb{cursor:default}
 .sel .togli{position:absolute;top:4px;right:4px;width:30px;height:30px;border-radius:50%;border:0;background:rgba(0,0,0,.65);color:#fff;font-size:16px;cursor:pointer}
@@ -334,8 +334,8 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
         <input type="text" class="big" id="tag" aria-label="TAG del componente" autocomplete="off" autocapitalize="characters" required>
         <span class="hint" id="ocrHint">Letto dalla foto oppure scritto a mano: controllalo sempre.</span>
       </fieldset>
-      <details class="altri">
-        <summary>Altri dati <span class="hint">(facoltativi: descrizione, fornitore, stato, note…)</span></summary>
+      <details class="altri step">
+        <summary>3. Altri dati <span class="hint">(facoltativi: descrizione, fornitore, stato, note…)</span></summary>
         <div class="altri-body">
           <div class="row" id="campiNuovo"></div>
           <fieldset>
@@ -348,8 +348,13 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
           </div>
         </div>
       </details>
+      <fieldset class="step">
+        <legend>4. Foto del componente</legend>
+        <p class="hint">Foto che attestano lo stato del componente, con una nota facoltativa. Altre foto si possono aggiungere in seguito dalla scheda.</p>
+        <div class="add-foto" id="fotoNuovo"></div>
+      </fieldset>
       <p class="msg error" id="nuovoErr" role="alert"></p>
-      <button class="btn primary block" type="submit" id="nuovoSubmit">Crea scheda</button>
+      <button class="btn primary block" type="submit" id="nuovoSubmit">Salva scheda</button>
     </form>
   </section>
 
@@ -382,21 +387,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     <div class="card" style="margin-top:16px">
       <h3>Aggiungi foto</h3>
       <form id="fotoForm" class="add-foto">
-        <fieldset>
-          <legend class="hint">Fase</legend>
-          <div class="choices" id="fasi"></div>
-        </fieldset>
-        <div class="btns">
-          <button class="btn primary" type="button" id="fotoCamera">📷 Scatta foto</button>
-          <button class="btn" type="button" id="fotoGalleria">🖼️ Dalla galleria</button>
-        </div>
-        <input type="file" id="fotoCameraInput" accept="image/*" capture="environment" hidden>
-        <input type="file" id="fotoGalleriaInput" accept="image/*" multiple hidden>
-        <div class="gallery" id="selezione"></div>
-        <div class="field" id="fotoNotaBox" hidden>
-          <label for="fotoNota">Nota sulle foto <span class="hint">(facoltativa)</span></label>
-          <textarea id="fotoNota" maxlength="4000" placeholder="Es. imballo integro, graffio sul lato sinistro, flange montate…"></textarea>
-        </div>
+        <div class="add-foto" id="fotoScheda"></div>
         <p class="msg error" id="fotoErr" role="alert"></p>
         <button class="btn primary block" type="submit" id="fotoSalva" hidden>Salva foto</button>
       </form>
@@ -432,7 +423,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   </section>
 </main>
 
-<footer>SICIET Quality</footer>
+<footer>SICIET Quality · versione 4</footer>
 
 <!-- Lettura del TAG da foto -->
 <div class="overlay" id="ocrDlg" hidden>
@@ -477,6 +468,6 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
 <!-- Aumentare ?v= a ogni modifica di quality.js, altrimenti i telefoni usano la versione in cache. -->
-<script src="quality.js?v=3"></script>
+<script src="quality.js?v=4"></script>
 </body>
 </html>
