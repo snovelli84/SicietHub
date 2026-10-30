@@ -34,9 +34,11 @@ Schede componenti/                        (sito SharePoint "SICIET Qualità")
 
 JOB e TAG diventano nomi di cartella in maiuscolo; i caratteri non ammessi da OneDrive (`\ / : * ? " < > | # %`) diventano `-` (es. `P-101/A` → `P-101-A`, il TAG scritto originale resta nella scheda). Nella scheda **📁 Apri cartella** apre la cartella in OneDrive/SharePoint.
 
-**Accesso: PIN e operatore, niente account Microsoft** – Chi usa la pagina non accede a Microsoft 365. Sul telefono si inserisce **una volta** il **PIN aziendale** e poi **nome e cognome dell'operatore** (si cambia con **Cambia** in alto); restano memorizzati. Il nome finisce nelle note, in Scheda.txt e nel nome delle foto. Se il PIN aziendale viene cambiato, al primo uso la pagina lo richiede.
+**Accesso: nessuno, solo il nome dell'operatore** – Chi usa la pagina non accede a nulla. Al primo uso sul telefono si scrive **nome e cognome dell'operatore** (si cambia con **Cambia** in alto), che resta memorizzato e finisce nelle note, in Scheda.txt e nel nome delle foto.
 
-**Come funziona il salvataggio** – La pagina manda foto e dati al **servizio** in [`api/`](api/) (una Azure Function), insieme al PIN. Il servizio controlla il PIN e scrive nella cartella **Schede componenti** del team **SICIET Qualità** con le credenziali dell'app **SICIET Quality** registrata in Entra ID, che può accedere solo a quel sito. Le credenziali restano nelle impostazioni del servizio, mai nella pagina. Il PIN protegge dall'uso di chi trova il link, ma è condiviso: se esce dall'azienda va cambiato (impostazione `PIN` del servizio).
+**Come funziona il salvataggio** – La pagina manda foto e dati al **servizio** in [`api/`](api/) (una Azure Function), che scrive nella cartella **Schede componenti** del team **SICIET Qualità** con le credenziali dell'app **SICIET Quality** registrata in Entra ID, che può accedere solo a quel sito. Le credenziali restano nelle impostazioni del servizio, mai nella pagina.
+
+Senza accesso, **chiunque abbia il link** (o inquadri un QR in cantiere) può vedere le schede e aggiungere foto, note e documenti. Per limitare i danni il servizio ammette scritture solo dentro `<COMMESSA>/<JOB>/<TAG>/` e solo per i file della pagina: foto (solo immagini, max 25 MB) e documenti (niente eseguibili né pagine web, max 50 MB) non sovrascrivono mai file esistenti; `scheda.json` deve essere una scheda valida per quel percorso. Le versioni precedenti dei file restano nella cronologia versioni di SharePoint. Non si può cancellare nulla dalla pagina. Se servisse più protezione basta impostare la variabile `PIN` del servizio: la pagina chiederà il PIN una volta per telefono, senza modifiche al codice.
 
 Finché `api` in `QUALITA_CONFIG` (all'inizio di [`quality.js`](quality.js)) è vuoto, la pagina funziona **in prova** e salva tutto solo nel browser del dispositivo.
 
@@ -54,7 +56,6 @@ Finché `api` in `QUALITA_CONFIG` (all'inizio di [`quality.js`](quality.js)) è 
    - *Impostazioni → Variabili d'ambiente*, aggiungere:
      | Nome | Valore |
      |---|---|
-     | `PIN` | il PIN aziendale (es. 6 cifre) |
      | `TENANT_ID` | `5c055224-300a-4b03-8742-552b7dd79f62` |
      | `CLIENT_ID` | `7b0cf16f-9dc4-4763-83e7-0ce9bef8e4df` |
      | `CLIENT_SECRET` | il valore del segreto client |
@@ -70,13 +71,13 @@ Finché `api` in `QUALITA_CONFIG` (all'inizio di [`quality.js`](quality.js)) è 
    - *Actions* → **SICIET Quality – servizio** → **Run workflow**. Da quel momento il servizio si aggiorna da solo a ogni modifica di `quality/api`.
 4. In `quality.js` impostare `api: "https://<dominio predefinito>/api"` e aumentare `?v=` in `index.html`.
 
-Verifica: `https://<dominio predefinito>/api/ping` aperto nel browser risponde `{"errore":"PIN non corretto."}` (giusto: manca il PIN); se risponde "Servizio non configurato" manca una variabile d'ambiente. Il servizio funziona anche su Cloudflare Workers ([`api/worker.js`](api/worker.js) così com'è, con le stesse variabili).
+Verifica: `https://<dominio predefinito>/api/ping` aperto nel browser risponde `{"ok":true}`; se risponde "Servizio non configurato" manca una variabile d'ambiente. (Facoltativo: variabile `PIN` per chiedere un PIN aziendale.) Il servizio funziona anche su Cloudflare Workers ([`api/worker.js`](api/worker.js) così com'è, con le stesse variabili).
 
 Nella stessa configurazione si cambiano i dati aggiuntivi (`campi`), gli stati (`stati`), le fasi delle foto (`fasi`, la prima è quella della foto della targhetta) e la riduzione delle foto (`foto`).
 
 **Limiti**
 
-- Per aprire la scheda dal QR serve il PIN aziendale (una volta per telefono). A un cliente o fornitore esterno si può condividere da SharePoint la singola cartella del TAG. Il pulsante **Apri in SharePoint** della scheda è per l'ufficio: SharePoint chiede l'account Microsoft.
+- Chi inquadra il QR vede la scheda senza accedere. A un cliente o fornitore esterno si può condividere da SharePoint la singola cartella del TAG. Il pulsante **Apri in SharePoint** della scheda è per l'ufficio: SharePoint chiede l'account Microsoft.
 - La lettura del TAG dà i risultati migliori riquadrando **solo il TAG**, con la foto dritta e ben illuminata: il riquadro viene ingrandito in base alla sua altezza, portato in bianco e nero (anche per scritte chiare su targhe scure) e letto più volte; tra le righe lette si preferisce il testo dopo "TAG" e la scritta più grande. Su targhette di prova lette con il riquadro, il TAG giusto è il primo proposto in circa 3 casi su 4. Sbaglia ancora con incisioni poco contrastate, riflessi e caratteri simili (B/8, I/1, O/0): il TAG va sempre controllato. In alternativa, su iPhone, toccando il campo TAG si può usare **Scansiona testo** (riconoscimento di Apple, di solito più preciso). La prima lettura scarica circa 10 MB (motore e dati della lingua), poi resta nella cache del browser.
 - Le librerie (Tesseract.js, generatore di QR) sono caricate da `cdn.jsdelivr.net`: deve essere raggiungibile dalla rete aziendale e dai telefoni.
 - Le foto in attesa di invio restano nel browser in cui sono state scattate: se si cancellano i dati del browser prima dell'invio vanno perse.

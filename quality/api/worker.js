@@ -1,16 +1,20 @@
 /*
  * SICIET QUALITY – SERVIZIO PER SHAREPOINT
  * ----------------------------------------
- * La pagina non accede a Microsoft 365: manda le richieste a questo servizio
- * con il PIN aziendale (intestazione X-Pin). Il servizio controlla il PIN e
- * legge/scrive nella cartella delle schede con le credenziali dell'app
+ * La pagina non accede a Microsoft 365: manda le richieste a questo servizio,
+ * che legge/scrive nella cartella delle schede con le credenziali dell'app
  * "SICIET Quality" registrata in Entra ID (permesso applicazione di Microsoft
  * Graph, limitato al sito SICIET Qualità). Vedi quality/README.md.
  *
  * Funziona su Azure Functions (index.js) e, così com'è, su Cloudflare Workers.
  *
+ * Senza PIN chiunque abbia il link può usare la pagina: per questo le
+ * scritture sono ammesse solo dentro <COMMESSA>/<JOB>/<TAG>/ e solo per i
+ * file che la pagina crea (vedi controllaScrittura).
+ *
  * Impostazioni (variabili d'ambiente):
- *   PIN            PIN aziendale chiesto dalla pagina
+ *   PIN            (facoltativo) PIN aziendale: se impostato la pagina lo chiede
+ *                  una volta per dispositivo (intestazione X-Pin)
  *   TENANT_ID      ID directory (tenant)
  *   CLIENT_ID      ID applicazione (client) di "SICIET Quality"
  *   CLIENT_SECRET  segreto client dell'app
@@ -19,7 +23,7 @@
  *   ORIGIN         (facoltativo) sito autorizzato a chiamare il servizio, es. https://hub.siciet.it
  *
  * Richieste (path = percorso relativo alla cartella delle schede):
- *   GET /ping                      verifica il PIN
+ *   GET /ping                      verifica il servizio (e il PIN, se impostato)
  *   GET /list?path=…               contenuto di una cartella
  *   GET /item?path=…               { etag, webUrl } di un file o cartella
  *   GET /json?path=…               { data, etag } di un file JSON
@@ -54,6 +58,34 @@ function json(env, status, obj){
 }
 
 // Confronto a tempo costante, per non far indovinare il PIN un carattere alla volta.
+// Estensioni mai ammesse tra i documenti.
+const VIETATE = /\.(exe|com|bat|cmd|ps1|psm1|vbs|vbe|js|mjs|jse|wsf|wsh|msi|msp|scr|pif|cpl|jar|hta|html?|xhtml|svg|lnk|reg|dll|sh|apk|app|dmg|iso)$/i;
+const MB = 1024 * 1024;
+
+// Cosa si può scrivere, e come: la struttura è <COMMESSA>/<JOB>/<TAG>/…
+//   scheda.json, Scheda.txt, Etichetta QR.png   nella cartella del TAG
+//   Foto/<file immagine>                        mai sovrascritte
+//   Documenti/<file>                            mai sovrascritti, niente eseguibili
+function controllaScrittura(parti, tipo, dimensione){
+  const nome = parti[parti.length - 1];
+  if(parti.length === 4){
+    if(nome === "scheda.json"){ if(dimensione > MB) throw new Errore(413, "Scheda troppo grande."); return { rename: false, json: true }; }
+    if(nome === "Scheda.txt"){ if(dimensione > MB) throw new Errore(413, "Scheda troppo grande."); return { rename: false }; }
+    if(nome === "Etichetta QR.png"){ if(dimensione > 2 * MB) throw new Errore(413, "Etichetta troppo grande."); return { rename: true }; }
+  }
+  if(parti.length === 5 && parti[3] === "Foto"){
+    if(!/^image\//.test(tipo || "") || !/\.(jpe?g|png|heic|webp)$/i.test(nome)) throw new Errore(415, "Nella cartella Foto si possono caricare solo immagini.");
+    if(dimensione > 25 * MB) throw new Errore(413, "Foto troppo grande (massimo 25 MB).");
+    return { rename: true };
+  }
+  if(parti.length === 5 && parti[3] === "Documenti"){
+    if(VIETATE.test(nome)) throw new Errore(415, "Tipo di file non ammesso.");
+    if(dimensione > 50 * MB) throw new Errore(413, "File troppo grande (massimo 50 MB).");
+    return { rename: true };
+  }
+  throw new Errore(403, "Scrittura non ammessa in questo percorso.");
+}
+
 function pinUguale(a, b){
   a = String(a || ""); b = String(b || "");
   let diff = a.length ^ b.length;
@@ -181,10 +213,13 @@ async function carica(env, parti, dati, tipo, etag, rename){
 export async function handle(request, env){
   if(request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(env) });
   try{
-    if(!env.PIN || !env.TENANT_ID || !env.CLIENT_ID || !env.CLIENT_SECRET || !env.SITE || !env.FOLDER){
-      throw new Errore(500, "Servizio non configurato: mancano PIN, TENANT_ID, CLIENT_ID, CLIENT_SECRET, SITE o FOLDER.");
+    if(!env.TENANT_ID || !env.CLIENT_ID || !env.CLIENT_SECRET || !env.SITE || !env.FOLDER){
+      throw new Errore(500, "Servizio non configurato: mancano TENANT_ID, CLIENT_ID, CLIENT_SECRET, SITE o FOLDER.");
     }
-    if(!pinUguale(request.headers.get("X-Pin"), env.PIN)){
+    // Richieste da altri siti web (il browser indica sempre l'Origin).
+    const origine = request.headers.get("Origin");
+    if(env.ORIGIN && origine && origine !== env.ORIGIN) throw new Errore(403, "Origine non ammessa.");
+    if(env.PIN && !pinUguale(request.headers.get("X-Pin"), env.PIN)){
       await new Promise(r => setTimeout(r, 800)); // rallenta i tentativi
       throw new Errore(401, "PIN non corretto.");
     }
@@ -209,10 +244,17 @@ export async function handle(request, env){
     }
 
     if(request.method === "PUT" && azione === "file"){
+      const tipo = request.headers.get("Content-Type");
+      const dichiarata = +request.headers.get("Content-Length") || 0;
+      controllaScrittura(parti, tipo, dichiarata);
       const dati = await request.arrayBuffer();
-      if(dati.byteLength > 60 * 1024 * 1024) throw new Errore(413, "File troppo grande (massimo 60 MB).");
-      const r = await carica(env, parti, dati, request.headers.get("Content-Type"),
-        request.headers.get("If-Match"), url.searchParams.get("rename") === "1");
+      const regola = controllaScrittura(parti, tipo, dati.byteLength);
+      if(regola.json){
+        let s;
+        try{ s = JSON.parse(new TextDecoder().decode(dati)); }catch(e){ throw new Errore(400, "Scheda non valida."); }
+        if(!s || s.commessa !== parti[0] || s.job !== parti[1] || s.tag !== parti[2] || !Array.isArray(s.note)) throw new Errore(400, "Scheda non valida.");
+      }
+      const r = await carica(env, parti, dati, tipo, request.headers.get("If-Match"), regola.rename);
       return json(env, 200, r);
     }
 
