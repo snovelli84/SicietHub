@@ -48,4 +48,6 @@ Nella stessa configurazione si cambiano i dati aggiuntivi (`campi`), gli stati (
 - Le librerie (MSAL per l'accesso Microsoft, Tesseract.js, generatore di QR) sono caricate da `cdn.jsdelivr.net`: deve essere raggiungibile dalla rete aziendale e dai telefoni.
 - Le foto in attesa di invio restano nel browser in cui sono state scattate: se si cancellano i dati del browser prima dell'invio vanno perse.
 
+**Aggiornamenti** – A ogni modifica di `quality.js` aumentare il numero in `quality.js?v=…` in fondo a `index.html`: altrimenti i telefoni possono continuare a usare per qualche tempo lo script vecchio insieme alla pagina nuova, con errori come "null is not an object".
+
 **Logo e icone** – In [`icons/`](icons/): marchio SICIET con la scritta QUALITY (font Orbitron, gradiente blu → verde come in SICIET HUB). `logo.png` è usato nell'intestazione, le altre sono le icone per la schermata Home e il browser.
