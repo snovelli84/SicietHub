@@ -3,11 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Controllo qualità – SICIET HUB</title>
+<title>SICIET Quality</title>
 <meta name="theme-color" content="#005baa">
 <meta name="robots" content="noindex">
 <link rel="icon" href="icons/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SICIET Quality">
 
 <style>
 :root{
@@ -66,11 +69,11 @@ header{
 }
 .header-inner{max-width:820px;margin:0 auto}
 .header-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
-.back{color:#fff;text-decoration:none;font-size:15px;opacity:.9;display:inline-block;padding:4px 0}
-.back:hover{opacity:1;text-decoration:underline}
+.logo{display:inline-block;background:#fff;border-radius:16px;padding:8px 12px;line-height:0}
+.logo img{display:block;height:64px;width:auto}
 .user{font-size:13px;opacity:.9;text-align:right;min-width:0;overflow-wrap:anywhere}
 .user button{background:none;border:0;color:#fff;font:inherit;text-decoration:underline;cursor:pointer;margin-left:6px}
-header h1{font-size:24px;margin-top:10px;text-wrap:balance}
+header h1{font-size:0;line-height:0}
 header p{opacity:.9;margin-top:4px;font-size:15px}
 
 main{
@@ -253,17 +256,16 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 <header>
   <div class="header-inner">
     <div class="header-top">
-      <a class="back" href="./">‹ SICIET HUB</a>
+      <h1><a class="logo" href="./"><img src="icons/logo.png" alt="SICIET Quality" width="447" height="340"></a></h1>
       <div class="user" id="user" hidden><span id="userName"></span><button type="button" id="logout">Esci</button></div>
     </div>
-    <h1>Controllo qualità</h1>
-    <p>Foto, note e documenti di fornitura e installazione dei componenti, per JOB e TAG.</p>
+    <p>Controllo qualità di fornitura e installazione: foto, note e documenti dei componenti per JOB e TAG.</p>
   </div>
 </header>
 
 <main>
   <p class="notice" id="demo" hidden>
-    Modalità prova: le schede e le foto restano solo su questo dispositivo. Per salvarle nella cartella condivisa di OneDrive va completata la configurazione (vedi README).
+    Modalità prova: le schede e le foto restano solo su questo dispositivo. Per salvarle nella cartella condivisa di OneDrive va completata la configurazione (vedi README nella cartella quality).
   </p>
   <p class="msg error" id="msg" role="alert"></p>
   <div class="queue" id="queue" hidden>
@@ -388,7 +390,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   </section>
 </main>
 
-<footer>SICIET HUB</footer>
+<footer>SICIET Quality</footer>
 
 <!-- Lettura del TAG da foto -->
 <div class="overlay" id="ocrDlg" hidden>
@@ -433,6 +435,6 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 <div id="printArea"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
-<script src="qualita.js"></script>
+<script src="quality.js"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 /*
- * CONTROLLO QUALITÀ COMPONENTI
- * ----------------------------
+ * SICIET QUALITY – CONTROLLO QUALITÀ COMPONENTI
+ * ----------------------------------------------
  * Per ogni componente di una commessa (JOB) si crea una scheda identificata
  * dal TAG, con foto, note, stato e documenti. Tutto viene salvato nella
  * cartella condivisa di OneDrive/SharePoint indicata in "cartella":
@@ -12,7 +12,7 @@
  *                          Documenti/<nome originale del file>
  *
  * L'accesso è con l'account Microsoft 365 aziendale (Microsoft Graph): serve
- * una registrazione dell'app in Microsoft Entra ID, vedi README.
+ * una registrazione dell'app in Microsoft Entra ID, vedi quality/README.md.
  * Se clientId, tenantId o cartella sono vuoti la pagina funziona in prova:
  * salva tutto solo nel browser di questo dispositivo.
  */
@@ -679,7 +679,7 @@ var QUALITA_CONFIG = {
     }
     g.textBaseline = "top";
     var y = pad;
-    testo("SICIET · CONTROLLO QUALITÀ", Math.round(2.4 * mm), "600", y, "#005baa");
+    testo("SICIET QUALITY", Math.round(2.4 * mm), "600", y, "#005baa");
     y += Math.round(5 * mm);
     testo("JOB", Math.round(2.2 * mm), "400", y, "#555");
     y += Math.round(2.8 * mm);

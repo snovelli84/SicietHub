@@ -78,16 +78,6 @@ window.SICIET_APPS = [
     verified: false
   },
   {
-    id: "qualita",
-    name: "Controllo qualità",
-    description: "Foto, note e documenti dei componenti installati, per JOB e TAG, con etichetta QR.",
-    category: "Operatività",
-    emoji: "✅",
-    // Pagina di questo portale: si apre nella stessa scheda.
-    web: "qualita.html",
-    verified: true
-  },
-  {
     id: "zconnect",
     name: "ZConnect",
     description: "Visualizzazione Cedolini Buste Paga",
