@@ -99,3 +99,7 @@ Nello stesso punto di `richieste.html` si possono cambiare i tipi di richiesta (
 ```
 
 **Limiti** – Il modulo non verifica chi lo compila: chiunque abbia il link può inviare una richiesta con qualsiasi nome. Gli addetti devono quindi considerare l'email come una segnalazione da confermare con il dipendente. I giorni lavorativi indicati contano lunedì–venerdì e non tengono conto delle festività.
+
+## Altri progetti
+
+La cartella [`quality/`](quality/) contiene **SICIET Quality** (controllo qualità dei componenti per JOB e TAG), un progetto separato che non compare nel portale: vedi [`quality/README.md`](quality/README.md).
