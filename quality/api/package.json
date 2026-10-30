@@ -1,0 +1,12 @@
+{
+  "name": "siciet-quality-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Servizio di SICIET Quality per leggere e scrivere le schede su SharePoint",
+  "type": "module",
+  "main": "index.js",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@azure/functions": "^4.5.0"
+  }
+}

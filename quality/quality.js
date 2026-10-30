@@ -3,30 +3,27 @@
  * ----------------------------------------------
  * Per ogni componente di una commessa (JOB) si crea una scheda identificata
  * dal TAG, con foto, note, stato e documenti. Tutto viene salvato nella
- * cartella condivisa di OneDrive/SharePoint indicata in "cartella":
+ * cartella "Schede componenti" del sito SharePoint "SICIET Qualità":
  *
- *   <cartella>/<COMMESSA>/<JOB>/<TAG>/scheda.json         dati della scheda (usati dalla pagina)
+ *   <COMMESSA>/<JOB>/<TAG>/scheda.json      dati della scheda (usati dalla pagina)
  *                          Scheda.txt          gli stessi dati, leggibili dall'ufficio
  *                          Etichetta QR.png    etichetta da stampare
- *                          Foto/2026-10-30 14.32.05 Installazione.jpg
+ *                          Foto/2026-10-30 14.32.05 Installazione - Mario Rossi.jpg
  *                          Documenti/<nome originale del file>
  *
- * L'accesso è con l'account Microsoft 365 aziendale (Microsoft Graph): serve
- * una registrazione dell'app in Microsoft Entra ID, vedi quality/README.md.
- * Se clientId, tenantId o cartella sono vuoti la pagina funziona in prova:
- * salva tutto solo nel browser di questo dispositivo.
+ * Chi usa la pagina non accede a Microsoft 365: inserisce una volta il PIN
+ * aziendale e il proprio nome. A leggere e scrivere su SharePoint è il
+ * servizio in quality/api (indirizzo in "api"), con le credenziali
+ * dell'azienda; vedi quality/README.md.
+ * Se "api" è vuoto la pagina funziona in prova: salva tutto solo nel
+ * browser di questo dispositivo.
  */
 var QUALITA_CONFIG = {
-  // ID applicazione (client) e ID directory (tenant) della registrazione in Entra ID.
-  clientId: "7b0cf16f-9dc4-4763-83e7-0ce9bef8e4df",
-  tenantId: "5c055224-300a-4b03-8742-552b7dd79f62",
-  // Link di condivisione della cartella che contiene le schede
-  // (OneDrive o SharePoint → Condividi → Copia collegamento).
-  cartella: "https://srlsiciet.sharepoint.com/:f:/s/SICIETQualit/IgA7vEheD4pNRKnHv5kDkH35Abb2m8NVouVpt8XLNzU5PQQ?e=B9XcHv",
+  // Indirizzo del servizio quality/api, es. "https://siciet-quality.azurewebsites.net/api".
+  api: "",
 
-  // Chiede il nome di chi usa l'app (memorizzato sul dispositivo): serve
-  // quando sui telefoni di cantiere si accede con un account condiviso.
-  // Il nome finisce nelle note e nei nomi delle foto.
+  // Chiede il nome di chi usa l'app (memorizzato sul dispositivo): finisce
+  // nelle note e nei nomi delle foto.
   chiediOperatore: true,
 
   // Dati aggiuntivi della scheda, tutti facoltativi.
@@ -55,18 +52,14 @@ var QUALITA_CONFIG = {
   "use strict";
 
   var cfg = QUALITA_CONFIG;
-  var configured = !!(cfg.clientId && cfg.tenantId && cfg.cartella);
-  var MSAL_URL = "https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js";
+  var configured = !!cfg.api;
   var TESSERACT_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
-  var GRAPH = "https://graph.microsoft.com/v1.0";
-  var SCOPES = ["User.Read", "Files.ReadWrite.All"];
   var LAST_JOB_KEY = "siciet-qualita-job";
   var COMMESSA_KEY = "siciet-qualita-commessa";
   var OPERATORE_KEY = "siciet-qualita-operatore";
-  // Indirizzo dell'app senza "index.html": è anche l'indirizzo di ritorno
-  // registrato in Entra ID e quello scritto nei QR code.
+  var PIN_KEY = "siciet-qualita-pin";
+  // Indirizzo dell'app senza "index.html", scritto nei QR code.
   var BASE_URL = location.origin + location.pathname.replace(/index\.html$/, "");
-  var SIMPLE_UPLOAD_MAX = 4000000; // oltre si usa una sessione di caricamento
 
   var $ = function(id){ return document.getElementById(id); };
 
@@ -128,8 +121,8 @@ var QUALITA_CONFIG = {
   }
 
   function operatore(){ return storage(function(){ return localStorage.getItem(OPERATORE_KEY); }) || ""; }
-  // Chi ha fatto la modifica: l'operatore indicato sul dispositivo, altrimenti l'account.
-  function autore(){ return (cfg.chiediOperatore && operatore()) || B.userName(); }
+  // Chi ha fatto la modifica: l'operatore indicato sul dispositivo.
+  function autore(){ return (cfg.chiediOperatore && operatore()) || "Operatore"; }
 
   function caricaScript(src){
     caricaScript.p = caricaScript.p || {};
@@ -179,141 +172,48 @@ var QUALITA_CONFIG = {
     });
   }
 
-  /* ---------- Archivio OneDrive / SharePoint (Microsoft Graph) ---------- */
+  /* ---------- Archivio SharePoint, tramite il servizio quality/api ---------- */
 
   function errore(msg, status){ var e = new Error(msg); e.status = status; return e; }
 
-  var Graph = {
-    pca: null, account: null, drive: null, root: null,
-
-    init: async function(){
-      await caricaScript(MSAL_URL);
-      this.pca = new msal.PublicClientApplication({
-        auth: {
-          clientId: cfg.clientId,
-          authority: "https://login.microsoftonline.com/" + cfg.tenantId,
-          redirectUri: BASE_URL
-        },
-        cache: { cacheLocation: "localStorage" }
-      });
-      await this.pca.initialize();
-      var r = await this.pca.handleRedirectPromise();
-      this.account = (r && r.account) || this.pca.getAllAccounts()[0] || null;
-    },
-    signedIn: function(){ return !!this.account; },
-    userName: function(){ return this.account ? (this.account.name || this.account.username) : ""; },
-    login: function(){
-      return this.pca.loginRedirect({ scopes: SCOPES, redirectStartPage: location.href, prompt: "select_account" });
-    },
-    logout: function(){
-      return this.pca.logoutRedirect({ account: this.account, postLogoutRedirectUri: BASE_URL });
-    },
-    token: async function(){
-      try{
-        return (await this.pca.acquireTokenSilent({ scopes: SCOPES, account: this.account })).accessToken;
-      }catch(e){
-        if(e instanceof msal.InteractionRequiredAuthError){
-          await this.pca.acquireTokenRedirect({ scopes: SCOPES, account: this.account, redirectStartPage: location.href });
-        }
-        throw e;
-      }
-    },
-    // Chiamata a Graph. 404 → null.
-    api: async function(method, url, body, headers){
-      var h = Object.assign({ Authorization: "Bearer " + await this.token() }, headers || {});
-      if(body && !(body instanceof Blob)){ body = JSON.stringify(body); h["Content-Type"] = "application/json"; }
+  var Server = {
+    init: async function(){},
+    pin: function(){ return storage(function(){ return localStorage.getItem(PIN_KEY); }) || ""; },
+    signedIn: function(){ return !!this.pin(); },
+    // Chiamata al servizio. 404 → null; PIN sbagliato → torna alla richiesta del PIN.
+    api: async function(method, azione, path, opts){
+      opts = opts || {};
+      var h = { "X-Pin": opts.pin || this.pin() };
+      if(opts.etag) h["If-Match"] = opts.etag;
+      if(opts.body) h["Content-Type"] = opts.body.type || "application/octet-stream";
+      var q = "?path=" + encodeURIComponent(path || "") + (opts.rename ? "&rename=1" : "");
       var res;
       try{
-        res = await fetch(url.indexOf("https://") === 0 ? url : GRAPH + url, { method: method, headers: h, body: body });
+        res = await fetch(cfg.api.replace(/\/$/, "") + "/" + azione + q, { method: method, headers: h, body: opts.body, cache: "no-store" });
       }catch(e){
         throw errore("Connessione assente o instabile: riprova.", 0);
       }
       if(res.status === 404) return null;
-      if(!res.ok){
-        var info = await res.json().catch(function(){ return {}; });
-        var msg = (info.error && info.error.message) || res.statusText;
-        if(res.status === 401 || res.status === 403) msg = "Accesso negato alla cartella condivisa (" + msg + "). Chiedi di essere aggiunto alla cartella.";
-        throw errore(msg, res.status);
+      var info = await res.json().catch(function(){ return {}; });
+      if(res.status === 401 && !opts.pin){
+        storage(function(){ localStorage.removeItem(PIN_KEY); });
+        setTimeout(mostra, 0);
       }
-      return res.status === 204 ? null : res.json();
+      if(!res.ok) throw errore(info.errore || "Errore del servizio (" + res.status + ").", res.status);
+      return info;
     },
-    // La cartella principale si ricava dal link di condivisione.
-    apriCartella: async function(){
-      if(this.root) return;
-      var key = "siciet-qualita-root:" + cfg.cartella;
-      var c = storage(function(){ return JSON.parse(sessionStorage.getItem(key)); });
-      if(!c){
-        var id = "u!" + btoa(unescape(encodeURIComponent(cfg.cartella))).replace(/=+$/, "").replace(/\//g, "_").replace(/\+/g, "-");
-        var it = await this.api("GET", "/shares/" + id + "/driveItem");
-        if(!it) throw errore("Cartella condivisa non trovata: controlla il link in QUALITA_CONFIG.cartella.", 404);
-        c = { d: it.parentReference.driveId, r: it.id };
-        storage(function(){ sessionStorage.setItem(key, JSON.stringify(c)); });
-      }
-      this.drive = c.d;
-      this.root = c.r;
+    // Verifica il PIN; se è giusto lo memorizza sul dispositivo.
+    entra: async function(pin){
+      await this.api("GET", "ping", "", { pin: pin });
+      storage(function(){ localStorage.setItem(PIN_KEY, pin); });
     },
-    url: function(path, suffix){
-      var p = path ? ":/" + path.split("/").map(encodeURIComponent).join("/") + ":" : "";
-      return "/drives/" + this.drive + "/items/" + this.root + p + (suffix || "");
-    },
-    list: async function(path){
-      await this.apriCartella();
-      var out = [], next = this.url(path, "/children?$expand=thumbnails&$top=500");
-      while(next){
-        var r = await this.api("GET", next);
-        if(!r) break;
-        r.value.forEach(function(it){
-          var th = (it.thumbnails && it.thumbnails[0]) || {};
-          out.push({
-            name: it.name,
-            folder: !!it.folder,
-            size: it.size,
-            modified: it.lastModifiedDateTime,
-            by: it.createdBy && it.createdBy.user && it.createdBy.user.displayName,
-            thumb: th.medium && th.medium.url,
-            large: th.large && th.large.url,
-            url: it["@microsoft.graph.downloadUrl"],
-            webUrl: it.webUrl
-          });
-        });
-        next = r["@odata.nextLink"];
-      }
-      return out;
-    },
-    info: async function(path){
-      await this.apriCartella();
-      var it = await this.api("GET", this.url(path));
-      return it && { etag: it.eTag, url: it["@microsoft.graph.downloadUrl"], webUrl: it.webUrl };
-    },
-    readJson: async function(path){
-      var i = await this.info(path);
-      if(!i) return null;
-      var res = await fetch(i.url, { cache: "no-store" });
-      if(!res.ok) throw errore("Lettura della scheda non riuscita.", res.status);
-      return { data: await res.json(), etag: i.etag };
-    },
+    list: async function(path){ return (await this.api("GET", "list", path)) || []; },
+    info: function(path){ return this.api("GET", "item", path); },
+    readJson: function(path){ return this.api("GET", "json", path); },
     // opts: { etag (sovrascrive solo se invariato), rename (non sovrascrive file esistenti) }
-    put: async function(path, blob, opts){
+    put: function(path, blob, opts){
       opts = opts || {};
-      await this.apriCartella();
-      if(blob.size <= SIMPLE_UPLOAD_MAX){
-        var h = { "Content-Type": blob.type || "application/octet-stream" };
-        if(opts.etag) h["If-Match"] = opts.etag;
-        return this.api("PUT", this.url(path, "/content" + (opts.rename ? "?@microsoft.graph.conflictBehavior=rename" : "")), blob, h);
-      }
-      var s = await this.api("POST", this.url(path, "/createUploadSession"), {
-        item: { "@microsoft.graph.conflictBehavior": opts.rename ? "rename" : "replace" }
-      });
-      var CHUNK = 10 * 327680; // multiplo di 320 KiB, come richiesto da Graph
-      for(var start = 0; start < blob.size; start += CHUNK){
-        var end = Math.min(start + CHUNK, blob.size);
-        var res = await fetch(s.uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Range": "bytes " + start + "-" + (end - 1) + "/" + blob.size },
-          body: blob.slice(start, end)
-        }).catch(function(){ throw errore("Connessione assente o instabile: riprova.", 0); });
-        if(!res.ok) throw errore("Caricamento non riuscito (" + res.status + ").", res.status);
-      }
+      return this.api("PUT", "file", path, { body: blob, etag: opts.etag, rename: opts.rename });
     }
   };
 
@@ -362,7 +262,7 @@ var QUALITA_CONFIG = {
     }
   };
 
-  var B = configured ? Graph : Prova;
+  var B = configured ? Server : Prova;
 
   /* ---------- Schede ---------- */
 
@@ -935,7 +835,7 @@ var QUALITA_CONFIG = {
   window.addEventListener("popstate", mostra);
 
   function soloVista(id){
-    ["viewLogin", "viewOperatore", "viewElenco", "viewNuovo", "viewScheda"].forEach(function(v){ $(v).hidden = v !== id; });
+    ["viewPin", "viewOperatore", "viewElenco", "viewNuovo", "viewScheda"].forEach(function(v){ $(v).hidden = v !== id; });
   }
 
   function mostra(){
@@ -945,11 +845,12 @@ var QUALITA_CONFIG = {
     $("ocrDlg").hidden = $("etichettaDlg").hidden = $("lightbox").hidden = true;
 
     if(!B.signedIn()){
-      stato.vista = "login";
-      $("loginText").textContent = job && tag
-        ? "Per vedere la scheda del TAG " + tag + " (JOB " + job + ") accedi con il tuo account Microsoft aziendale."
-        : "Per vedere e aggiungere schede accedi con il tuo account Microsoft aziendale.";
-      soloVista("viewLogin");
+      stato.vista = "pin";
+      $("pinTesto").textContent = job && tag
+        ? "Per vedere la scheda del TAG " + tag + " (JOB " + job + ") inserisci il PIN aziendale. Va inserito una volta sola su questo telefono."
+        : "Inserisci il PIN aziendale. Va inserito una volta sola su questo telefono.";
+      soloVista("viewPin");
+      $("pin").focus();
       return;
     }
     if(cfg.chiediOperatore && !operatore()){
@@ -1321,7 +1222,7 @@ var QUALITA_CONFIG = {
           return;
         }
         var f = x.f;
-        grid.appendChild(el("button", { type: "button", class: "thumb", onclick: function(){ apriFoto(f.large || f.url, f.webUrl || f.url, when + (x.op ? " – " + x.op : ""), noteFoto[f.name]); } }, [
+        grid.appendChild(el("button", { type: "button", class: "thumb", onclick: function(){ apriFoto(f.large || f.url, f.url || f.webUrl, when + (x.op ? " – " + x.op : ""), noteFoto[f.name]); } }, [
           f.thumb ? el("img", { src: f.thumb, alt: fase + " " + when, loading: "lazy" }) : el("span", { class: "when", text: f.name }),
           el("span", { class: "when", text: when.slice(0, 10) })
         ]));
@@ -1336,7 +1237,7 @@ var QUALITA_CONFIG = {
     ul.textContent = "";
     docs.sort(function(a, b){ return a.name.localeCompare(b.name, "it"); }).forEach(function(d){
       ul.appendChild(el("li", null, [
-        el("a", { href: d.webUrl || d.url, target: "_blank", rel: "noopener", text: d.name }),
+        el("a", { href: d.url || d.webUrl, target: "_blank", rel: "noopener", text: d.name }),
         el("span", { class: "hint", text: " – " + fmtData(d.modified) + (d.by ? ", " + d.by : "") })
       ]));
     });
@@ -1417,8 +1318,23 @@ var QUALITA_CONFIG = {
   });
 
   $("queueRetry").addEventListener("click", svuotaCoda);
-  $("login").addEventListener("click", function(){ B.login().catch(mostraErrore); });
-  $("logout").addEventListener("click", function(){ B.logout().catch(mostraErrore); });
+  $("pinForm").addEventListener("submit", async function(ev){
+    ev.preventDefault();
+    var pin = $("pin").value.trim(), btn = this.querySelector("button");
+    if(!pin){ $("pin").focus(); return; }
+    btn.disabled = true;
+    $("pinErr").textContent = "";
+    try{
+      await B.entra(pin);
+      $("pin").value = "";
+      mostra();
+      svuotaCoda();
+    }catch(e){
+      $("pinErr").textContent = e.status === 401 ? "PIN non corretto." : e.message;
+    }finally{
+      btn.disabled = false;
+    }
+  });
   window.addEventListener("online", svuotaCoda);
   setInterval(svuotaCoda, 60000);
 
@@ -1429,10 +1345,6 @@ var QUALITA_CONFIG = {
     }catch(e){
       mostraErrore(e);
       return;
-    }
-    if(configured && B.signedIn()){
-      $("userName").textContent = B.userName();
-      $("account").hidden = false;
     }
     mostraOperatore();
     mostra();
