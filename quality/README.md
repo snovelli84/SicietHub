@@ -6,8 +6,12 @@ Per ogni componente di una commessa si crea una scheda identificata da **JOB** e
 
 **Uso in cantiere**
 
-1. **Rilevamento del TAG** – **+ Nuovo componente** → JOB (viene ricordato l'ultimo usato) → **📷 Fotografa la targhetta**: si riquadra il TAG col dito e il testo viene letto in automatico (OCR con [Tesseract.js](https://tesseract.projectnaptha.com), direttamente sul telefono). Il TAG va sempre controllato; se la lettura non riesce lo si scrive a mano (**Scrivo a mano**). La foto della targhetta viene comunque salvata nella scheda (fase "Targhetta"). Descrizione, fornitore, posizione, DDT, stato e note sono in **Altri dati**, facoltativi. → **Crea scheda**.
-2. **Aggiungi foto** – Nella scheda si sceglie la fase (Ricevimento, Installazione, Collaudo, Non conformità…), si scattano una o più foto (o si prendono dalla galleria), si controllano nell'anteprima togliendo quelle venute male, si scrive una nota facoltativa e si preme **Salva foto**. La nota compare nello storico della scheda e sotto ogni foto quando la si ingrandisce.
+1. **Nuovo componente** – un unico modulo, in quattro passi, salvato con **Salva scheda**:
+   1. **Foto della targhetta** → si riquadra il TAG col dito e il testo viene letto in automatico (OCR con [Tesseract.js](https://tesseract.projectnaptha.com), direttamente sul telefono). Se la lettura non riesce lo si scrive a mano (**Scrivo a mano**). La foto della targhetta viene comunque salvata (fase "Targhetta").
+   2. **TAG**, da controllare sempre. Il JOB in cima viene ricordato.
+   3. **Altri dati**, facoltativi: descrizione, fornitore, posizione, DDT, stato, note.
+   4. **Foto del componente**: si sceglie la fase, si scattano una o più foto (o si prendono dalla galleria), si tolgono con × quelle venute male e si scrive una nota facoltativa.
+2. **Altre foto in seguito** – Nella scheda del componente, riquadro **Aggiungi foto**: stessa procedura, poi **Salva foto**. Le note delle foto compaiono nello storico della scheda e sotto ogni foto quando la si ingrandisce.
 3. **Note e stato, documenti** – Note generali con cambio di stato (Da verificare / Conforme / Non conforme) e documenti (DDT, certificati, schede tecniche, verbali).
 4. **🏷️ Etichetta QR** → **Stampa** (formato dell'etichetta in `QUALITA_CONFIG.etichetta`, di base 62×40 mm) oppure **Scarica PNG** per le app delle stampanti di etichette. Per l'esterno conviene un'etichetta in poliestere/vinile resistente agli agenti atmosferici.
 
