@@ -36,13 +36,13 @@ JOB e TAG diventano nomi di cartella in maiuscolo; i caratteri non ammessi da On
 
 **Accesso: nessuno, solo il nome dell'operatore** – Chi usa la pagina non accede a nulla. Al primo uso sul telefono si scrive **nome e cognome dell'operatore** (si cambia con **Cambia** in alto), che resta memorizzato e finisce nelle note, in Scheda.txt e nel nome delle foto.
 
-**Come funziona il salvataggio** – La pagina manda foto e dati al **servizio** in [`api/`](api/) (una Azure Function), che scrive nella cartella **Schede componenti** del team **SICIET Qualità** con le credenziali dell'app **SICIET Quality** registrata in Entra ID, che può accedere solo a quel sito. Le credenziali restano nelle impostazioni del servizio, mai nella pagina.
+**Come funziona il salvataggio** – La pagina manda foto e dati al **servizio** in [`api/`](api/) (un Cloudflare Worker gratuito; in alternativa una Azure Function), che scrive nella cartella **Schede componenti** del team **SICIET Qualità** con le credenziali dell'app **SICIET Quality** registrata in Entra ID, che può accedere solo a quel sito. Le credenziali restano nelle impostazioni del servizio, mai nella pagina.
 
 Senza accesso, **chiunque abbia il link** (o inquadri un QR in cantiere) può vedere le schede e aggiungere foto, note e documenti. Per limitare i danni il servizio ammette scritture solo dentro `<COMMESSA>/<JOB>/<TAG>/` e solo per i file della pagina: foto (solo immagini, max 25 MB) e documenti (niente eseguibili né pagine web, max 50 MB) non sovrascrivono mai file esistenti; `scheda.json` deve essere una scheda valida per quel percorso. Le versioni precedenti dei file restano nella cronologia versioni di SharePoint. Non si può cancellare nulla dalla pagina. Se servisse più protezione basta impostare la variabile `PIN` del servizio: la pagina chiederà il PIN una volta per telefono, senza modifiche al codice.
 
 Finché `api` in `QUALITA_CONFIG` (all'inizio di [`quality.js`](quality.js)) è vuoto, la pagina funziona **in prova** e salva tutto solo nel browser del dispositivo.
 
-**Attivazione** (una volta, da amministratore Microsoft 365/Azure)
+**Attivazione** (una volta, da amministratore Microsoft 365)
 
 1. **Entra ID** → *Registrazioni app* → **SICIET Quality**:
    - *Certificati e segreti* → **Nuovo segreto client** (descrizione "Servizio", scadenza 24 mesi) → copiare subito il **Valore** (si vede una volta sola). Annotare la scadenza: prima di allora va creato un segreto nuovo e aggiornato `CLIENT_SECRET`.
@@ -52,8 +52,11 @@ Finché `api` in `QUALITA_CONFIG` (all'inizio di [`quality.js`](quality.js)) è 
      - `POST https://graph.microsoft.com/v1.0/sites/<id>/permissions` con corpo
        `{"roles":["write"],"grantedToIdentities":[{"application":{"id":"7b0cf16f-9dc4-4763-83e7-0ce9bef8e4df","displayName":"SICIET Quality"}}]}`
    - (Più semplice ma meno restrittivo: autorizzazione applicazione `Sites.ReadWrite.All` al posto di `Sites.Selected`, senza il passo con Graph Explorer: l'app potrebbe però scrivere in tutti i siti.)
-2. **Azure** ([portal.azure.com](https://portal.azure.com), serve una sottoscrizione; per questo uso il costo è praticamente nullo) → *Crea una risorsa* → **App per le funzioni** → piano **Consumo** → nome es. `siciet-quality`, stack **Node.js 20**, sistema operativo **Windows**, area Europa → *Crea*. Poi, nell'app creata:
-   - *Impostazioni → Variabili d'ambiente*, aggiungere:
+2. **Cloudflare Workers** (piano gratuito: 100.000 richieste al giorno, nessuna carta di credito):
+   - registrarsi su [dash.cloudflare.com](https://dash.cloudflare.com/sign-up) con un'email aziendale;
+   - *Workers e Pages* → **Crea** → **Inizia con Hello World** → nome `siciet-quality` → **Distribuisci**;
+   - **Modifica codice** → cancellare tutto il codice di esempio, incollare il contenuto di [`api/worker.js`](api/worker.js) (su GitHub: pulsante *Raw*, poi seleziona tutto e copia) → **Distribuisci**;
+   - *Impostazioni → Variabili e segreti* → **Aggiungi**, una per riga (tipo *Testo*, tranne `CLIENT_SECRET` di tipo *Segreto*):
      | Nome | Valore |
      |---|---|
      | `TENANT_ID` | `5c055224-300a-4b03-8742-552b7dd79f62` |
@@ -62,16 +65,14 @@ Finché `api` in `QUALITA_CONFIG` (all'inizio di [`quality.js`](quality.js)) è 
      | `SITE` | `srlsiciet.sharepoint.com:/sites/SICIETQualit` |
      | `FOLDER` | `Qualità/Schede componenti` |
      | `ORIGIN` | `https://hub.siciet.it` |
-   - *Impostazioni → Configurazione → Impostazioni generali*: **Credenziali di pubblicazione di autenticazione di base SCM** → Attivato → Salva.
-   - *Panoramica* → **Scarica profilo di pubblicazione**, e annotare il **Dominio predefinito** (es. `siciet-quality.azurewebsites.net`).
-   - La sezione CORS dell'app va lasciata vuota: le intestazioni le gestisce il servizio.
-3. **GitHub** → repository → *Settings → Secrets and variables → Actions*:
-   - scheda *Secrets* → **New repository secret** `AZURE_FUNCTIONAPP_PUBLISH_PROFILE` = contenuto del file del profilo di pubblicazione;
-   - scheda *Variables* → **New repository variable** `AZURE_FUNCTIONAPP_NAME` = nome dell'app (es. `siciet-quality`);
-   - *Actions* → **SICIET Quality – servizio** → **Run workflow**. Da quel momento il servizio si aggiorna da solo a ogni modifica di `quality/api`.
-4. In `quality.js` impostare `api: "https://<dominio predefinito>/api"` e aumentare `?v=` in `index.html`.
+   - annotare l'indirizzo del worker (es. `https://siciet-quality.<nome-account>.workers.dev`).
 
-Verifica: `https://<dominio predefinito>/api/ping` aperto nel browser risponde `{"ok":true}`; se risponde "Servizio non configurato" manca una variabile d'ambiente. (Facoltativo: variabile `PIN` per chiedere un PIN aziendale.) Il servizio funziona anche su Cloudflare Workers ([`api/worker.js`](api/worker.js) così com'è, con le stesse variabili).
+   Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo. Foto e dati passano dal worker (non vengono conservati) e arrivano su SharePoint.
+3. In `quality.js` impostare `api: "https://<indirizzo del worker>/api"` e aumentare `?v=` in `index.html`.
+
+**In alternativa, Azure Functions** (a pagamento a consumo, costo minimo): App per le funzioni con piano **Consumo**, Node.js 20, Windows; le stesse variabili d'ambiente; *Configurazione → Credenziali di pubblicazione di autenticazione di base SCM* attivate; profilo di pubblicazione nel segreto GitHub `AZURE_FUNCTIONAPP_PUBLISH_PROFILE` e nome dell'app nella variabile `AZURE_FUNCTIONAPP_NAME`; poi *Actions* → **SICIET Quality – servizio** → **Run workflow**. In questo caso `api` è `https://<dominio predefinito>/api`.
+
+Verifica: `https://<indirizzo del servizio>/api/ping` aperto nel browser risponde `{"ok":true}`; se risponde "Servizio non configurato" manca una variabile d'ambiente. (Facoltativo: variabile `PIN` per chiedere un PIN aziendale.)
 
 Nella stessa configurazione si cambiano i dati aggiuntivi (`campi`), gli stati (`stati`), le fasi delle foto (`fasi`, la prima è quella della foto della targhetta) e la riduzione delle foto (`foto`).
 
