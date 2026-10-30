@@ -20,6 +20,9 @@
  *   CLIENT_SECRET  segreto client dell'app
  *   SITE           sito SharePoint, es. srlsiciet.sharepoint.com:/sites/SICIETQualit
  *   FOLDER         cartella delle schede nella raccolta Documenti, es. Qualità/Schede componenti
+ *   FOLDER_DATI    (facoltativo) cartella dei dati della pagina (scheda.json di ogni
+ *                  scheda e indice.json), fuori dalle cartelle che usano le persone;
+ *                  di base "SICIET Quality - dati (non modificare)" nella raccolta Documenti
  *   ORIGIN         (facoltativo) sito autorizzato a chiamare il servizio, es. https://hub.siciet.it
  *   APP_URL        (facoltativo) indirizzo della pagina, per i link nei riepiloghi;
  *                  di base ORIGIN + "/quality/"
@@ -32,6 +35,13 @@
  *   PUT /file?path=…[&rename=1]    carica il corpo della richiesta (If-Match: etag facoltativo)
  *   GET /aggiorna?path=C/J/T       aggiorna i riepiloghi Excel per una scheda
  *   GET /aggiorna?azzera=1         svuota l'indice (prima di ricostruire tutti i riepiloghi)
+ *   GET /schede                    elenco sintetico di tutte le schede (ricerca nella pagina)
+ *
+ * La pagina legge e scrive <C>/<J>/<T>/scheda.json, ma il file sta in
+ * FOLDER_DATI/<C>/<J>/<T>/scheda.json (lo stesso per indice.json): così nelle
+ * cartelle dei componenti restano solo i file utili alle persone. Le schede
+ * create prima, con scheda.json nella cartella del TAG, vengono spostate la
+ * prima volta che si leggono.
  *
  * Riepiloghi Excel, aggiornati a ogni salvataggio di scheda, foto o documento:
  *   Riepilogo componenti.xlsx                 tutte le schede (cartella principale)
@@ -164,10 +174,33 @@ async function radice(env){
   rootCache = { drive: it.parentReference.driveId, id: it.id };
   return rootCache;
 }
+// File dei dati della pagina, conservati in FOLDER_DATI.
+function inDati(parti){
+  return (parti.length === 4 && parti[3] === "scheda.json") || (parti.length === 1 && parti[0] === "indice.json");
+}
 async function urlItem(env, parti, suffisso){
+  const r = await radice(env);
+  if(inDati(parti)){
+    const tutto = (env.FOLDER_DATI || "SICIET Quality - dati (non modificare)").split("/").concat(parti);
+    return "/drives/" + r.drive + "/root:/" + tutto.map(encodeURIComponent).join("/") + ":" + (suffisso || "");
+  }
+  return urlVecchio(env, parti, suffisso);
+}
+// Indirizzo relativo alla cartella delle schede (dove stavano anche i dati).
+async function urlVecchio(env, parti, suffisso){
   const r = await radice(env);
   const p = parti.length ? ":/" + parti.map(encodeURIComponent).join("/") + ":" : "";
   return "/drives/" + r.drive + "/items/" + r.id + p + (suffisso || "");
+}
+// Sposta un file dei dati dalla vecchia posizione a FOLDER_DATI; null se non c'è.
+async function spostaInDati(env, parti){
+  const vecchio = await graphJson(env, "GET", await urlVecchio(env, parti));
+  if(!vecchio) return null;
+  const res = await fetch(vecchio["@microsoft.graph.downloadUrl"]);
+  if(!res.ok) throw new Errore(502, "Lettura da SharePoint non riuscita.");
+  await graphJson(env, "PUT", await urlItem(env, parti, "/content"), await res.arrayBuffer(), { "Content-Type": "application/json" });
+  await graph(env, "DELETE", await urlVecchio(env, parti));
+  return graphJson(env, "GET", await urlItem(env, parti));
 }
 
 async function elenco(env, parti){
@@ -349,7 +382,8 @@ const NOMI_CAMPI = { descrizione: "Descrizione componente", fornitore: "Fornitor
 const TIPO_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 async function leggiJson(env, parti){
-  const it = await graphJson(env, "GET", await urlItem(env, parti));
+  let it = await graphJson(env, "GET", await urlItem(env, parti));
+  if(!it && inDati(parti)) it = await spostaInDati(env, parti);
   if(!it) return null;
   const res = await fetch(it["@microsoft.graph.downloadUrl"]);
   if(!res.ok) throw new Errore(502, "Lettura da SharePoint non riuscita.");
@@ -423,6 +457,7 @@ async function aggiornaRiepiloghi(env, dir){
   const [c, j] = dir;
   const chiave = dir.join("/");
   const scheda = await leggiJson(env, dir.concat("scheda.json"));
+  const cartella = scheda ? await graphJson(env, "GET", await urlItem(env, dir, "?$select=webUrl")) : null;
   const foto = scheda ? await contaFile(env, dir.concat("Foto")) : 0;
   const documenti = scheda ? await contaFile(env, dir.concat("Documenti")) : 0;
   let indice;
@@ -431,7 +466,7 @@ async function aggiornaRiepiloghi(env, dir){
     indice = letto ? letto.data : { versione: 1, schede: {} };
     if(scheda){
       indice.schede[chiave] = Object.assign(rigaDa(scheda.data, indice.schede[chiave]), {
-        foto, documenti, cartella: scheda.webUrl.replace(/\/scheda\.json$/, "")
+        foto, documenti, cartella: cartella && cartella.webUrl
       });
     }else{
       delete indice.schede[chiave];
@@ -491,13 +526,23 @@ export async function handle(request, env, ctx){
       return v ? json(env, 200, v) : json(env, 404, { errore: "Non trovato." });
     }
 
-    if(request.method === "GET" && (azione === "item" || azione === "json")){
+    if(request.method === "GET" && azione === "item"){
       const it = await graphJson(env, "GET", await urlItem(env, parti));
-      if(!it) return json(env, 404, { errore: "Non trovato." });
-      if(azione === "item") return json(env, 200, { etag: it.eTag, webUrl: it.webUrl });
-      const res = await fetch(it["@microsoft.graph.downloadUrl"]);
-      if(!res.ok) throw new Errore(502, "Lettura da SharePoint non riuscita.");
-      return json(env, 200, { data: await res.json(), etag: it.eTag });
+      return it ? json(env, 200, { etag: it.eTag, webUrl: it.webUrl }) : json(env, 404, { errore: "Non trovato." });
+    }
+
+    if(request.method === "GET" && azione === "json"){
+      const r = await leggiJson(env, parti);
+      return r ? json(env, 200, { data: r.data, etag: r.etag }) : json(env, 404, { errore: "Non trovato." });
+    }
+
+    if(request.method === "GET" && azione === "schede"){
+      const r = await leggiJson(env, [INDICE]);
+      const righe = r ? Object.values(r.data.schede) : [];
+      return json(env, 200, righe.map(x => ({
+        commessa: x.commessa, job: x.job, tag: x.tag, descrizione: (x.campi || {}).descrizione || "",
+        stato: x.stato, aggiornataIl: x.aggiornataIl, aggiornataDa: x.aggiornataDa
+      })));
     }
 
     if(request.method === "PUT" && azione === "file"){

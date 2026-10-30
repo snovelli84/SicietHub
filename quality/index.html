@@ -203,6 +203,11 @@ input:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:1px}
 .list .name{font-weight:600;overflow-wrap:anywhere}
 .list .meta{color:var(--muted);font-size:13px;white-space:nowrap}
 .empty{color:var(--muted);font-size:14px}
+.schede-box{display:grid;gap:8px}
+.schede-box h3{font-size:15px}
+.list .sub{display:block;font-weight:400;font-size:13px;color:var(--muted);margin-top:2px}
+#docBox.drop{outline:3px dashed var(--brand);outline-offset:-6px}
+@media (hover:none){.solo-pc{display:none}}
 .riepiloghi{display:grid;gap:8px;justify-items:start;border-top:1px solid var(--border);padding-top:14px}
 
 /* Scheda */
@@ -327,6 +332,10 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     <div class="field">
       <label for="filtro" id="filtroLabel">Cerca</label>
       <input type="search" id="filtro" autocomplete="off" autocapitalize="characters">
+    </div>
+    <div class="schede-box" id="schedeBox" hidden>
+      <h3 id="schedeTitolo">Ultime schede aggiornate</h3>
+      <ul class="list" id="schede"></ul>
     </div>
     <ul class="list" id="elenco"></ul>
     <p class="empty" id="elencoVuoto" hidden></p>
@@ -459,16 +468,17 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
       </form>
     </div>
 
-    <div class="card" style="margin-top:16px">
+    <div class="card" style="margin-top:16px" id="docBox">
       <h3>Documenti</h3>
       <ul class="docs" id="documenti"></ul>
       <button class="btn block" type="button" id="docBtn">📎 Aggiungi documento</button>
+      <p class="hint solo-pc">Dal PC puoi anche trascinare i file qui.</p>
       <input type="file" id="docInput" multiple hidden>
     </div>
   </section>
 </main>
 
-<footer>SICIET Quality · versione 12</footer>
+<footer>SICIET Quality · versione 13</footer>
 
 <!-- Lettura del TAG da foto -->
 <div class="overlay" id="ocrDlg" hidden>
@@ -513,6 +523,6 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
 <!-- Aumentare ?v= a ogni modifica di quality.js, altrimenti i telefoni usano la versione in cache. -->
-<script src="quality.js?v=12"></script>
+<script src="quality.js?v=13"></script>
 </body>
 </html>
