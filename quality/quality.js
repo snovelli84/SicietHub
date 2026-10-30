@@ -477,20 +477,68 @@ var QUALITA_CONFIG = {
     return (await canvasBlob(c, "image/jpeg", cfg.foto.qualita)) || file;
   }
 
-  async function aggiungiFoto(files, fase){
-    var s = stato.scheda;
-    if(!files.length || !s) return;
+  // Foto scelte ma non ancora salvate: si possono togliere e accompagnare con una nota.
+  function aggiungiSelezione(files){
+    files.forEach(function(f){ stato.selezione.push({ file: f, url: URL.createObjectURL(f) }); });
+    disegnaSelezione();
+  }
+
+  function disegnaSelezione(){
+    var box = $("selezione"), n = stato.selezione.length;
+    box.textContent = "";
+    stato.selezione.forEach(function(x, i){
+      box.appendChild(el("div", { class: "sel" }, [
+        el("span", { class: "thumb" }, [el("img", { src: x.url, alt: "Foto " + (i + 1) })]),
+        el("button", { type: "button", class: "togli", "aria-label": "Togli la foto " + (i + 1), text: "×", onclick: function(){
+          stato.selezione.splice(i, 1);
+          disegnaSelezione();
+        } })
+      ]));
+    });
+    $("fotoNotaBox").hidden = !n;
+    $("fotoSalva").hidden = !n;
+    $("fotoSalva").textContent = n === 1 ? "Salva 1 foto" : "Salva " + n + " foto";
+    $("fotoCamera").textContent = n ? "📷 Scatta un'altra foto" : "📷 Scatta foto";
+  }
+
+  function svuotaSelezione(){
+    stato.selezione = [];
+    $("fotoNota").value = "";
+    $("fotoErr").textContent = "";
+    disegnaSelezione();
+  }
+
+  // Salva le foto scelte (in coda di invio) e, se c'è, la nota che le accompagna.
+  async function salvaFoto(){
+    var s = stato.scheda, sel = stato.selezione, fase = valoreScelto($("fasi")), testo = $("fotoNota").value.trim();
+    if(!s || !sel.length) return;
+    var btn = $("fotoSalva");
+    btn.disabled = true;
+    $("fotoErr").textContent = "";
     try{
-      var base = new Date();
-      for(var i = 0; i < files.length; i++){
-        var blob = await comprimi(files[i]);
-        var nome = timbro(base) + " " + nomeFile(fase) + (files.length > 1 ? " " + (i + 1) : "") + ".jpg";
-        await accoda(s.job, s.tag, "Foto", nome, blob);
+      var base = new Date(), nomi = [];
+      for(var i = 0; i < sel.length; i++){
+        var nome = timbro(base) + " " + nomeFile(fase) + (sel.length > 1 ? " " + (i + 1) : "") + ".jpg";
+        await accoda(s.job, s.tag, "Foto", nome, await comprimi(sel[i].file));
+        nomi.push(nome);
       }
+      svuotaSelezione();
       await mostraCoda();
       caricaFileScheda();
       svuotaCoda();
-    }catch(e){ mostraErrore(e); }
+      if(testo){
+        stato.scheda = await aggiornaScheda(s.job, s.tag, function(d){
+          d.note.push({ il: base.toISOString(), da: B.userName(), fase: fase, foto: nomi, testo: testo });
+        });
+        disegnaScheda();
+        caricaFileScheda();
+      }
+    }catch(e){
+      $("fotoErr").textContent = (testo && !stato.selezione.length ? "Foto salvate, ma la nota no: " : "") + (e.message || e);
+      if(testo && !stato.selezione.length) $("fotoNota").value = testo;
+    }finally{
+      btn.disabled = false;
+    }
   }
 
   /* ---------- Lettura del TAG da foto (OCR) ---------- */
@@ -509,7 +557,6 @@ var QUALITA_CONFIG = {
       disegnaOcr();
       $("ocrRisultati").textContent = "";
       $("ocrStato").textContent = "";
-      $("ocrFase").textContent = cfg.fasi[0];
       $("ocrDlg").hidden = false;
     }).catch(mostraErrore);
   }
@@ -626,20 +673,32 @@ var QUALITA_CONFIG = {
   function scegliTag(x){
     $("tag").value = x;
     $("tag").classList.remove("invalid");
-    stato.fotoTarghetta = $("ocrAllega").checked ? ocr.file : null;
-    $("ocrHint").textContent = stato.fotoTarghetta
-      ? "TAG letto dalla foto: controllalo. La foto della targhetta verrà allegata alla scheda."
-      : "TAG letto dalla foto: controllalo.";
+    $("ocrHint").textContent = "TAG letto dalla foto: controllalo prima di creare la scheda.";
     $("ocrDlg").hidden = true;
     $("tag").focus();
   }
 
+  // La foto della targhetta viene sempre salvata con la scheda, anche se il TAG si scrive a mano.
+  function mostraTarghetta(){
+    var f = stato.fotoTarghetta;
+    $("targhetta").hidden = !f;
+    $("ocrBtn").hidden = !!f;
+    if(f) $("targhettaImg").src = URL.createObjectURL(f);
+    else $("targhettaImg").removeAttribute("src");
+  }
+
   $("ocrBtn").addEventListener("click", function(){ $("ocrInput").click(); });
   $("ocrAltra").addEventListener("click", function(){ $("ocrInput").click(); });
+  $("targhettaCambia").addEventListener("click", function(){ $("ocrInput").click(); });
+  $("targhettaRileggi").addEventListener("click", function(){ if(stato.fotoTarghetta) apriOcr(stato.fotoTarghetta); });
+  $("targhettaTogli").addEventListener("click", function(){ stato.fotoTarghetta = null; mostraTarghetta(); });
   $("ocrInput").addEventListener("change", function(){
     var f = this.files[0];
     this.value = "";
-    if(f) apriOcr(f);
+    if(!f) return;
+    stato.fotoTarghetta = f;
+    mostraTarghetta();
+    apriOcr(f);
   });
   $("ocrLeggi").addEventListener("click", leggiTesto);
   $("ocrAnnulla").addEventListener("click", function(){ $("ocrDlg").hidden = true; });
@@ -719,7 +778,7 @@ var QUALITA_CONFIG = {
 
   /* ---------- Navigazione ---------- */
 
-  var stato = { vista: null, job: null, tag: null, scheda: null, fotoTarghetta: null };
+  var stato = { vista: null, job: null, tag: null, scheda: null, fotoTarghetta: null, selezione: [] };
 
   function vai(query){
     history.pushState(null, "", location.pathname + query);
@@ -857,10 +916,12 @@ var QUALITA_CONFIG = {
     $("nuovoErr").textContent = "";
     $("job").value = job || storage(function(){ return localStorage.getItem(LAST_JOB_KEY); }) || "";
     $("tag").value = "";
-    $("ocrHint").textContent = "Con \"📷 Leggi\" scatti una foto della targhetta e il TAG viene letto in automatico (controllalo sempre).";
+    $("ocrHint").textContent = "Letto dalla foto oppure scritto a mano: controllalo sempre.";
+    document.querySelector("#viewNuovo details").open = false;
+    mostraTarghetta();
     campiForm($("campiNuovo"), "n-");
     sceltaStati($("statiNuovo"), "statoNuovo");
-    (job || $("job").value ? $("tag") : $("job")).focus();
+    if(!job && !$("job").value) $("job").focus();
     // Suggerimenti per il campo JOB.
     B.list("").then(function(v){
       var dl = $("jobList");
@@ -937,6 +998,7 @@ var QUALITA_CONFIG = {
     $("galleria").textContent = "";
     $("documenti").textContent = "";
     $("modificaForm").hidden = true;
+    svuotaSelezione();
     $("cartellaBtn").hidden = true;
     disegnaFasi();
     sceltaStati($("statiNota"), "statoNota");
@@ -972,7 +1034,8 @@ var QUALITA_CONFIG = {
     var ul = $("note");
     ul.textContent = "";
     s.note.slice().reverse().forEach(function(n){
-      var li = el("li", null, [el("span", { class: "who", text: fmtData(n.il) + " – " + n.da })]);
+      var li = el("li", null, [el("span", { class: "who", text: fmtData(n.il) + " – " + n.da +
+        (n.foto ? " · 📷 " + (n.foto.length === 1 ? "1 foto" : n.foto.length + " foto") + (n.fase ? " (" + n.fase + ")" : "") : "") })]);
       if(n.stato) li.appendChild(el("span", null, [el("span", { class: "badge " + statoInfo(n.stato).tipo, text: n.stato })]));
       if(n.testo) li.appendChild(el("span", { class: "txt", text: n.testo }));
       ul.appendChild(li);
@@ -1010,8 +1073,10 @@ var QUALITA_CONFIG = {
   }
 
   function disegnaGalleria(foto, inCoda){
-    var box = $("galleria"), gruppi = {};
+    var box = $("galleria"), gruppi = {}, noteFoto = {};
     box.textContent = "";
+    // Nota che accompagna ciascuna foto, mostrata quando la si ingrandisce.
+    stato.scheda.note.forEach(function(n){ (n.foto || []).forEach(function(f){ noteFoto[f] = n.testo; }); });
     foto.forEach(function(f){
       var i = leggiNomeFoto(f.name);
       (gruppi[i.fase] = gruppi[i.fase] || []).push({ f: f, data: i.data || new Date(f.modified) });
@@ -1030,20 +1095,20 @@ var QUALITA_CONFIG = {
         var when = fmtData(x.data);
         if(x.coda){
           var u = URL.createObjectURL(x.coda.blob);
-          grid.appendChild(el("button", { type: "button", class: "thumb pending", onclick: function(){ apriFoto(u, u, when + " (in attesa di invio)"); } }, [
+          grid.appendChild(el("button", { type: "button", class: "thumb pending", onclick: function(){ apriFoto(u, u, when + " (in attesa di invio)", noteFoto[x.coda.nome]); } }, [
             el("img", { src: u, alt: fase + " " + when, loading: "lazy" })
           ]));
           return;
         }
         var f = x.f;
-        grid.appendChild(el("button", { type: "button", class: "thumb", onclick: function(){ apriFoto(f.large || f.url, f.webUrl || f.url, when + (f.by ? " – " + f.by : "")); } }, [
+        grid.appendChild(el("button", { type: "button", class: "thumb", onclick: function(){ apriFoto(f.large || f.url, f.webUrl || f.url, when + (f.by ? " – " + f.by : ""), noteFoto[f.name]); } }, [
           f.thumb ? el("img", { src: f.thumb, alt: fase + " " + when, loading: "lazy" }) : el("span", { class: "when", text: f.name }),
           el("span", { class: "when", text: when.slice(0, 10) })
         ]));
       });
       box.appendChild(el("div", { class: "gallery-group" }, [el("h4", { text: fase + " (" + g.length + ")" }), grid]));
     });
-    if(!box.childNodes.length) box.appendChild(el("p", { class: "empty", text: "Nessuna foto. Scegli la fase e scatta le foto che attestano lo stato del componente." }));
+    if(!box.childNodes.length) box.appendChild(el("p", { class: "empty", text: "Nessuna foto: aggiungile dalla sezione qui sopra." }));
   }
 
   function disegnaDocumenti(docs, inCoda){
@@ -1061,10 +1126,11 @@ var QUALITA_CONFIG = {
     if(!ul.childNodes.length) ul.appendChild(el("li", { class: "empty", text: "Nessun documento (es. DDT, certificati, schede tecniche, verbali)." }));
   }
 
-  function apriFoto(src, originale, testo){
+  function apriFoto(src, originale, testo, nota){
     $("lightboxImg").src = src;
     $("lightboxApri").href = originale;
     $("lightboxText").textContent = testo;
+    $("lightboxNota").textContent = nota || "";
     $("lightbox").hidden = false;
   }
   $("lightboxChiudi").addEventListener("click", function(){ $("lightbox").hidden = true; $("lightboxImg").removeAttribute("src"); });
@@ -1076,9 +1142,11 @@ var QUALITA_CONFIG = {
     $(id).addEventListener("change", function(){
       var files = Array.prototype.slice.call(this.files);
       this.value = "";
-      aggiungiFoto(files, valoreScelto($("fasi")));
+      aggiungiSelezione(files);
     });
   });
+
+  $("fotoForm").addEventListener("submit", function(ev){ ev.preventDefault(); salvaFoto(); });
 
   $("docBtn").addEventListener("click", function(){ $("docInput").click(); });
   $("docInput").addEventListener("change", async function(){
