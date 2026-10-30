@@ -22,7 +22,7 @@ var QUALITA_CONFIG = {
   tenantId: "",
   // Link di condivisione della cartella che contiene le schede
   // (OneDrive o SharePoint → Condividi → Copia collegamento).
-  cartella: "",
+  cartella: "https://srlsiciet.sharepoint.com/:f:/s/SICIETQualit/IgA7vEheD4pNRKnHv5kDkH35Abb2m8NVouVpt8XLNzU5PQQ?e=B9XcHv",
 
   // Dati aggiuntivi della scheda, tutti facoltativi.
   campi: [
