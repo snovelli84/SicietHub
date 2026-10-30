@@ -364,8 +364,11 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     <ul class="list" id="elenco"></ul>
     <p class="empty" id="elencoVuoto" hidden></p>
     <div class="riepiloghi" id="riepiloghi" hidden>
-      <p class="hint">I riepiloghi Excel (in Schede componenti, in ogni commessa e in ogni JOB) si aggiornano da soli a ogni salvataggio.</p>
-      <button class="btn small" type="button" id="riepiloghiBtn">📊 Ricostruisci riepiloghi Excel</button>
+      <p class="hint">I riepiloghi Excel (in Schede componenti, in ogni commessa e in ogni JOB) si aggiornano da soli a ogni salvataggio. Questi pulsanti, per l'ufficio, rifanno tutto da zero.</p>
+      <div class="btns">
+        <button class="btn small" type="button" id="riepiloghiBtn">📊 Ricostruisci riepiloghi Excel</button>
+        <button class="btn small" type="button" id="etichetteBtn">🏷️ Rigenera etichette QR</button>
+      </div>
       <p class="hint" id="riepiloghiStato" aria-live="polite"></p>
     </div>
   </section>
@@ -502,7 +505,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   </section>
 </main>
 
-<footer>SICIET Quality · versione 15</footer>
+<footer>SICIET Quality · versione 16</footer>
 
 <!-- Lettura del TAG da foto -->
 <div class="overlay" id="ocrDlg" hidden>
@@ -550,6 +553,6 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
 <!-- Aumentare ?v= a ogni modifica di quality.js, altrimenti i telefoni usano la versione in cache. -->
-<script src="quality.js?v=15"></script>
+<script src="quality.js?v=16"></script>
 </body>
 </html>
