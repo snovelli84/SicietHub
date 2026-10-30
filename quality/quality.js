@@ -45,8 +45,10 @@ var QUALITA_CONFIG = {
   fasi: ["Targhetta", "Ricevimento", "Installazione", "Collaudo", "Non conformità", "Altro"],
   // Le foto vengono ridotte a questo lato massimo (pixel) e qualità JPEG.
   foto: { latoMax: 2560, qualita: 0.85 },
-  // Misure dell'etichetta adesiva (mm), per la stampa.
-  etichetta: { larghezzaMm: 62, altezzaMm: 40 }
+  // Etichetta per stampanti a nastro Brother con nastro TZe da 24 mm: l'area
+  // stampabile è alta 18 mm, a 180 punti per pollice, in un solo colore.
+  // La lunghezza si adatta al TAG (al massimo lunghezzaMaxMm).
+  etichetta: { altezzaMm: 18, dpi: 180, lunghezzaMaxMm: 110 }
 };
 
 (function(){
@@ -784,76 +786,122 @@ var QUALITA_CONFIG = {
 
   /* ---------- Etichetta QR ---------- */
 
-  // Disegna l'etichetta (QR a sinistra, commessa, JOB e TAG a destra) a 300 dpi.
+  /*
+   * Etichetta per nastro Brother: QR a sinistra, a destra il TAG grande, sotto
+   * JOB e commessa. Tutto nero pieno su bianco (niente grigi né colori, che sul
+   * nastro diventerebbero puntinati). Il QR usa moduli di un numero intero di
+   * punti della stampante, così resta nitido; l'immagine è a doppia
+   * risoluzione (360 dpi) e l'app Brother la riduce all'altezza del nastro.
+   */
   function disegnaEtichetta(s){
-    var job = s.job, tag = s.tag;
-    var mm = 300 / 25.4;
-    var W = Math.round(cfg.etichetta.larghezzaMm * mm), H = Math.round(cfg.etichetta.altezzaMm * mm);
-    var c = document.createElement("canvas");
-    c.width = W;
+    var e = cfg.etichetta, k = 2;
+    var punti = Math.round(e.altezzaMm / 25.4 * e.dpi);   // 128 punti per 18 mm a 180 dpi
+    var H = punti * k, mm = H / e.altezzaMm;
+    // Correzione d'errore M (regge graffi e sporco); L solo se con M i
+    // quadratini scenderebbero sotto i 3 punti di stampa.
+    var qr;
+    ["M", "L"].some(function(liv){
+      qr = qrcode(0, liv);
+      qr.addData(urlScheda(s));
+      qr.make();
+      return Math.floor(punti / qr.getModuleCount()) >= 3;
+    });
+    var n = qr.getModuleCount(), cell = Math.floor(punti / n) * k, q = cell * n;
+    var bordo = 2 * cell;                                 // zona di rispetto del QR
+    var x = bordo + q + Math.round(2.5 * mm), destra = Math.round(2 * mm);
+    var font = "Arial, Helvetica, sans-serif";
+    var righe = [
+      { t: s.tag, px: Math.round(8.5 * mm), peso: "700" },
+      { t: "JOB " + s.job, px: Math.round(4 * mm), peso: "700" },
+      { t: "Commessa " + (s.commessa || "—") + " · SICIET Quality", px: Math.round(3 * mm), peso: "400" }
+    ];
+    var c = document.createElement("canvas"), g = c.getContext("2d");
+    // Larghezza: quella del testo più lungo, entro il massimo; il TAG si riduce se non ci sta.
+    var maxTesto = Math.round(e.lunghezzaMaxMm * mm) - x - destra, larg = 0;
+    righe.forEach(function(r){
+      g.font = r.peso + " " + r.px + "px " + font;
+      while(r.px > 2.5 * mm && g.measureText(r.t).width > maxTesto){ r.px -= 2; g.font = r.peso + " " + r.px + "px " + font; }
+      larg = Math.max(larg, g.measureText(r.t).width);
+    });
+    c.width = Math.max(Math.round(45 * mm), Math.ceil(x + larg + destra));
     c.height = H;
-    var g = c.getContext("2d");
+    g = c.getContext("2d");
     g.fillStyle = "#fff";
-    g.fillRect(0, 0, W, H);
-
-    var qr = qrcode(0, "M");
-    qr.addData(urlScheda(s));
-    qr.make();
-    var n = qr.getModuleCount(), pad = Math.round(2.5 * mm);
-    var size = H - 2 * pad, cell = Math.floor(size / n), q = cell * n, ox = pad, oy = Math.round((H - q) / 2);
+    g.fillRect(0, 0, c.width, H);
     g.fillStyle = "#000";
+    var oy = Math.round((H - q) / 2);
     for(var r = 0; r < n; r++) for(var col = 0; col < n; col++){
-      if(qr.isDark(r, col)) g.fillRect(ox + col * cell, oy + r * cell, cell, cell);
+      if(qr.isDark(r, col)) g.fillRect(bordo + col * cell, oy + r * cell, cell, cell);
     }
-
-    var x = ox + q + Math.round(2.5 * mm), maxW = W - x - pad;
-    var font = "-apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
-    function testo(t, px, peso, y, colore){
-      var s = px;
-      g.font = peso + " " + s + "px " + font;
-      while(s > 10 && g.measureText(t).width > maxW){ s -= 2; g.font = peso + " " + s + "px " + font; }
-      g.fillStyle = colore || "#000";
-      g.fillText(t, x, y);
-      return s;
-    }
+    // Righe di testo distribuite sull'altezza.
+    var alt = righe.reduce(function(a, r){ return a + r.px; }, 0), spazio = (H - alt) / (righe.length + 1), y = spazio;
     g.textBaseline = "top";
-    var y = pad;
-    testo("SICIET QUALITY" + (s.commessa ? " · " + s.commessa : ""), Math.round(2.4 * mm), "600", y, "#005baa");
-    y += Math.round(5 * mm);
-    testo("JOB", Math.round(2.2 * mm), "400", y, "#555");
-    y += Math.round(2.8 * mm);
-    y += testo(job, Math.round(4.2 * mm), "700", y) + Math.round(1.5 * mm);
-    testo("TAG", Math.round(2.2 * mm), "400", y, "#555");
-    y += Math.round(2.8 * mm);
-    testo(tag, Math.round(6 * mm), "700", y);
-    g.textBaseline = "bottom";
-    testo("Scansiona per foto e documenti", Math.round(2 * mm), "400", H - pad, "#555");
+    righe.forEach(function(r){
+      g.font = r.peso + " " + r.px + "px " + font;
+      g.fillText(r.t, x, y);
+      y += r.px + spazio;
+    });
+    // Solo bianco o nero.
+    var d = g.getImageData(0, 0, c.width, H), p = d.data;
+    for(var i = 0; i < p.length; i += 4){
+      var v = p[i] + p[i + 1] + p[i + 2] < 384 ? 0 : 255;
+      p[i] = p[i + 1] = p[i + 2] = v;
+      p[i + 3] = 255;
+    }
+    g.putImageData(d, 0, 0);
     return c;
   }
 
+  // Misure in mm dell'etichetta disegnata (per la stampa dal browser).
+  function misureEtichetta(c){
+    var mmPerPx = cfg.etichetta.altezzaMm / c.height;
+    return { w: Math.round(c.width * mmPerPx * 10) / 10, h: cfg.etichetta.altezzaMm };
+  }
+
+  var fileEtichetta = null;
+
   function apriEtichetta(){
-    var s = stato.scheda;
-    var url = disegnaEtichetta(s).toDataURL("image/png");
+    var s = stato.scheda, c = disegnaEtichetta(s), url = c.toDataURL("image/png");
+    var nome = "Etichetta " + nomeFile([s.commessa, s.job, s.tag].filter(Boolean).join(" ")) + ".png";
     $("etichettaImg").src = url;
+    $("etichettaImg").dataset.w = misureEtichetta(c).w;
     $("etichettaUrl").textContent = urlScheda(s);
+    $("etichettaMisure").textContent = "Misure: " + misureEtichetta(c).w + " × " + cfg.etichetta.altezzaMm + " mm di stampa (nastro da 24 mm).";
     $("etichettaScarica").href = url;
-    $("etichettaScarica").download = "Etichetta " + nomeFile([s.commessa, s.job, s.tag].filter(Boolean).join(" ")) + ".png";
+    $("etichettaScarica").download = nome;
+    // Il file per "Condividi" si prepara subito: Safari permette di condividere
+    // solo nel momento del tocco, senza attese.
+    fileEtichetta = null;
+    $("etichettaCondividi").hidden = true;
+    c.toBlob(function(b){
+      if(!b || !window.File || !navigator.canShare) return;
+      var f = new File([b], nome, { type: "image/png" });
+      if(navigator.canShare({ files: [f] })){ fileEtichetta = f; $("etichettaCondividi").hidden = false; }
+    }, "image/png");
     $("etichettaDlg").hidden = false;
   }
 
+  function condividiEtichetta(){
+    if(!fileEtichetta) return;
+    navigator.share({ files: [fileEtichetta], title: fileEtichetta.name }).catch(function(e){
+      if(e && e.name !== "AbortError") mostraErrore(e);
+    });
+  }
+
   function stampaEtichetta(){
-    var a = $("printArea");
+    var a = $("printArea"), w = $("etichettaImg").dataset.w, h = cfg.etichetta.altezzaMm;
     a.textContent = "";
-    a.style.width = cfg.etichetta.larghezzaMm + "mm";
-    a.style.height = cfg.etichetta.altezzaMm + "mm";
+    a.style.width = w + "mm";
+    a.style.height = h + "mm";
     a.appendChild(el("img", { src: $("etichettaImg").src, alt: "" }));
     var st = $("pageSize") || document.head.appendChild(el("style", { id: "pageSize" }));
-    st.textContent = "@page{size:" + cfg.etichetta.larghezzaMm + "mm " + cfg.etichetta.altezzaMm + "mm;margin:0}";
+    st.textContent = "@page{size:" + w + "mm " + h + "mm;margin:0}";
     window.print();
   }
 
   $("etichettaBtn").addEventListener("click", apriEtichetta);
   $("etichettaStampa").addEventListener("click", stampaEtichetta);
+  $("etichettaCondividi").addEventListener("click", condividiEtichetta);
   $("etichettaChiudi").addEventListener("click", function(){ $("etichettaDlg").hidden = true; });
 
   /* ---------- Navigazione ---------- */
