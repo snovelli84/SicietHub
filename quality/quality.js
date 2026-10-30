@@ -463,18 +463,117 @@ var QUALITA_CONFIG = {
     return new Promise(function(res){ canvas.toBlob(res, tipo, q); });
   }
 
-  // Riduce la foto (lato massimo e qualità da configurazione). Se il browser
-  // non riesce a leggerla (es. HEIC da PC) la invia così com'è.
-  async function comprimi(file){
+  /*
+   * Data di scatto dai dati EXIF di una foto JPEG (DateTimeOriginal e, se c'è,
+   * il fuso OffsetTimeOriginal). null se il file non li ha.
+   */
+  async function dataExif(file){
+    try{
+      var v = new DataView(await file.slice(0, 256 * 1024).arrayBuffer()), off = 2;
+      if(v.getUint16(0) !== 0xFFD8) return null;
+      while(off + 10 < v.byteLength){
+        var marker = v.getUint16(off), len = v.getUint16(off + 2);
+        if(marker === 0xFFE1 && v.getUint32(off + 4) === 0x45786966) return leggiTiff(v, off + 10);
+        if((marker & 0xFF00) !== 0xFF00 || marker === 0xFFDA) break;
+        off += 2 + len;
+      }
+    }catch(e){}
+    return null;
+  }
+  function leggiTiff(v, t){
+    var le = v.getUint16(t) === 0x4949;
+    function u16(o){ return v.getUint16(t + o, le); }
+    function u32(o){ return v.getUint32(t + o, le); }
+    function testo(o, n){ var x = ""; for(var i = 0; i < n; i++){ var ch = v.getUint8(t + o + i); if(!ch) break; x += String.fromCharCode(ch); } return x; }
+    function voci(ifd){
+      var n = u16(ifd), out = {};
+      for(var i = 0; i < n; i++){
+        var e = ifd + 2 + i * 12, cnt = u32(e + 4);
+        out[u16(e)] = { cnt: cnt, off: cnt > 4 ? u32(e + 8) : e + 8, val: u32(e + 8) };
+      }
+      return out;
+    }
+    var ifd0 = voci(u32(4)), exif = ifd0[0x8769] ? voci(ifd0[0x8769].val) : {};
+    var d = exif[0x9003] || exif[0x9004] || ifd0[0x0132];
+    var m = d && /^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/.exec(testo(d.off, d.cnt));
+    if(!m || m[1] === "0000") return null;
+    var o = exif[0x9011] || exif[0x9010], fuso = o ? testo(o.off, o.cnt) : "";
+    return { campi: m.slice(1).map(Number), fuso: /^[+-]\d{2}:\d{2}$/.test(fuso) ? fuso : null };
+  }
+
+  // "UTC+01:00" da minuti di scostamento.
+  function utc(min){
+    var a = Math.abs(min);
+    return "UTC" + (min < 0 ? "−" : "+") + due(Math.floor(a / 60)) + ":" + due(a % 60);
+  }
+  // Sigla del fuso del telefono in quella data (CET/CEST), se il browser la conosce.
+  function siglaFuso(d){
+    try{
+      var p = new Intl.DateTimeFormat("en-GB", { timeZoneName: "short" }).formatToParts(d).filter(function(x){ return x.type === "timeZoneName"; })[0];
+      return p && !/^(GMT|UTC)/.test(p.value) ? p.value : "";
+    }catch(e){ return ""; }
+  }
+
+  /*
+   * Testo della fascia: data, ora e fuso dello scatto (dai dati EXIF, oppure
+   * l'ora attuale se la foto arriva dalla fotocamera in quel momento) o, per
+   * le foto della galleria senza dati, l'ora di caricamento.
+   */
+  async function rigaData(file){
+    var ex = await dataExif(file), d, min, fonte;
+    if(ex){
+      var c = ex.campi;
+      d = new Date(c[0], c[1] - 1, c[2], c[3], c[4], c[5]);
+      min = ex.fuso ? (ex.fuso[0] === "-" ? -1 : 1) * (+ex.fuso.slice(1, 3) * 60 + +ex.fuso.slice(4, 6)) : -d.getTimezoneOffset();
+      fonte = "scattata";
+    }else{
+      d = new Date();
+      min = -d.getTimezoneOffset();
+      fonte = file.daFotocamera ? "scattata" : "caricata";
+    }
+    var sigla = min === -d.getTimezoneOffset() ? siglaFuso(d) : "";
+    return due(d.getDate()) + "/" + due(d.getMonth() + 1) + "/" + d.getFullYear() + " " +
+      due(d.getHours()) + ":" + due(d.getMinutes()) + ":" + due(d.getSeconds()) + " " +
+      (sigla ? sigla + " (" + utc(min) + ")" : utc(min)) + " · " + fonte;
+  }
+
+  /*
+   * Riduce la foto (lato massimo e qualità da configurazione) e scrive in
+   * basso una fascia con data, ora e fuso, e commessa, JOB, TAG, fase e
+   * operatore. info: { commessa, job, tag, fase, stato }. Se il browser non
+   * riesce a leggere la foto (es. HEIC da PC) la invia così com'è.
+   */
+  async function comprimi(file, info){
     var img;
     try{ img = await caricaImmagine(file); }catch(e){ return file; }
     var w = img.naturalWidth, h = img.naturalHeight;
     var k = Math.min(1, cfg.foto.latoMax / Math.max(w, h));
-    if(k === 1 && file.type === "image/jpeg" && file.size < 2500000) return file;
     var c = document.createElement("canvas");
     c.width = Math.round(w * k);
     c.height = Math.round(h * k);
-    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    var g = c.getContext("2d");
+    g.drawImage(img, 0, 0, c.width, c.height);
+    info = info || {};
+    var righe = [
+      await rigaData(file),
+      [info.commessa, info.job && "JOB " + info.job, info.tag && "TAG " + info.tag,
+        info.fase && (info.fase + (info.stato ? " → " + info.stato : "")), autore()].filter(Boolean).join(" · ")
+    ];
+    var font = "-apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
+    var fs = Math.max(14, Math.round(Math.min(c.width, c.height * 1.4) * 0.026)), pad = Math.round(fs * 0.6);
+    g.font = "600 " + fs + "px " + font;
+    while(fs > 10 && Math.max.apply(null, righe.map(function(r){ return g.measureText(r).width; })) > c.width - 2 * pad){
+      fs--;
+      pad = Math.round(fs * 0.6);
+      g.font = "600 " + fs + "px " + font;
+    }
+    var alt = Math.round(fs * 2.5 + pad * 1.4);
+    g.fillStyle = "rgba(0,0,0,.62)";
+    g.fillRect(0, c.height - alt, c.width, alt);
+    g.fillStyle = "#fff";
+    g.textBaseline = "alphabetic";
+    g.fillText(righe[0], pad, c.height - alt + pad * 0.7 + fs);
+    g.fillText(righe[1], pad, c.height - alt + pad * 0.7 + fs * 2.25);
     return (await canvasBlob(c, "image/jpeg", cfg.foto.qualita)) || file;
   }
 
@@ -498,7 +597,11 @@ var QUALITA_CONFIG = {
     var gal = el("input", { type: "file", accept: "image/*", multiple: "", hidden: "" });
     [cam, gal].forEach(function(inp){
       inp.addEventListener("change", function(){
-        Array.prototype.slice.call(this.files).forEach(function(f){ self.sel.push({ file: f, url: URL.createObjectURL(f) }); });
+        var daFotocamera = this === cam;
+        Array.prototype.slice.call(this.files).forEach(function(f){
+          f.daFotocamera = daFotocamera; // per la fascia: "scattata" anche senza dati EXIF
+          self.sel.push({ file: f, url: URL.createObjectURL(f) });
+        });
         this.value = "";
         self.disegna();
       });
@@ -553,8 +656,9 @@ var QUALITA_CONFIG = {
     for(var i = 0; i < n; i++) out.push(timbro(base) + " " + nomeFile(fase) + (n > 1 ? " " + (i + 1) : "") + op + ".jpg");
     return out;
   }
-  async function accodaFoto(dir, files, nomi){
-    for(var i = 0; i < files.length; i++) await accoda(dir, "Foto", nomi[i], await comprimi(files[i]));
+  // info: dati per la fascia sulla foto (vedi comprimi).
+  async function accodaFoto(dir, files, nomi, info){
+    for(var i = 0; i < files.length; i++) await accoda(dir, "Foto", nomi[i], await comprimi(files[i], info));
   }
 
   var fotoNuovo, fotoScheda;
@@ -568,7 +672,8 @@ var QUALITA_CONFIG = {
     $("fotoErr").textContent = "";
     try{
       var base = new Date(), nomi = nomiFoto(base, fase, p.sel.length);
-      await accodaFoto(cartellaScheda(s), p.sel.map(function(x){ return x.file; }), nomi);
+      await accodaFoto(cartellaScheda(s), p.sel.map(function(x){ return x.file; }), nomi,
+        { commessa: s.commessa, job: s.job, tag: s.tag, fase: fase });
       salvate = true;
       p.reset();
       await mostraCoda();
@@ -807,6 +912,7 @@ var QUALITA_CONFIG = {
     var f = this.files[0];
     this.value = "";
     if(!f) return;
+    f.daFotocamera = true;
     stato.fotoTarghetta = f;
     mostraTarghetta();
     apriOcr(f);
@@ -1375,10 +1481,11 @@ var QUALITA_CONFIG = {
       var etichetta = await canvasBlob(disegnaEtichetta(s), "image/png");
       await accoda(dir, "", "Etichetta QR.png", etichetta);
       if(stato.fotoTarghetta){
-        await accoda(dir, "Foto", nomiFoto(ora, cfg.fasi[0], 1)[0], await comprimi(stato.fotoTarghetta));
+        await accoda(dir, "Foto", nomiFoto(ora, cfg.fasi[0], 1)[0],
+          await comprimi(stato.fotoTarghetta, { commessa: commessa, job: job, tag: tag, fase: cfg.fasi[0] }));
         stato.fotoTarghetta = null;
       }
-      await accodaFoto(dir, filePrima, nomiPrima);
+      await accodaFoto(dir, filePrima, nomiPrima, { commessa: commessa, job: job, tag: tag, fase: fasePrima });
       fotoNuovo.reset();
       stato.inseriti.push({ c: commessa, job: job, tag: tag });
       svuotaCoda();
@@ -1643,7 +1750,8 @@ var QUALITA_CONFIG = {
       var base = new Date(), nomi = [];
       if(t && fotoStato.sel.length){
         nomi = nomiFoto(base, t.fase, fotoStato.sel.length, t.nuovo);
-        await accodaFoto(cartellaScheda(s), fotoStato.sel.map(function(x){ return x.file; }), nomi);
+        await accodaFoto(cartellaScheda(s), fotoStato.sel.map(function(x){ return x.file; }), nomi,
+          { commessa: s.commessa, job: s.job, tag: s.tag, fase: t.fase, stato: t.nuovo });
       }
       stato.scheda = await aggiornaScheda(s, function(d){
         var n = { il: base.toISOString(), da: autore(), testo: testo };
