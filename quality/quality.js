@@ -211,6 +211,8 @@ var QUALITA_CONFIG = {
       storage(function(){ localStorage.setItem(PIN_KEY, pin); });
     },
     list: async function(path){ return (await this.api("GET", "list", path)) || []; },
+    // Elenco sintetico di tutte le schede (dall'indice del servizio), per la ricerca.
+    schede: async function(){ return (await this.api("GET", "schede", "")) || []; },
     info: function(path){ return this.api("GET", "item", path); },
     readJson: function(path){ return this.api("GET", "json", path); },
     // opts: { etag (sovrascrive solo se invariato), rename (non sovrascrive file esistenti) }
@@ -249,6 +251,17 @@ var QUALITA_CONFIG = {
     readJson: async function(path){
       var f = await idb("prova", "readonly", function(s){ return s.get(path); });
       return f ? { data: JSON.parse(await datoBlob(f).text()), etag: f.modified } : null;
+    },
+    schede: async function(){
+      var keys = await idb("prova", "readonly", function(s){ return s.getAllKeys(); });
+      var out = [];
+      for(var i = 0; i < keys.length; i++){
+        if(!/^[^\/]+\/[^\/]+\/[^\/]+\/scheda\.json$/.test(keys[i])) continue;
+        var d = (await this.readJson(keys[i])).data;
+        out.push({ commessa: d.commessa, job: d.job, tag: d.tag, descrizione: (d.campi || {}).descrizione || "", stato: d.stato,
+          aggiornataIl: (d.aggiornata || d.creata).il, aggiornataDa: (d.aggiornata || d.creata).da });
+      }
+      return out;
     },
     put: async function(path, blob, opts){
       opts = opts || {};
@@ -945,7 +958,14 @@ var QUALITA_CONFIG = {
     }
     $("nuovoBtn").href = qs(c, job, null, "nuovo");
     $("nuovoBtn").setAttribute("data-vai", "");
-    $("filtroLabel").textContent = job ? "Cerca un TAG nel JOB " + job : c ? "Cerca un JOB nella commessa " + c : "Cerca una commessa";
+    $("filtroLabel").textContent = job ? "Cerca un TAG nel JOB " + job : c ? "Cerca un JOB nella commessa " + c : "Cerca TAG, JOB, commessa o descrizione";
+    stato.schede = null;
+    $("schedeBox").hidden = true;
+    if(!c) B.schede().then(function(v){
+      if(stato.vista !== "elenco" || stato.c) return;
+      stato.schede = v;
+      disegnaElenco();
+    }).catch(function(){});
     $("filtro").value = "";
     $("elenco").textContent = "";
     $("elencoVuoto").hidden = false;
@@ -961,7 +981,25 @@ var QUALITA_CONFIG = {
     }
   }
 
+  // Nella pagina iniziale: schede trovate dalla ricerca, o le ultime aggiornate.
+  function disegnaSchede(){
+    var box = $("schedeBox"), ul = $("schede"), cerca = $("filtro").value.trim().toUpperCase(), tutte = stato.schede || [];
+    var voci = cerca
+      ? tutte.filter(function(x){ return [x.tag, x.job, x.commessa, x.descrizione].join(" ").toUpperCase().indexOf(cerca) >= 0; }).slice(0, 30)
+      : tutte.slice().sort(function(a, b){ return String(b.aggiornataIl).localeCompare(String(a.aggiornataIl)); }).slice(0, 5);
+    ul.textContent = "";
+    voci.forEach(function(x){
+      var a = link(qs(x.commessa, x.job, x.tag), "");
+      a.appendChild(el("span", { class: "name" }, [x.tag, el("span", { class: "sub", text: "JOB " + x.job + " · commessa " + x.commessa + (x.descrizione ? " · " + x.descrizione : "") })]));
+      a.appendChild(el("span", { class: "meta" }, [el("span", { class: "badge " + statoInfo(x.stato).tipo, text: x.stato })]));
+      ul.appendChild(el("li", null, [a]));
+    });
+    $("schedeTitolo").textContent = cerca ? (voci.length ? "Schede trovate" : "Nessuna scheda trovata") : "Ultime schede aggiornate";
+    box.hidden = !tutte.length || (!cerca && !voci.length);
+  }
+
   function disegnaElenco(){
+    if(!stato.c) disegnaSchede();
     var f = nomeCartella($("filtro").value), c = stato.c, job = stato.job, ul = $("elenco");
     ul.textContent = "";
     var voci = elencoVoci.filter(function(v){ return !f || v.name.indexOf(f) >= 0; });
@@ -972,7 +1010,7 @@ var QUALITA_CONFIG = {
       a.appendChild(el("span", { class: "meta", text: v.modified ? fmtData(v.modified).slice(0, 10) : "" }));
       ul.appendChild(el("li", null, [a]));
     });
-    $("elencoVuoto").hidden = voci.length > 0;
+    $("elencoVuoto").hidden = voci.length > 0 || (!c && !!$("filtro").value.trim());
     $("riepiloghi").hidden = !configured || !!c;
     $("elencoVuoto").textContent = elencoVoci.length
       ? "Nessun risultato."
@@ -1327,17 +1365,32 @@ var QUALITA_CONFIG = {
   $("fotoForm").addEventListener("submit", function(ev){ ev.preventDefault(); salvaFoto(); });
 
   $("docBtn").addEventListener("click", function(){ $("docInput").click(); });
-  $("docInput").addEventListener("change", async function(){
-    var files = Array.prototype.slice.call(this.files), s = stato.scheda;
-    this.value = "";
-    if(!s) return;
+  async function aggiungiDocumenti(files){
+    var s = stato.scheda;
+    if(!s || !files.length) return;
     try{
       for(var i = 0; i < files.length; i++) await accoda(cartellaScheda(s), "Documenti", nomeFile(files[i].name), files[i]);
       await mostraCoda();
       caricaFileScheda();
       svuotaCoda();
     }catch(e){ mostraErrore(e); }
+  }
+  $("docInput").addEventListener("change", function(){
+    var files = Array.prototype.slice.call(this.files);
+    this.value = "";
+    aggiungiDocumenti(files);
   });
+  // Dal PC i documenti si possono trascinare sul riquadro.
+  (function(){
+    var box = $("docBox");
+    box.addEventListener("dragover", function(ev){ ev.preventDefault(); box.classList.add("drop"); });
+    box.addEventListener("dragleave", function(ev){ if(!box.contains(ev.relatedTarget)) box.classList.remove("drop"); });
+    box.addEventListener("drop", function(ev){
+      ev.preventDefault();
+      box.classList.remove("drop");
+      aggiungiDocumenti(Array.prototype.slice.call(ev.dataTransfer.files || []));
+    });
+  })();
 
   $("notaForm").addEventListener("submit", async function(ev){
     ev.preventDefault();
