@@ -72,6 +72,7 @@ header{
 .logo{display:inline-block;background:#fff;border-radius:16px;padding:8px 12px;line-height:0}
 .logo img{display:block;height:64px;width:auto}
 .user{font-size:13px;opacity:.9;text-align:right;min-width:0;overflow-wrap:anywhere}
+.user > div + div{margin-top:2px}
 .user button{background:none;border:0;color:#fff;font:inherit;text-decoration:underline;cursor:pointer;margin-left:6px}
 header h1{font-size:0;line-height:0}
 header p{opacity:.9;margin-top:4px;font-size:15px}
@@ -273,7 +274,10 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   <div class="header-inner">
     <div class="header-top">
       <h1><a class="logo" href="./"><img src="icons/logo.png" alt="SICIET Quality" width="447" height="340"></a></h1>
-      <div class="user" id="user" hidden><span id="userName"></span><button type="button" id="logout">Esci</button></div>
+      <div class="user">
+        <div id="operatore" hidden><span id="operatoreTesto"></span><button type="button" id="operatoreCambia">Cambia</button></div>
+        <div id="account" hidden><span id="userName"></span><button type="button" id="logout">Esci</button></div>
+      </div>
     </div>
     <p>Controllo qualità di fornitura e installazione: foto, note e documenti dei componenti per JOB e TAG.</p>
   </div>
@@ -296,7 +300,20 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     <button class="btn primary block" type="button" id="login">Accedi con Microsoft</button>
   </section>
 
-  <!-- Elenco dei JOB, oppure dei TAG di un JOB -->
+  <!-- Nome di chi usa l'app su questo dispositivo -->
+  <section class="card" id="viewOperatore" hidden>
+    <h2>Chi sta usando l'app?</h2>
+    <form id="operatoreForm" novalidate>
+      <div class="field">
+        <label for="operatoreNome">Nome e cognome</label>
+        <input type="text" id="operatoreNome" autocomplete="name" autocapitalize="words" maxlength="60" required>
+        <span class="hint">Viene memorizzato su questo telefono e scritto nelle note e nei nomi delle foto. Si cambia con "Cambia" in alto.</span>
+      </div>
+      <button class="btn primary block" type="submit">Continua</button>
+    </form>
+  </section>
+
+  <!-- Elenco delle commesse, dei JOB di una commessa o dei TAG di un JOB -->
   <section class="card" id="viewElenco" hidden>
     <div class="crumbs" id="elencoCrumbs"></div>
     <a class="btn primary block" id="nuovoBtn" href="?nuovo">+ Nuovo componente</a>
@@ -310,14 +327,15 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 
   <!-- Nuova scheda -->
   <section class="card" id="viewNuovo" hidden>
-    <div class="crumbs"><a href="?" data-vai>Tutti i JOB</a></div>
+    <div class="crumbs"><a href="?" data-vai>Tutte le commesse</a></div>
     <h2>Nuovo componente</h2>
     <div class="msg ok" id="nuovoOk" role="status" hidden></div>
     <form id="nuovoForm" novalidate>
       <div class="row">
       <div class="field">
         <label for="commessa">Commessa SICIET</label>
-        <input type="text" class="big" id="commessa" autocomplete="off" autocapitalize="characters" required>
+        <input type="text" class="big" id="commessa" list="commessaList" autocomplete="off" autocapitalize="characters" required>
+        <datalist id="commessaList"></datalist>
       </div>
       <div class="field">
         <label for="job">JOB</label>
@@ -438,7 +456,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   </section>
 </main>
 
-<footer>SICIET Quality · versione 6</footer>
+<footer>SICIET Quality · versione 7</footer>
 
 <!-- Lettura del TAG da foto -->
 <div class="overlay" id="ocrDlg" hidden>
@@ -483,6 +501,6 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
 <!-- Aumentare ?v= a ogni modifica di quality.js, altrimenti i telefoni usano la versione in cache. -->
-<script src="quality.js?v=6"></script>
+<script src="quality.js?v=7"></script>
 </body>
 </html>

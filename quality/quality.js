@@ -5,7 +5,7 @@
  * dal TAG, con foto, note, stato e documenti. Tutto viene salvato nella
  * cartella condivisa di OneDrive/SharePoint indicata in "cartella":
  *
- *   <cartella>/<JOB>/<TAG>/scheda.json         dati della scheda (usati dalla pagina)
+ *   <cartella>/<COMMESSA>/<JOB>/<TAG>/scheda.json         dati della scheda (usati dalla pagina)
  *                          Scheda.txt          gli stessi dati, leggibili dall'ufficio
  *                          Etichetta QR.png    etichetta da stampare
  *                          Foto/2026-10-30 14.32.05 Installazione.jpg
@@ -18,11 +18,16 @@
  */
 var QUALITA_CONFIG = {
   // ID applicazione (client) e ID directory (tenant) della registrazione in Entra ID.
-  clientId: "",
-  tenantId: "",
+  clientId: "7b0cf16f-9dc4-4763-83e7-0ce9bef8e4df",
+  tenantId: "5c055224-300a-4b03-8742-552b7dd79f62",
   // Link di condivisione della cartella che contiene le schede
   // (OneDrive o SharePoint → Condividi → Copia collegamento).
   cartella: "https://srlsiciet.sharepoint.com/:f:/s/SICIETQualit/IgA7vEheD4pNRKnHv5kDkH35Abb2m8NVouVpt8XLNzU5PQQ?e=B9XcHv",
+
+  // Chiede il nome di chi usa l'app (memorizzato sul dispositivo): serve
+  // quando sui telefoni di cantiere si accede con un account condiviso.
+  // Il nome finisce nelle note e nei nomi delle foto.
+  chiediOperatore: true,
 
   // Dati aggiuntivi della scheda, tutti facoltativi.
   campi: [
@@ -57,6 +62,10 @@ var QUALITA_CONFIG = {
   var SCOPES = ["User.Read", "Files.ReadWrite.All"];
   var LAST_JOB_KEY = "siciet-qualita-job";
   var COMMESSA_KEY = "siciet-qualita-commessa";
+  var OPERATORE_KEY = "siciet-qualita-operatore";
+  // Indirizzo dell'app senza "index.html": è anche l'indirizzo di ritorno
+  // registrato in Entra ID e quello scritto nei QR code.
+  var BASE_URL = location.origin + location.pathname.replace(/index\.html$/, "");
   var SIMPLE_UPLOAD_MAX = 4000000; // oltre si usa una sessione di caricamento
 
   var $ = function(id){ return document.getElementById(id); };
@@ -99,14 +108,28 @@ var QUALITA_CONFIG = {
     return d.getFullYear() + "-" + due(d.getMonth() + 1) + "-" + due(d.getDate()) + " " +
       due(d.getHours()) + "." + due(d.getMinutes()) + "." + due(d.getSeconds());
   }
-  // "2026-10-30 14.32.05 Installazione.jpg" → { data, fase }
+  // "2026-10-30 14.32.05 Installazione 2 - Mario Rossi.jpg" → { data, fase, operatore }
   function leggiNomeFoto(nome){
-    var m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2})\.(\d{2})\.(\d{2}) (.+?)(?: \d+)?\.[a-z0-9]+$/i.exec(nome);
+    var m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2})\.(\d{2})\.(\d{2}) (.+?)(?: \d+)?(?: - (.+?))?\.[a-z0-9]+$/i.exec(nome);
     if(!m) return { data: null, fase: "Altro" };
-    return { data: new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]), fase: m[7] };
+    return { data: new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]), fase: m[7], operatore: m[8] };
   }
 
   function percorso(parti){ return parti.filter(Boolean).join("/"); }
+  // Cartella di una scheda: <COMMESSA>/<JOB>/<TAG>.
+  function cartellaScheda(s){ return percorso([s.commessa, s.job, s.tag]); }
+  // Indirizzo (parte dopo "?") di commessa, JOB e TAG.
+  function qs(c, job, tag, extra){
+    var p = extra ? [extra] : [];
+    if(c) p.push("c=" + encodeURIComponent(c));
+    if(job) p.push("job=" + encodeURIComponent(job));
+    if(tag) p.push("tag=" + encodeURIComponent(tag));
+    return "?" + p.join("&");
+  }
+
+  function operatore(){ return storage(function(){ return localStorage.getItem(OPERATORE_KEY); }) || ""; }
+  // Chi ha fatto la modifica: l'operatore indicato sul dispositivo, altrimenti l'account.
+  function autore(){ return (cfg.chiediOperatore && operatore()) || B.userName(); }
 
   function caricaScript(src){
     caricaScript.p = caricaScript.p || {};
@@ -169,7 +192,7 @@ var QUALITA_CONFIG = {
         auth: {
           clientId: cfg.clientId,
           authority: "https://login.microsoftonline.com/" + cfg.tenantId,
-          redirectUri: location.origin + location.pathname
+          redirectUri: BASE_URL
         },
         cache: { cacheLocation: "localStorage" }
       });
@@ -183,7 +206,7 @@ var QUALITA_CONFIG = {
       return this.pca.loginRedirect({ scopes: SCOPES, redirectStartPage: location.href, prompt: "select_account" });
     },
     logout: function(){
-      return this.pca.logoutRedirect({ account: this.account, postLogoutRedirectUri: location.origin + location.pathname });
+      return this.pca.logoutRedirect({ account: this.account, postLogoutRedirectUri: BASE_URL });
     },
     token: async function(){
       try{
@@ -347,9 +370,7 @@ var QUALITA_CONFIG = {
     return cfg.stati.filter(function(s){ return s.nome === nome; })[0] || { nome: nome || "—", tipo: "warn" };
   }
 
-  function urlScheda(job, tag){
-    return location.origin + location.pathname + "?job=" + encodeURIComponent(job) + "&tag=" + encodeURIComponent(tag);
-  }
+  function urlScheda(s){ return BASE_URL + qs(s.commessa, s.job, s.tag); }
 
   function testoScheda(s){
     var r = [
@@ -363,7 +384,7 @@ var QUALITA_CONFIG = {
     r.push("Stato:  " + s.stato);
     r.push("Creata il " + fmtData(s.creata.il) + " da " + s.creata.da);
     if(s.aggiornata) r.push("Ultimo aggiornamento " + fmtData(s.aggiornata.il) + " da " + s.aggiornata.da);
-    r.push("Scheda online: " + urlScheda(s.job, s.tag));
+    r.push("Scheda online: " + urlScheda(s));
     r.push("", "NOTE", "");
     if(!s.note.length) r.push("(nessuna)");
     s.note.forEach(function(n){
@@ -378,19 +399,19 @@ var QUALITA_CONFIG = {
 
   async function scriviScheda(s, etag){
     var json = new Blob([JSON.stringify(s, null, 2)], { type: "application/json" });
-    await B.put(percorso([s.job, s.tag, "scheda.json"]), json, { etag: etag });
+    await B.put(percorso([cartellaScheda(s), "scheda.json"]), json, { etag: etag });
     var txt = new Blob(["﻿" + testoScheda(s)], { type: "text/plain;charset=utf-8" });
-    await B.put(percorso([s.job, s.tag, "Scheda.txt"]), txt);
+    await B.put(percorso([cartellaScheda(s), "Scheda.txt"]), txt);
   }
 
   // Rilegge la scheda, applica la modifica e salva; se nel frattempo qualcun
   // altro l'ha cambiata (412) riprova sulla versione aggiornata.
-  async function aggiornaScheda(job, tag, modifica){
+  async function aggiornaScheda(s, modifica){
     for(var i = 0; ; i++){
-      var r = await B.readJson(percorso([job, tag, "scheda.json"]));
+      var r = await B.readJson(percorso([cartellaScheda(s), "scheda.json"]));
       if(!r) throw errore("Scheda non trovata.", 404);
       modifica(r.data);
-      r.data.aggiornata = { il: new Date().toISOString(), da: B.userName() };
+      r.data.aggiornata = { il: new Date().toISOString(), da: autore() };
       try{
         await scriviScheda(r.data, r.etag);
         return r.data;
@@ -407,13 +428,17 @@ var QUALITA_CONFIG = {
 
   var inviando = false, erroreInvio = "";
 
-  async function accoda(job, tag, cartella, nome, blob){
+  // dir: cartella della scheda (vedi cartellaScheda); cartella: "Foto", "Documenti" o "".
+  async function accoda(dir, cartella, nome, blob){
     // Copia in memoria: alcuni browser non salvano in IndexedDB i file di <input type=file>.
     var copy = new Blob([await blob.arrayBuffer()], { type: blob.type });
     await idb("coda", "readwrite", function(s){
-      return s.add({ job: job, tag: tag, cartella: cartella, nome: nome, blob: copy, il: Date.now() });
+      return s.add({ dir: dir, cartella: cartella, nome: nome, blob: copy, il: Date.now() });
     });
   }
+
+  // Gli elementi accodati dalle prime versioni avevano job e tag invece di dir.
+  function dirCoda(it){ return it.dir || percorso([it.job, it.tag]); }
 
   async function elementiInCoda(){
     return idb("coda", "readonly", function(s){ return s.getAll(); }).catch(function(){ return []; });
@@ -436,7 +461,7 @@ var QUALITA_CONFIG = {
         var it = items[i];
         $("queueText").textContent = "Invio " + (i + 1) + " di " + items.length + "…";
         $("queue").hidden = false;
-        await B.put(percorso([it.job, it.tag, it.cartella, it.nome]), it.blob, { rename: true });
+        await B.put(percorso([dirCoda(it), it.cartella, it.nome]), it.blob, { rename: true });
         await idb("coda", "readwrite", function(s){ return s.delete(it.id); });
         inviati = true;
       }
@@ -545,14 +570,14 @@ var QUALITA_CONFIG = {
     this.disegna();
   };
 
-  // Nomi dei file: "2026-10-30 14.32.05 Installazione 2.jpg".
+  // Nomi dei file: "2026-10-30 14.32.05 Installazione 2 - Mario Rossi.jpg".
   function nomiFoto(base, fase, n){
-    var out = [];
-    for(var i = 0; i < n; i++) out.push(timbro(base) + " " + nomeFile(fase) + (n > 1 ? " " + (i + 1) : "") + ".jpg");
+    var out = [], op = cfg.chiediOperatore && operatore() ? " - " + nomeFile(operatore()) : "";
+    for(var i = 0; i < n; i++) out.push(timbro(base) + " " + nomeFile(fase) + (n > 1 ? " " + (i + 1) : "") + op + ".jpg");
     return out;
   }
-  async function accodaFoto(job, tag, files, nomi){
-    for(var i = 0; i < files.length; i++) await accoda(job, tag, "Foto", nomi[i], await comprimi(files[i]));
+  async function accodaFoto(dir, files, nomi){
+    for(var i = 0; i < files.length; i++) await accoda(dir, "Foto", nomi[i], await comprimi(files[i]));
   }
 
   var fotoNuovo, fotoScheda;
@@ -566,15 +591,15 @@ var QUALITA_CONFIG = {
     $("fotoErr").textContent = "";
     try{
       var base = new Date(), nomi = nomiFoto(base, fase, p.sel.length);
-      await accodaFoto(s.job, s.tag, p.sel.map(function(x){ return x.file; }), nomi);
+      await accodaFoto(cartellaScheda(s), p.sel.map(function(x){ return x.file; }), nomi);
       salvate = true;
       p.reset();
       await mostraCoda();
       caricaFileScheda();
       svuotaCoda();
       if(testo){
-        stato.scheda = await aggiornaScheda(s.job, s.tag, function(d){
-          d.note.push({ il: base.toISOString(), da: B.userName(), fase: fase, foto: nomi, testo: testo });
+        stato.scheda = await aggiornaScheda(s, function(d){
+          d.note.push({ il: base.toISOString(), da: autore(), fase: fase, foto: nomi, testo: testo });
         });
         disegnaScheda();
         caricaFileScheda();
@@ -813,8 +838,9 @@ var QUALITA_CONFIG = {
 
   /* ---------- Etichetta QR ---------- */
 
-  // Disegna l'etichetta (QR a sinistra, JOB e TAG a destra) a 300 dpi.
-  function disegnaEtichetta(job, tag){
+  // Disegna l'etichetta (QR a sinistra, commessa, JOB e TAG a destra) a 300 dpi.
+  function disegnaEtichetta(s){
+    var job = s.job, tag = s.tag;
     var mm = 300 / 25.4;
     var W = Math.round(cfg.etichetta.larghezzaMm * mm), H = Math.round(cfg.etichetta.altezzaMm * mm);
     var c = document.createElement("canvas");
@@ -825,7 +851,7 @@ var QUALITA_CONFIG = {
     g.fillRect(0, 0, W, H);
 
     var qr = qrcode(0, "M");
-    qr.addData(urlScheda(job, tag));
+    qr.addData(urlScheda(s));
     qr.make();
     var n = qr.getModuleCount(), pad = Math.round(2.5 * mm);
     var size = H - 2 * pad, cell = Math.floor(size / n), q = cell * n, ox = pad, oy = Math.round((H - q) / 2);
@@ -846,7 +872,7 @@ var QUALITA_CONFIG = {
     }
     g.textBaseline = "top";
     var y = pad;
-    testo("SICIET QUALITY", Math.round(2.4 * mm), "600", y, "#005baa");
+    testo("SICIET QUALITY" + (s.commessa ? " · " + s.commessa : ""), Math.round(2.4 * mm), "600", y, "#005baa");
     y += Math.round(5 * mm);
     testo("JOB", Math.round(2.2 * mm), "400", y, "#555");
     y += Math.round(2.8 * mm);
@@ -861,11 +887,11 @@ var QUALITA_CONFIG = {
 
   function apriEtichetta(){
     var s = stato.scheda;
-    var url = disegnaEtichetta(s.job, s.tag).toDataURL("image/png");
+    var url = disegnaEtichetta(s).toDataURL("image/png");
     $("etichettaImg").src = url;
-    $("etichettaUrl").textContent = urlScheda(s.job, s.tag);
+    $("etichettaUrl").textContent = urlScheda(s);
     $("etichettaScarica").href = url;
-    $("etichettaScarica").download = "Etichetta " + nomeFile(s.job + " " + s.tag) + ".png";
+    $("etichettaScarica").download = "Etichetta " + nomeFile([s.commessa, s.job, s.tag].filter(Boolean).join(" ")) + ".png";
     $("etichettaDlg").hidden = false;
   }
 
@@ -909,12 +935,12 @@ var QUALITA_CONFIG = {
   window.addEventListener("popstate", mostra);
 
   function soloVista(id){
-    ["viewLogin", "viewElenco", "viewNuovo", "viewScheda"].forEach(function(v){ $(v).hidden = v !== id; });
+    ["viewLogin", "viewOperatore", "viewElenco", "viewNuovo", "viewScheda"].forEach(function(v){ $(v).hidden = v !== id; });
   }
 
   function mostra(){
     var q = new URLSearchParams(location.search);
-    var job = q.get("job"), tag = q.get("tag");
+    var c = q.get("c"), job = q.get("job"), tag = q.get("tag");
     mostraErrore(null);
     $("ocrDlg").hidden = $("etichettaDlg").hidden = $("lightbox").hidden = true;
 
@@ -926,37 +952,73 @@ var QUALITA_CONFIG = {
       soloVista("viewLogin");
       return;
     }
-    if(q.has("nuovo")) return mostraNuovo(job);
-    if(job && tag) return mostraScheda(job, tag);
-    return mostraElenco(job);
+    if(cfg.chiediOperatore && !operatore()){
+      stato.vista = "operatore";
+      soloVista("viewOperatore");
+      $("operatoreNome").focus();
+      return;
+    }
+    if(q.has("nuovo")) return mostraNuovo(c, job);
+    if(c && job && tag) return mostraScheda(c, job, tag);
+    return mostraElenco(c, c && job);
   }
 
-  /* ---------- Elenco JOB / TAG ---------- */
+  /* ---------- Operatore ---------- */
+
+  function mostraOperatore(){
+    var op = cfg.chiediOperatore && operatore();
+    $("operatore").hidden = !op;
+    $("operatoreTesto").textContent = op ? "Operatore: " + op : "";
+  }
+  $("operatoreForm").addEventListener("submit", function(ev){
+    ev.preventDefault();
+    var nome = $("operatoreNome").value.replace(/\s+/g, " ").trim();
+    if(nome.length < 3){ $("operatoreNome").classList.add("invalid"); $("operatoreNome").focus(); return; }
+    $("operatoreNome").classList.remove("invalid");
+    storage(function(){ localStorage.setItem(OPERATORE_KEY, nome); });
+    mostraOperatore();
+    mostra();
+  });
+  $("operatoreCambia").addEventListener("click", function(){
+    $("operatoreNome").value = operatore();
+    storage(function(){ localStorage.removeItem(OPERATORE_KEY); });
+    mostraOperatore();
+    mostra();
+  });
+
+  /* ---------- Elenco commesse / JOB / TAG ---------- */
 
   var elencoVoci = [];
 
-  async function mostraElenco(job){
+  async function mostraElenco(c, job){
     stato.vista = "elenco";
+    stato.c = c;
     stato.job = job;
     soloVista("viewElenco");
     var cr = $("elencoCrumbs");
     cr.textContent = "";
-    if(job){
-      cr.appendChild(link("?", "Tutti i JOB"));
-      cr.appendChild(document.createTextNode(" › JOB " + job));
+    if(c){
+      cr.appendChild(link("?", "Tutte le commesse"));
+      cr.appendChild(document.createTextNode(" › "));
+      if(job){
+        cr.appendChild(link(qs(c), "Commessa " + c));
+        cr.appendChild(document.createTextNode(" › JOB " + job));
+      }else{
+        cr.appendChild(document.createTextNode("Commessa " + c));
+      }
     }else{
-      cr.appendChild(document.createTextNode("Tutti i JOB"));
+      cr.appendChild(document.createTextNode("Tutte le commesse"));
     }
-    $("nuovoBtn").href = "?nuovo" + (job ? "&job=" + encodeURIComponent(job) : "");
+    $("nuovoBtn").href = qs(c, job, null, "nuovo");
     $("nuovoBtn").setAttribute("data-vai", "");
-    $("filtroLabel").textContent = job ? "Cerca un TAG nel JOB " + job : "Cerca un JOB";
+    $("filtroLabel").textContent = job ? "Cerca un TAG nel JOB " + job : c ? "Cerca un JOB nella commessa " + c : "Cerca una commessa";
     $("filtro").value = "";
     $("elenco").textContent = "";
     $("elencoVuoto").hidden = false;
     $("elencoVuoto").textContent = "Caricamento…";
     try{
-      var voci = (await B.list(job || "")).filter(function(v){ return v.folder; });
-      if(stato.vista !== "elenco" || stato.job !== job) return;
+      var voci = (await B.list(percorso([c, job]))).filter(function(v){ return v.folder; });
+      if(stato.vista !== "elenco" || stato.c !== c || stato.job !== job) return;
       elencoVoci = voci.sort(function(a, b){ return a.name.localeCompare(b.name, "it", { numeric: true }); });
       disegnaElenco();
     }catch(e){
@@ -966,20 +1028,20 @@ var QUALITA_CONFIG = {
   }
 
   function disegnaElenco(){
-    var f = nomeCartella($("filtro").value), job = stato.job, ul = $("elenco");
+    var f = nomeCartella($("filtro").value), c = stato.c, job = stato.job, ul = $("elenco");
     ul.textContent = "";
     var voci = elencoVoci.filter(function(v){ return !f || v.name.indexOf(f) >= 0; });
     voci.forEach(function(v){
-      var q = job ? "?job=" + encodeURIComponent(job) + "&tag=" + encodeURIComponent(v.name) : "?job=" + encodeURIComponent(v.name);
+      var q = job ? qs(c, job, v.name) : c ? qs(c, v.name) : qs(v.name);
       var a = link(q, "");
-      a.appendChild(el("span", { class: "name", text: (job ? "" : "JOB ") + v.name }));
+      a.appendChild(el("span", { class: "name", text: (job ? "" : c ? "JOB " : "Commessa ") + v.name }));
       a.appendChild(el("span", { class: "meta", text: v.modified ? fmtData(v.modified).slice(0, 10) : "" }));
       ul.appendChild(el("li", null, [a]));
     });
     $("elencoVuoto").hidden = voci.length > 0;
     $("elencoVuoto").textContent = elencoVoci.length
       ? "Nessun risultato."
-      : (job ? "Nessun componente in questo JOB." : "Nessun JOB: crea la prima scheda con \"Nuovo componente\".");
+      : (job ? "Nessun componente in questo JOB." : c ? "Nessun JOB in questa commessa." : "Nessuna commessa: crea la prima scheda con \"Nuovo componente\".");
   }
   $("filtro").addEventListener("input", disegnaElenco);
 
@@ -1016,27 +1078,39 @@ var QUALITA_CONFIG = {
     return r ? r.value : "";
   }
 
-  function mostraNuovo(job){
+  function mostraNuovo(c, job){
     stato.vista = "nuovo";
     soloVista("viewNuovo");
     $("nuovoOk").hidden = true;
-    pulisciNuovo(job || storage(function(){ return localStorage.getItem(LAST_JOB_KEY); }) || "");
+    pulisciNuovo(
+      c || storage(function(){ return localStorage.getItem(COMMESSA_KEY); }) || "",
+      job || (c ? "" : storage(function(){ return localStorage.getItem(LAST_JOB_KEY); })) || ""
+    );
     if(!$("commessa").value) $("commessa").focus();
     else if(!$("job").value) $("job").focus();
-    // Suggerimenti per il campo JOB.
-    B.list("").then(function(v){
-      var dl = $("jobList");
-      dl.textContent = "";
+    suggerimenti($("commessaList"), "");
+    suggerimenti($("jobList"), nomeCartella($("commessa").value));
+  }
+
+  // Suggerimenti per i campi commessa e JOB: le cartelle già presenti.
+  function suggerimenti(dl, path){
+    dl.textContent = "";
+    if(path === null) return;
+    B.list(path).then(function(v){
       v.filter(function(x){ return x.folder; }).forEach(function(x){ dl.appendChild(el("option", { value: x.name })); });
     }).catch(function(){});
   }
+  $("commessa").addEventListener("change", function(){
+    var c = nomeCartella(this.value);
+    suggerimenti($("jobList"), c || null);
+  });
 
   // Svuota il modulo per un nuovo componente, tenendo commessa SICIET e JOB.
-  function pulisciNuovo(job){
+  function pulisciNuovo(c, job){
     stato.fotoTarghetta = null;
     $("nuovoForm").reset();
     $("nuovoErr").textContent = "";
-    $("commessa").value = storage(function(){ return localStorage.getItem(COMMESSA_KEY); }) || "";
+    $("commessa").value = c;
     $("job").value = job;
     $("tag").value = "";
     $("ocrHint").textContent = "Letto dalla foto oppure scritto a mano: controllalo sempre.";
@@ -1054,8 +1128,8 @@ var QUALITA_CONFIG = {
     var ultimo = stato.inseriti[stato.inseriti.length - 1];
     box.appendChild(el("strong", { text: "✓ Scheda del TAG " + ultimo.tag + " salvata. Puoi inserire il prossimo componente." }));
     stato.inseriti.slice().reverse().forEach(function(x){
-      var a = link("?job=" + encodeURIComponent(x.job) + "&tag=" + encodeURIComponent(x.tag), x.tag);
-      ul.appendChild(el("li", null, [a, " – JOB " + x.job]));
+      var a = link(qs(x.c, x.job, x.tag), x.tag);
+      ul.appendChild(el("li", null, [a, " – JOB " + x.job + ", commessa " + x.c]));
     });
     box.appendChild(el("span", { class: "hint", text: "Inseriti finora (" + stato.inseriti.length + "):" }));
     box.appendChild(ul);
@@ -1069,7 +1143,7 @@ var QUALITA_CONFIG = {
 
   $("nuovoForm").addEventListener("submit", async function(ev){
     ev.preventDefault();
-    var commessa = $("commessa").value.trim().toUpperCase(), job = nomeCartella($("job").value), tag = nomeCartella($("tag").value), err = $("nuovoErr");
+    var commessa = nomeCartella($("commessa").value), job = nomeCartella($("job").value), tag = nomeCartella($("tag").value), err = $("nuovoErr");
     var dopo = stato.dopo || "prossimo";
     stato.dopo = null;
     $("commessa").classList.toggle("invalid", !commessa);
@@ -1081,12 +1155,13 @@ var QUALITA_CONFIG = {
     $("nuovoApri").disabled = $("nuovoSubmit").disabled = true;
     btn.textContent = "Salvataggio…";
     try{
-      if(await B.readJson(percorso([job, tag, "scheda.json"]))){
-        err.textContent = "Esiste già una scheda per il TAG " + tag + " nel JOB " + job + ": la apro, puoi aggiungere foto e note.";
-        setTimeout(function(){ vai("?job=" + encodeURIComponent(job) + "&tag=" + encodeURIComponent(tag)); }, 1800);
+      var dir = percorso([commessa, job, tag]);
+      if(await B.readJson(percorso([dir, "scheda.json"]))){
+        err.textContent = "Esiste già una scheda per il TAG " + tag + " nel JOB " + job + " (commessa " + commessa + "): la apro, puoi aggiungere foto e note.";
+        setTimeout(function(){ vai(qs(commessa, job, tag)); }, 1800);
         return;
       }
-      var ora = new Date(), adesso = ora.toISOString(), chi = B.userName();
+      var ora = new Date(), adesso = ora.toISOString(), chi = autore();
       var fasePrima = fotoNuovo.fase(), filePrima = fotoNuovo.sel.map(function(x){ return x.file; });
       var nomiPrima = nomiFoto(new Date(ora.getTime() + 1000), fasePrima, filePrima.length), notaFoto = fotoNuovo.testo();
       var tagScritto = $("tag").value.trim(), statoIniz = valoreScelto($("statiNuovo")), nota = $("notaNuovo").value.trim();
@@ -1105,20 +1180,20 @@ var QUALITA_CONFIG = {
       await scriviScheda(s);
       storage(function(){ localStorage.setItem(LAST_JOB_KEY, job); localStorage.setItem(COMMESSA_KEY, commessa); });
 
-      var etichetta = await canvasBlob(disegnaEtichetta(job, tag), "image/png");
-      await accoda(job, tag, "", "Etichetta QR.png", etichetta);
+      var etichetta = await canvasBlob(disegnaEtichetta(s), "image/png");
+      await accoda(dir, "", "Etichetta QR.png", etichetta);
       if(stato.fotoTarghetta){
-        await accoda(job, tag, "Foto", timbro(new Date()) + " " + nomeFile(cfg.fasi[0]) + ".jpg", await comprimi(stato.fotoTarghetta));
+        await accoda(dir, "Foto", nomiFoto(ora, cfg.fasi[0], 1)[0], await comprimi(stato.fotoTarghetta));
         stato.fotoTarghetta = null;
       }
-      await accodaFoto(job, tag, filePrima, nomiPrima);
+      await accodaFoto(dir, filePrima, nomiPrima);
       fotoNuovo.reset();
-      stato.inseriti.push({ job: job, tag: tag });
+      stato.inseriti.push({ c: commessa, job: job, tag: tag });
       svuotaCoda();
       if(dopo === "apri"){
-        vai("?job=" + encodeURIComponent(job) + "&tag=" + encodeURIComponent(tag));
+        vai(qs(commessa, job, tag));
       }else{
-        pulisciNuovo(job);
+        pulisciNuovo(commessa, job);
         mostraInseriti();
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
@@ -1132,17 +1207,21 @@ var QUALITA_CONFIG = {
 
   /* ---------- Scheda ---------- */
 
-  async function mostraScheda(job, tag){
+  async function mostraScheda(c, job, tag){
+    var dir = percorso([c, job, tag]);
     stato.vista = "scheda";
+    stato.c = c;
     stato.job = job;
     stato.tag = tag;
     stato.scheda = null;
     soloVista("viewScheda");
     var cr = $("schedaCrumbs");
     cr.textContent = "";
-    cr.appendChild(link("?", "Tutti i JOB"));
+    cr.appendChild(link("?", "Tutte le commesse"));
     cr.appendChild(document.createTextNode(" › "));
-    cr.appendChild(link("?job=" + encodeURIComponent(job), "JOB " + job));
+    cr.appendChild(link(qs(c), "Commessa " + c));
+    cr.appendChild(document.createTextNode(" › "));
+    cr.appendChild(link(qs(c, job), "JOB " + job));
     $("schedaTag").textContent = tag;
     $("schedaStato").textContent = "";
     $("schedaStato").className = "badge";
@@ -1155,16 +1234,16 @@ var QUALITA_CONFIG = {
     $("cartellaBtn").hidden = true;
     sceltaStati($("statiNota"), "statoNota");
     try{
-      var r = await B.readJson(percorso([job, tag, "scheda.json"]));
-      if(stato.vista !== "scheda" || stato.tag !== tag || stato.job !== job) return;
+      var r = await B.readJson(percorso([dir, "scheda.json"]));
+      if(stato.vista !== "scheda" || stato.tag !== tag || stato.job !== job || stato.c !== c) return;
       if(!r){
-        mostraErrore(new Error("Nessuna scheda per il TAG " + tag + " nel JOB " + job + "."));
+        mostraErrore(new Error("Nessuna scheda per il TAG " + tag + " nel JOB " + job + " (commessa " + c + ")."));
         return;
       }
       stato.scheda = r.data;
       disegnaScheda();
       caricaFileScheda();
-      if(B.info) B.info(percorso([job, tag])).then(function(i){
+      if(B.info) B.info(dir).then(function(i){
         if(i && i.webUrl && stato.tag === tag){ $("cartellaBtn").href = i.webUrl; $("cartellaBtn").hidden = false; }
       }).catch(function(){});
     }catch(e){ mostraErrore(e); }
@@ -1199,15 +1278,15 @@ var QUALITA_CONFIG = {
   async function caricaFileScheda(){
     var s = stato.scheda;
     if(!s) return;
-    var job = s.job, tag = s.tag;
+    var dir = cartellaScheda(s);
     try{
       var res = await Promise.all([
-        B.list(percorso([job, tag, "Foto"])),
-        B.list(percorso([job, tag, "Documenti"])),
+        B.list(percorso([dir, "Foto"])),
+        B.list(percorso([dir, "Documenti"])),
         elementiInCoda()
       ]);
-      if(!stato.scheda || stato.scheda.tag !== tag || stato.scheda.job !== job) return;
-      var coda = res[2].filter(function(c){ return c.job === job && c.tag === tag; });
+      if(!stato.scheda || cartellaScheda(stato.scheda) !== dir) return;
+      var coda = res[2].filter(function(c){ return dirCoda(c) === dir; });
       disegnaGalleria(res[0].filter(function(f){ return !f.folder; }), coda.filter(function(c){ return c.cartella === "Foto"; }));
       disegnaDocumenti(res[1].filter(function(f){ return !f.folder; }), coda.filter(function(c){ return c.cartella === "Documenti"; }));
     }catch(e){ mostraErrore(e); }
@@ -1220,7 +1299,7 @@ var QUALITA_CONFIG = {
     stato.scheda.note.forEach(function(n){ (n.foto || []).forEach(function(f){ noteFoto[f] = n.testo; }); });
     foto.forEach(function(f){
       var i = leggiNomeFoto(f.name);
-      (gruppi[i.fase] = gruppi[i.fase] || []).push({ f: f, data: i.data || new Date(f.modified) });
+      (gruppi[i.fase] = gruppi[i.fase] || []).push({ f: f, data: i.data || new Date(f.modified), op: i.operatore || f.by });
     });
     inCoda.forEach(function(c){
       var i = leggiNomeFoto(c.nome);
@@ -1242,7 +1321,7 @@ var QUALITA_CONFIG = {
           return;
         }
         var f = x.f;
-        grid.appendChild(el("button", { type: "button", class: "thumb", onclick: function(){ apriFoto(f.large || f.url, f.webUrl || f.url, when + (f.by ? " – " + f.by : ""), noteFoto[f.name]); } }, [
+        grid.appendChild(el("button", { type: "button", class: "thumb", onclick: function(){ apriFoto(f.large || f.url, f.webUrl || f.url, when + (x.op ? " – " + x.op : ""), noteFoto[f.name]); } }, [
           f.thumb ? el("img", { src: f.thumb, alt: fase + " " + when, loading: "lazy" }) : el("span", { class: "when", text: f.name }),
           el("span", { class: "when", text: when.slice(0, 10) })
         ]));
@@ -1285,7 +1364,7 @@ var QUALITA_CONFIG = {
     this.value = "";
     if(!s) return;
     try{
-      for(var i = 0; i < files.length; i++) await accoda(s.job, s.tag, "Documenti", nomeFile(files[i].name), files[i]);
+      for(var i = 0; i < files.length; i++) await accoda(cartellaScheda(s), "Documenti", nomeFile(files[i].name), files[i]);
       await mostraCoda();
       caricaFileScheda();
       svuotaCoda();
@@ -1301,8 +1380,8 @@ var QUALITA_CONFIG = {
     var btn = $("notaSubmit");
     btn.disabled = true;
     try{
-      stato.scheda = await aggiornaScheda(s.job, s.tag, function(d){
-        var n = { il: new Date().toISOString(), da: B.userName() };
+      stato.scheda = await aggiornaScheda(s, function(d){
+        var n = { il: new Date().toISOString(), da: autore() };
         if(nuovo && nuovo !== d.stato){ n.stato = nuovo; d.stato = nuovo; }
         if(testo) n.testo = testo;
         d.note.push(n);
@@ -1315,19 +1394,15 @@ var QUALITA_CONFIG = {
 
   $("modificaBtn").addEventListener("click", function(){
     campiForm($("campiModifica"), "m-", stato.scheda && stato.scheda.campi);
-    $("campiModifica").insertBefore(el("div", { class: "field" }, [
-      el("label", { for: "m-commessa", text: "Commessa SICIET" }),
-      el("input", { type: "text", id: "m-commessa", maxlength: "80", value: (stato.scheda && stato.scheda.commessa) || "" })
-    ]), $("campiModifica").firstChild);
     $("modificaForm").hidden = false;
   });
   $("modificaAnnulla").addEventListener("click", function(){ $("modificaForm").hidden = true; });
   $("modificaForm").addEventListener("submit", async function(ev){
     ev.preventDefault();
-    var s = stato.scheda, campi = leggiCampi("m-"), commessa = $("m-commessa").value.trim().toUpperCase();
+    var s = stato.scheda, campi = leggiCampi("m-");
     if(!s) return;
     try{
-      stato.scheda = await aggiornaScheda(s.job, s.tag, function(d){ d.campi = campi; d.commessa = commessa || undefined; });
+      stato.scheda = await aggiornaScheda(s, function(d){ d.campi = campi; });
       $("modificaForm").hidden = true;
       disegnaScheda();
     }catch(e){ mostraErrore(e); }
@@ -1357,8 +1432,9 @@ var QUALITA_CONFIG = {
     }
     if(configured && B.signedIn()){
       $("userName").textContent = B.userName();
-      $("user").hidden = false;
+      $("account").hidden = false;
     }
+    mostraOperatore();
     mostra();
     await mostraCoda();
     svuotaCoda();

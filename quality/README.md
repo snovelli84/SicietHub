@@ -21,24 +21,27 @@ In un secondo momento si torna alla scheda inquadrando il QR, oppure da **Tutti 
 **Cartella in ufficio** – Ogni scheda è una cartella, consultabile anche da Esplora file (OneDrive sincronizzato) o dal sito SharePoint, senza passare dal portale:
 
 ```
-<cartella condivisa>/
-  C2401/                                  ← JOB
-    P-101-A/                              ← TAG
-      Scheda.txt                          dati e storico delle note, leggibile
-      scheda.json                         gli stessi dati, usati dalla pagina (non modificare a mano)
-      Etichetta QR.png
-      Foto/2026-10-30 14.32.05 Installazione.jpg
-      Documenti/DDT 1234.pdf
+Schede componenti/                        (sito SharePoint "SICIET Qualità")
+  S24-015/                                ← Commessa SICIET
+    J900/                                 ← JOB
+      P-101-A/                            ← TAG
+        Scheda.txt                        dati e storico delle note, leggibile
+        scheda.json                       gli stessi dati, usati dalla pagina (non modificare a mano)
+        Etichetta QR.png
+        Foto/2026-10-30 14.32.05 Installazione - Mario Rossi.jpg
+        Documenti/DDT 1234.pdf
 ```
 
 JOB e TAG diventano nomi di cartella in maiuscolo; i caratteri non ammessi da OneDrive (`\ / : * ? " < > | # %`) diventano `-` (es. `P-101/A` → `P-101-A`, il TAG scritto originale resta nella scheda). Nella scheda **📁 Apri cartella** apre la cartella in OneDrive/SharePoint.
 
-**Configurazione** – Per ora l'accesso con le credenziali Microsoft non è attivo: la pagina funziona **in prova** e salva tutto solo nel browser del dispositivo. Per salvare nella cartella condivisa servono i passi seguenti (una volta). I parametri sono in `QUALITA_CONFIG` all'inizio di [`quality.js`](quality.js):
+**Accesso e operatore** – Si accede con un account Microsoft 365 (sui telefoni di cantiere un account condiviso, inserito una volta: l'accesso resta memorizzato). Al primo uso la pagina chiede **nome e cognome dell'operatore**, memorizzato sul telefono (si cambia con **Cambia** in alto): finisce nelle note, in Scheda.txt e nel nome delle foto, così si sa chi ha fatto cosa anche con l'account condiviso. Si disattiva con `chiediOperatore: false`.
+
+**Configurazione** – Attiva: cartella **Schede componenti** del team Teams **SICIET Qualità** e app **SICIET Quality** registrata in Entra ID (ID in `QUALITA_CONFIG`). Se `clientId`, `tenantId` o `cartella` sono vuoti la pagina funziona **in prova** e salva tutto solo nel browser del dispositivo. Passi per rifare la configurazione: I parametri sono in `QUALITA_CONFIG` all'inizio di [`quality.js`](quality.js):
 
 1. **Cartella**: creare la cartella delle schede in un **sito SharePoint** (es. il team Teams "Qualità" → scheda *File*, oppure un sito SharePoint dedicato), non nel OneDrive personale di un dipendente: il OneDrive personale appartiene all'utente e viene eliminato quando l'account viene chiuso, mentre il sito SharePoint è dell'azienda. Dare accesso in **modifica** al gruppo di chi la userà (cantiere e ufficio). Poi **Condividi → Copia collegamento** (con "Persone con accesso esistente") e incollarlo in `cartella`.
 2. **Registrazione dell'app** in [Microsoft Entra ID](https://entra.microsoft.com) → *Registrazioni app → Nuova registrazione*:
    - nome: `SICIET Quality`; tipi di account: *solo questa directory*;
-   - URI di reindirizzamento: piattaforma **Applicazione a pagina singola (SPA)**, `https://hub.siciet.it/quality/`;
+   - URI di reindirizzamento: piattaforma **Applicazione a pagina singola (SPA)**, `https://hub.siciet.it/quality/` (la pagina usa sempre questo indirizzo, anche se aperta come `…/quality/index.html`);
    - *Autorizzazioni API → Microsoft Graph → Autorizzazioni delegate*: `User.Read` e `Files.ReadWrite.All`, poi **Concedi consenso amministratore**;
    - copiare *ID applicazione (client)* in `clientId` e *ID directory (tenant)* in `tenantId`.
 
