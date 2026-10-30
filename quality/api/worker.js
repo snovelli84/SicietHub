@@ -97,7 +97,12 @@ function controllaScrittura(parti, tipo, dimensione){
   if(parti.length === 4){
     if(nome === "scheda.json"){ if(dimensione > MB) throw new Errore(413, "Scheda troppo grande."); return { rename: false, json: true }; }
     if(nome === "Scheda.txt"){ if(dimensione > MB) throw new Errore(413, "Scheda troppo grande."); return { rename: false }; }
-    if(nome === "Etichetta QR.png"){ if(dimensione > 2 * MB) throw new Errore(413, "Etichetta troppo grande."); return { rename: true }; }
+    if(nome === "Etichetta QR.png"){
+      // Si sostituisce (le etichette si possono rigenerare), ma solo con un PNG.
+      if(tipo !== "image/png") throw new Errore(415, "L'etichetta deve essere un'immagine PNG.");
+      if(dimensione > 2 * MB) throw new Errore(413, "Etichetta troppo grande.");
+      return { rename: false };
+    }
   }
   if(parti.length === 5 && parti[3] === "Foto"){
     if(!/^image\//.test(tipo || "") || !/\.(jpe?g|png|heic|webp)$/i.test(nome)) throw new Errore(415, "Nella cartella Foto si possono caricare solo immagini.");

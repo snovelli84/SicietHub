@@ -1152,26 +1152,54 @@ var QUALITA_CONFIG = {
   }
   $("filtro").addEventListener("input", disegnaElenco);
 
-  /* ---------- Riepiloghi Excel ----------
-   * Il servizio li aggiorna da solo a ogni salvataggio. Questo pulsante (per
-   * l'ufficio) li ricostruisce da zero: serve per le schede create prima dei
-   * riepiloghi o dopo aver cancellato schede a mano su SharePoint.
+  /* ---------- Riepiloghi Excel ed etichette ----------
+   * Il servizio aggiorna da solo i riepiloghi a ogni salvataggio. Questi
+   * pulsanti (per l'ufficio) rifanno tutto da zero: riepiloghi (schede create
+   * prima, o cancellate a mano su SharePoint) ed etichette QR (formato nuovo,
+   * o mancanti).
    */
+
+  // Cartelle delle schede, cercate su SharePoint: [[commessa, JOB, TAG], …].
+  async function trovaSchede(st){
+    st.textContent = "Ricerca delle schede…";
+    var schede = [];
+    var commesse = (await B.list("")).filter(function(x){ return x.folder; });
+    for(var i = 0; i < commesse.length; i++){
+      var jobs = (await B.list(commesse[i].name)).filter(function(x){ return x.folder; });
+      for(var k = 0; k < jobs.length; k++){
+        var tags = (await B.list(percorso([commesse[i].name, jobs[k].name]))).filter(function(x){ return x.folder; });
+        tags.forEach(function(t){ schede.push([commesse[i].name, jobs[k].name, t.name]); });
+      }
+    }
+    return schede;
+  }
+
+  $("etichetteBtn").addEventListener("click", async function(){
+    if(!confirm("Ricreare l'etichetta QR (Etichetta QR.png) di tutte le schede, nel formato attuale? Quelle presenti vengono sostituite, quelle mancanti create. Tieni aperta la pagina.")) return;
+    var btn = this, st = $("riepiloghiStato");
+    btn.disabled = true;
+    try{
+      var schede = await trovaSchede(st);
+      for(var n = 0; n < schede.length; n++){
+        var x = { commessa: schede[n][0], job: schede[n][1], tag: schede[n][2] };
+        st.textContent = "Etichetta " + (n + 1) + " di " + schede.length + ": " + percorso(schede[n]);
+        var png = await canvasBlob(disegnaEtichetta(x), "image/png");
+        await B.put(percorso(schede[n].concat("Etichetta QR.png")), png);
+      }
+      st.textContent = "Etichette ricreate (" + schede.length + (schede.length === 1 ? " scheda)." : " schede).");
+    }catch(e){
+      st.textContent = "Etichette non completate: " + (e.message || e);
+    }finally{
+      btn.disabled = false;
+    }
+  });
+
   $("riepiloghiBtn").addEventListener("click", async function(){
     if(!confirm("Ricostruire i riepiloghi Excel di tutte le schede? Può richiedere qualche minuto: tieni aperta la pagina.")) return;
     var btn = this, st = $("riepiloghiStato");
     btn.disabled = true;
     try{
-      st.textContent = "Ricerca delle schede…";
-      var schede = [];
-      var commesse = (await B.list("")).filter(function(x){ return x.folder; });
-      for(var i = 0; i < commesse.length; i++){
-        var jobs = (await B.list(commesse[i].name)).filter(function(x){ return x.folder; });
-        for(var k = 0; k < jobs.length; k++){
-          var tags = (await B.list(percorso([commesse[i].name, jobs[k].name]))).filter(function(x){ return x.folder; });
-          tags.forEach(function(t){ schede.push(percorso([commesse[i].name, jobs[k].name, t.name])); });
-        }
-      }
+      var schede = (await trovaSchede(st)).map(percorso);
       await B.api("GET", "aggiorna", "", { query: "&azzera=1" });
       for(var n = 0; n < schede.length; n++){
         st.textContent = "Aggiornamento " + (n + 1) + " di " + schede.length + ": " + schede[n];
