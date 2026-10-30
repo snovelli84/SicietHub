@@ -236,19 +236,19 @@ var QUALITA_CONFIG = {
         var rest = k.slice(prefix.length), slash = rest.indexOf("/");
         var name = slash < 0 ? rest : rest.slice(0, slash);
         if(seen[name]){ if(all[i].modified > seen[name].modified) seen[name].modified = all[i].modified; return; }
-        var f = all[i], url = slash < 0 ? URL.createObjectURL(f.blob) : null;
-        seen[name] = { name: name, folder: slash >= 0, size: f.blob.size, modified: f.modified, by: f.by, thumb: url, large: url, url: url };
+        var f = all[i], b = datoBlob(f), url = slash < 0 ? URL.createObjectURL(b) : null;
+        seen[name] = { name: name, folder: slash >= 0, size: b.size, modified: f.modified, by: f.by, thumb: url, large: url, url: url };
         out.push(seen[name]);
       });
       return out;
     },
     info: async function(path){
       var f = await idb("prova", "readonly", function(s){ return s.get(path); });
-      return f ? { etag: f.modified, url: URL.createObjectURL(f.blob) } : null;
+      return f ? { etag: f.modified, url: URL.createObjectURL(datoBlob(f)) } : null;
     },
     readJson: async function(path){
       var f = await idb("prova", "readonly", function(s){ return s.get(path); });
-      return f ? { data: JSON.parse(await f.blob.text()), etag: f.modified } : null;
+      return f ? { data: JSON.parse(await datoBlob(f).text()), etag: f.modified } : null;
     },
     put: async function(path, blob, opts){
       opts = opts || {};
@@ -259,9 +259,8 @@ var QUALITA_CONFIG = {
         while(await idb("prova", "readonly", function(s){ return s.get(m[1] + " " + n + (m[2] || "")); })) n++;
         path = m[1] + " " + n + (m[2] || "");
       }
-      // Copia in memoria: i Blob di <input type=file> non sempre si salvano in IndexedDB su iOS.
-      var copy = new Blob([await blob.arrayBuffer()], { type: blob.type });
-      await idb("prova", "readwrite", function(s){ return s.put({ blob: copy, modified: new Date().toISOString(), by: "Prova" }, path); });
+      var buf = await blob.arrayBuffer();
+      await idb("prova", "readwrite", function(s){ return s.put({ buf: buf, type: blob.type, modified: new Date().toISOString(), by: "Prova" }, path); });
     }
   };
 
@@ -331,25 +330,56 @@ var QUALITA_CONFIG = {
 
   var inviando = false, erroreInvio = "";
 
+  /*
+   * I file si conservano come ArrayBuffer e non come Blob: Safari su iPhone
+   * salva i Blob in IndexedDB ma a volte non riesce più a rileggerli, senza
+   * dare errori, e le foto non partivano mai.
+   */
+  function datoBlob(it){ return it.blob || new Blob([it.buf], { type: it.type || "" }); }
+
   // dir: cartella della scheda (vedi cartellaScheda); cartella: "Foto", "Documenti" o "".
+  // Se la memoria del browser non funziona il file viene inviato subito.
   async function accoda(dir, cartella, nome, blob){
-    // Copia in memoria: alcuni browser non salvano in IndexedDB i file di <input type=file>.
-    var copy = new Blob([await blob.arrayBuffer()], { type: blob.type });
-    await idb("coda", "readwrite", function(s){
-      return s.add({ dir: dir, cartella: cartella, nome: nome, blob: copy, il: Date.now() });
-    });
+    var buf = await blob.arrayBuffer();
+    try{
+      await idb("coda", "readwrite", function(s){
+        return s.add({ dir: dir, cartella: cartella, nome: nome, buf: buf, type: blob.type, il: Date.now() });
+      });
+    }catch(e){
+      console.warn("Coda non disponibile, invio diretto", e);
+      await B.put(percorso([dir, cartella, nome]), new Blob([buf], { type: blob.type }), { rename: true });
+    }
   }
 
   // Gli elementi accodati dalle prime versioni avevano job e tag invece di dir.
   function dirCoda(it){ return it.dir || percorso([it.job, it.tag]); }
 
+  // Elementi in coda. Se la lettura di tutti insieme non riesce si leggono uno
+  // alla volta; quelli illeggibili vengono scartati e segnalati.
   async function elementiInCoda(){
-    return idb("coda", "readonly", function(s){ return s.getAll(); }).catch(function(){ return []; });
+    try{
+      return await idb("coda", "readonly", function(s){ return s.getAll(); });
+    }catch(e){
+      var chiavi = await idb("coda", "readonly", function(s){ return s.getAllKeys(); }).catch(function(){ return []; });
+      var out = [], persi = 0;
+      for(var i = 0; i < chiavi.length; i++){
+        var k = chiavi[i];
+        try{
+          out.push(await idb("coda", "readonly", function(s){ return s.get(k); }));
+        }catch(e2){
+          persi++;
+          await idb("coda", "readwrite", function(s){ return s.delete(k); }).catch(function(){});
+        }
+      }
+      if(persi) erroreInvio = persi + (persi === 1 ? " file non recuperabile dalla memoria del telefono" : " file non recuperabili dalla memoria del telefono");
+      return out;
+    }
   }
 
   async function mostraCoda(){
     var n = (await elementiInCoda()).length;
-    $("queue").hidden = !n;
+    $("queue").hidden = !n && !erroreInvio;
+    if(!n && erroreInvio){ $("queueText").textContent = erroreInvio; return; }
     $("queueText").textContent = (n === 1 ? "1 file in attesa di invio" : n + " file in attesa di invio") +
       (erroreInvio ? " (" + erroreInvio + ")" : "");
   }
@@ -359,16 +389,16 @@ var QUALITA_CONFIG = {
     inviando = true;
     var inviati = false;
     try{
+      erroreInvio = "";
       var items = await elementiInCoda();
       for(var i = 0; i < items.length; i++){
         var it = items[i];
         $("queueText").textContent = "Invio " + (i + 1) + " di " + items.length + "…";
         $("queue").hidden = false;
-        await B.put(percorso([dirCoda(it), it.cartella, it.nome]), it.blob, { rename: true });
+        await B.put(percorso([dirCoda(it), it.cartella, it.nome]), datoBlob(it), { rename: true });
         await idb("coda", "readwrite", function(s){ return s.delete(it.id); });
         inviati = true;
       }
-      erroreInvio = "";
     }catch(e){
       console.warn("Invio rimandato", e);
       erroreInvio = e.message || String(e);
@@ -1218,7 +1248,7 @@ var QUALITA_CONFIG = {
       g.forEach(function(x){
         var when = fmtData(x.data);
         if(x.coda){
-          var u = URL.createObjectURL(x.coda.blob);
+          var u = URL.createObjectURL(datoBlob(x.coda));
           grid.appendChild(el("button", { type: "button", class: "thumb pending", onclick: function(){ apriFoto(u, u, when + " (in attesa di invio)", noteFoto[x.coda.nome]); } }, [
             el("img", { src: u, alt: fase + " " + when, loading: "lazy" })
           ]));
