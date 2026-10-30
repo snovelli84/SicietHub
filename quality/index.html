@@ -272,7 +272,15 @@ input:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:1px}
   #printArea img{display:block;width:100%;height:100%}
 }
 
-footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
+footer{text-align:center;padding:24px 16px 88px;color:var(--muted);font-size:12px}
+.home-fab{
+  position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:5;
+  width:56px;height:56px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--brand);color:#fff;font-size:26px;text-decoration:none;
+  box-shadow:0 4px 14px rgba(0,0,0,.3);
+}
+.home-fab:focus-visible{outline:3px solid var(--text);outline-offset:2px}
 </style>
 </head>
 
@@ -281,7 +289,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 <header>
   <div class="header-inner">
     <div class="header-top">
-      <h1><a class="logo" href="./"><img src="icons/logo.png" alt="SICIET Quality" width="447" height="340"></a></h1>
+      <h1><a class="logo" href="?" data-vai title="Pagina iniziale"><img src="icons/logo.png" alt="SICIET Quality" width="447" height="340"></a></h1>
       <div class="user">
         <div id="operatore" hidden><span id="operatoreTesto"></span><button type="button" id="operatoreCambia">Cambia</button></div>
       </div>
@@ -375,7 +383,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 
   <!-- Nuova scheda -->
   <section class="card" id="viewNuovo" hidden>
-    <div class="crumbs"><a href="?" data-vai>Tutte le commesse</a></div>
+    <div class="crumbs"><a href="?" data-vai>🏠 Inizio</a></div>
     <h2>Nuovo componente</h2>
     <div class="msg ok" id="nuovoOk" role="status" hidden></div>
     <form id="nuovoForm" novalidate>
@@ -505,7 +513,9 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   </section>
 </main>
 
-<footer>SICIET Quality · versione 16</footer>
+<footer>SICIET Quality · versione 17</footer>
+
+<a class="home-fab" id="homeFab" href="?" data-vai aria-label="Torna alla pagina iniziale" title="Pagina iniziale" hidden>🏠</a>
 
 <!-- Lettura del TAG da foto -->
 <div class="overlay" id="ocrDlg" hidden>
@@ -553,6 +563,6 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
 <!-- Aumentare ?v= a ogni modifica di quality.js, altrimenti i telefoni usano la versione in cache. -->
-<script src="quality.js?v=16"></script>
+<script src="quality.js?v=17"></script>
 </body>
 </html>
