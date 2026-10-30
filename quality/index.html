@@ -180,6 +180,9 @@ input:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:1px}
 .targhetta img{width:120px;height:120px;object-fit:cover;border-radius:10px;background:var(--chip)}
 .targhetta-azioni{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .targhetta-azioni .hint{flex-basis:100%}
+#nuovoOk strong{display:block;margin-bottom:6px}
+.inseriti{margin-top:6px;padding-left:18px;display:grid;gap:4px}
+.inseriti a{color:inherit;font-weight:600}
 .altri summary{cursor:pointer;font-weight:600;font-size:15px;padding:6px 0}
 .altri-body{display:grid;gap:16px;margin-top:12px}
 .add-foto{display:grid;gap:14px}
@@ -309,12 +312,20 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   <section class="card" id="viewNuovo" hidden>
     <div class="crumbs"><a href="?" data-vai>Tutti i JOB</a></div>
     <h2>Nuovo componente</h2>
+    <div class="msg ok" id="nuovoOk" role="status" hidden></div>
     <form id="nuovoForm" novalidate>
+      <div class="row">
       <div class="field">
-        <label for="job">JOB <span class="hint">(commessa)</span></label>
+        <label for="commessa">Commessa SICIET</label>
+        <input type="text" class="big" id="commessa" autocomplete="off" autocapitalize="characters" required>
+      </div>
+      <div class="field">
+        <label for="job">JOB</label>
         <input type="text" class="big" id="job" list="jobList" autocomplete="off" autocapitalize="characters" required>
         <datalist id="jobList"></datalist>
       </div>
+      </div>
+      <span class="hint" style="margin-top:-10px">Commessa e JOB restano memorizzati per i componenti successivi.</span>
       <fieldset class="step">
         <legend>1. Foto della targhetta</legend>
         <p class="hint">Fotografa la targhetta del componente: il TAG viene letto in automatico e la foto viene salvata nella scheda.</p>
@@ -354,7 +365,10 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
         <div class="add-foto" id="fotoNuovo"></div>
       </fieldset>
       <p class="msg error" id="nuovoErr" role="alert"></p>
-      <button class="btn primary block" type="submit" id="nuovoSubmit">Salva scheda</button>
+      <div class="btns">
+        <button class="btn" type="submit" id="nuovoApri" data-dopo="apri">Salva e apri la scheda</button>
+        <button class="btn primary" type="submit" id="nuovoSubmit" data-dopo="prossimo">Salva e inserisci il prossimo</button>
+      </div>
     </form>
   </section>
 
@@ -423,7 +437,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   </section>
 </main>
 
-<footer>SICIET Quality · versione 4</footer>
+<footer>SICIET Quality · versione 5</footer>
 
 <!-- Lettura del TAG da foto -->
 <div class="overlay" id="ocrDlg" hidden>
@@ -468,6 +482,6 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
 <!-- Aumentare ?v= a ogni modifica di quality.js, altrimenti i telefoni usano la versione in cache. -->
-<script src="quality.js?v=4"></script>
+<script src="quality.js?v=5"></script>
 </body>
 </html>

@@ -56,6 +56,7 @@ var QUALITA_CONFIG = {
   var GRAPH = "https://graph.microsoft.com/v1.0";
   var SCOPES = ["User.Read", "Files.ReadWrite.All"];
   var LAST_JOB_KEY = "siciet-qualita-job";
+  var COMMESSA_KEY = "siciet-qualita-commessa";
   var SIMPLE_UPLOAD_MAX = 4000000; // oltre si usa una sessione di caricamento
 
   var $ = function(id){ return document.getElementById(id); };
@@ -354,6 +355,7 @@ var QUALITA_CONFIG = {
     var r = [
       "SCHEDA CONTROLLO QUALITÀ",
       "",
+      "Commessa SICIET: " + (s.commessa || "—"),
       "JOB:    " + s.job,
       "TAG:    " + s.tag + (s.tagOriginale ? " (scritto come " + s.tagOriginale + ")" : "")
     ];
@@ -822,7 +824,7 @@ var QUALITA_CONFIG = {
 
   /* ---------- Navigazione ---------- */
 
-  var stato = { vista: null, job: null, tag: null, scheda: null, fotoTarghetta: null };
+  var stato = { vista: null, job: null, tag: null, scheda: null, fotoTarghetta: null, inseriti: [], dopo: null };
 
   function vai(query){
     history.pushState(null, "", location.pathname + query);
@@ -954,19 +956,11 @@ var QUALITA_CONFIG = {
 
   function mostraNuovo(job){
     stato.vista = "nuovo";
-    stato.fotoTarghetta = null;
     soloVista("viewNuovo");
-    $("nuovoForm").reset();
-    $("nuovoErr").textContent = "";
-    $("job").value = job || storage(function(){ return localStorage.getItem(LAST_JOB_KEY); }) || "";
-    $("tag").value = "";
-    $("ocrHint").textContent = "Letto dalla foto oppure scritto a mano: controllalo sempre.";
-    document.querySelector("#viewNuovo details").open = false;
-    fotoNuovo.reset();
-    mostraTarghetta();
-    campiForm($("campiNuovo"), "n-");
-    sceltaStati($("statiNuovo"), "statoNuovo");
-    if(!job && !$("job").value) $("job").focus();
+    $("nuovoOk").hidden = true;
+    pulisciNuovo(job || storage(function(){ return localStorage.getItem(LAST_JOB_KEY); }) || "");
+    if(!$("commessa").value) $("commessa").focus();
+    else if(!$("job").value) $("job").focus();
     // Suggerimenti per il campo JOB.
     B.list("").then(function(v){
       var dl = $("jobList");
@@ -975,15 +969,54 @@ var QUALITA_CONFIG = {
     }).catch(function(){});
   }
 
+  // Svuota il modulo per un nuovo componente, tenendo commessa SICIET e JOB.
+  function pulisciNuovo(job){
+    stato.fotoTarghetta = null;
+    $("nuovoForm").reset();
+    $("nuovoErr").textContent = "";
+    $("commessa").value = storage(function(){ return localStorage.getItem(COMMESSA_KEY); }) || "";
+    $("job").value = job;
+    $("tag").value = "";
+    $("ocrHint").textContent = "Letto dalla foto oppure scritto a mano: controllalo sempre.";
+    document.querySelector("#viewNuovo details").open = false;
+    fotoNuovo.reset();
+    mostraTarghetta();
+    campiForm($("campiNuovo"), "n-");
+    sceltaStati($("statiNuovo"), "statoNuovo");
+  }
+
+  // Componenti inseriti di seguito: elenco con il link a ciascuna scheda.
+  function mostraInseriti(){
+    var box = $("nuovoOk"), ul = el("ul", { class: "inseriti" });
+    box.textContent = "";
+    var ultimo = stato.inseriti[stato.inseriti.length - 1];
+    box.appendChild(el("strong", { text: "✓ Scheda del TAG " + ultimo.tag + " salvata. Puoi inserire il prossimo componente." }));
+    stato.inseriti.slice().reverse().forEach(function(x){
+      var a = link("?job=" + encodeURIComponent(x.job) + "&tag=" + encodeURIComponent(x.tag), x.tag);
+      ul.appendChild(el("li", null, [a, " – JOB " + x.job]));
+    });
+    box.appendChild(el("span", { class: "hint", text: "Inseriti finora (" + stato.inseriti.length + "):" }));
+    box.appendChild(ul);
+    box.hidden = false;
+  }
+
+  // Ricorda quale pulsante ha inviato il modulo (event.submitter manca sui Safari meno recenti).
+  ["nuovoApri", "nuovoSubmit"].forEach(function(id){
+    $(id).addEventListener("click", function(){ stato.dopo = this.getAttribute("data-dopo"); });
+  });
+
   $("nuovoForm").addEventListener("submit", async function(ev){
     ev.preventDefault();
-    var job = nomeCartella($("job").value), tag = nomeCartella($("tag").value), err = $("nuovoErr");
+    var commessa = $("commessa").value.trim().toUpperCase(), job = nomeCartella($("job").value), tag = nomeCartella($("tag").value), err = $("nuovoErr");
+    var dopo = stato.dopo || "prossimo";
+    stato.dopo = null;
+    $("commessa").classList.toggle("invalid", !commessa);
     $("job").classList.toggle("invalid", !job);
     $("tag").classList.toggle("invalid", !tag);
-    if(!job || !tag){ err.textContent = "Indica JOB e TAG."; return; }
+    if(!commessa || !job || !tag){ err.textContent = "Indica commessa SICIET, JOB e TAG."; return; }
     err.textContent = "";
-    var btn = $("nuovoSubmit");
-    btn.disabled = true;
+    var btn = dopo === "apri" ? $("nuovoApri") : $("nuovoSubmit"), testoBtn = btn.textContent;
+    $("nuovoApri").disabled = $("nuovoSubmit").disabled = true;
     btn.textContent = "Salvataggio…";
     try{
       if(await B.readJson(percorso([job, tag, "scheda.json"]))){
@@ -997,6 +1030,7 @@ var QUALITA_CONFIG = {
       var tagScritto = $("tag").value.trim(), statoIniz = valoreScelto($("statiNuovo")), nota = $("notaNuovo").value.trim();
       var s = {
         versione: 1,
+        commessa: commessa,
         job: job,
         tag: tag,
         campi: leggiCampi("n-"),
@@ -1007,7 +1041,7 @@ var QUALITA_CONFIG = {
       if(filePrima.length) s.note.push({ il: adesso, da: chi, fase: fasePrima, foto: nomiPrima, testo: notaFoto || undefined });
       if(tagScritto.toUpperCase() !== tag) s.tagOriginale = tagScritto;
       await scriviScheda(s);
-      storage(function(){ localStorage.setItem(LAST_JOB_KEY, job); });
+      storage(function(){ localStorage.setItem(LAST_JOB_KEY, job); localStorage.setItem(COMMESSA_KEY, commessa); });
 
       var etichetta = await canvasBlob(disegnaEtichetta(job, tag), "image/png");
       await accoda(job, tag, "", "Etichetta QR.png", etichetta);
@@ -1017,13 +1051,20 @@ var QUALITA_CONFIG = {
       }
       await accodaFoto(job, tag, filePrima, nomiPrima);
       fotoNuovo.reset();
-      vai("?job=" + encodeURIComponent(job) + "&tag=" + encodeURIComponent(tag));
+      stato.inseriti.push({ job: job, tag: tag });
       svuotaCoda();
+      if(dopo === "apri"){
+        vai("?job=" + encodeURIComponent(job) + "&tag=" + encodeURIComponent(tag));
+      }else{
+        pulisciNuovo(job);
+        mostraInseriti();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
     }catch(e){
       err.textContent = e.message || String(e);
     }finally{
-      btn.disabled = false;
-      btn.textContent = "Salva scheda";
+      $("nuovoApri").disabled = $("nuovoSubmit").disabled = false;
+      btn.textContent = testoBtn;
     }
   });
 
@@ -1074,6 +1115,7 @@ var QUALITA_CONFIG = {
     var dl = $("schedaDati");
     dl.textContent = "";
     function riga(k, v){ if(v){ dl.appendChild(el("dt", { text: k })); dl.appendChild(el("dd", { text: v })); } }
+    riga("Commessa SICIET", s.commessa);
     riga("JOB", s.job);
     riga("TAG scritto come", s.tagOriginale);
     cfg.campi.forEach(function(c){ riga(c.nome, s.campi && s.campi[c.id]); });
@@ -1211,15 +1253,19 @@ var QUALITA_CONFIG = {
 
   $("modificaBtn").addEventListener("click", function(){
     campiForm($("campiModifica"), "m-", stato.scheda && stato.scheda.campi);
+    $("campiModifica").insertBefore(el("div", { class: "field" }, [
+      el("label", { for: "m-commessa", text: "Commessa SICIET" }),
+      el("input", { type: "text", id: "m-commessa", maxlength: "80", value: (stato.scheda && stato.scheda.commessa) || "" })
+    ]), $("campiModifica").firstChild);
     $("modificaForm").hidden = false;
   });
   $("modificaAnnulla").addEventListener("click", function(){ $("modificaForm").hidden = true; });
   $("modificaForm").addEventListener("submit", async function(ev){
     ev.preventDefault();
-    var s = stato.scheda, campi = leggiCampi("m-");
+    var s = stato.scheda, campi = leggiCampi("m-"), commessa = $("m-commessa").value.trim().toUpperCase();
     if(!s) return;
     try{
-      stato.scheda = await aggiornaScheda(s.job, s.tag, function(d){ d.campi = campi; });
+      stato.scheda = await aggiornaScheda(s.job, s.tag, function(d){ d.campi = campi; d.commessa = commessa || undefined; });
       $("modificaForm").hidden = true;
       disegnaScheda();
     }catch(e){ mostraErrore(e); }
