@@ -32,6 +32,14 @@ Schede componenti/                        (sito SharePoint "SICIET Qualità")
         Documenti/DDT 1234.pdf
 ```
 
+**Riepiloghi Excel** – Il servizio li aggiorna da solo a ogni salvataggio di una scheda, di una foto o di un documento:
+
+- `Schede componenti/Riepilogo componenti.xlsx`: tutte le schede;
+- `<commessa>/Riepilogo commessa <commessa>.xlsx`: le schede della commessa;
+- `<commessa>/<JOB>/Riepilogo JOB <JOB>.xlsx`: le schede del JOB.
+
+Una riga per componente, nell'ordine di inserimento (le schede nuove in fondo; per ordinare o filtrare si usano i filtri già attivi sulla prima riga): commessa, JOB, TAG, descrizione, fornitore, posizione, DDT, stato, numero di foto, documenti e note, ultima nota, date e autori di creazione e aggiornamento, link **Apri scheda** (pagina) e **Apri cartella** (SharePoint). I dati vengono da `indice.json` nella cartella principale, che il servizio tiene aggiornato: non va modificato né cancellato. Se un riepilogo è aperto in Excel sul PC può non aggiornarsi in quel momento: si aggiorna al salvataggio successivo. Nella pagina iniziale c'è il pulsante **Ricostruisci riepiloghi Excel**, per ricrearli da zero (per esempio dopo aver cancellato a mano delle schede su SharePoint). Sul piano gratuito di Cloudflare l'aggiornamento resta veloce fino a qualche centinaio di schede; oltre, il riepilogo generale potrebbe non aggiornarsi sempre (si può passare a Workers Paid, 5 $/mese).
+
 JOB e TAG diventano nomi di cartella in maiuscolo; i caratteri non ammessi da OneDrive (`\ / : * ? " < > | # %`) diventano `-` (es. `P-101/A` → `P-101-A`, il TAG scritto originale resta nella scheda). Nella scheda **📁 Apri cartella** apre la cartella in OneDrive/SharePoint.
 
 **Accesso: nessuno, solo il nome dell'operatore** – Chi usa la pagina non accede a nulla. Al primo uso sul telefono si scrive **nome e cognome dell'operatore** (si cambia con **Cambia** in alto), che resta memorizzato e finisce nelle note, in Scheda.txt e nel nome delle foto.
@@ -67,7 +75,7 @@ Finché `api` in `QUALITA_CONFIG` (all'inizio di [`quality.js`](quality.js)) è 
      | `ORIGIN` | `https://hub.siciet.it` |
    - annotare l'indirizzo del worker (es. `https://siciet-quality.<nome-account>.workers.dev`).
 
-   Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo. Foto e dati passano dal worker (non vengono conservati) e arrivano su SharePoint.
+   Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo (*Modifica codice* → incolla → *Distribuisci*). Foto e dati passano dal worker (non vengono conservati) e arrivano su SharePoint.
 3. In `quality.js` impostare `api: "https://<indirizzo del worker>/api"` e aumentare `?v=` in `index.html`.
 
 **In alternativa, Azure Functions** (a pagamento a consumo, costo minimo): App per le funzioni con piano **Consumo**, Node.js 20, Windows; le stesse variabili d'ambiente; *Configurazione → Credenziali di pubblicazione di autenticazione di base SCM* attivate; profilo di pubblicazione nel segreto GitHub `AZURE_FUNCTIONAPP_PUBLISH_PROFILE` e nome dell'app nella variabile `AZURE_FUNCTIONAPP_NAME`; poi *Actions* → **SICIET Quality – servizio** → **Run workflow**. In questo caso `api` è `https://<dominio predefinito>/api`.

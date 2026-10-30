@@ -189,7 +189,7 @@ var QUALITA_CONFIG = {
       var h = { "X-Pin": opts.pin || this.pin() };
       if(opts.etag) h["If-Match"] = opts.etag;
       if(opts.body) h["Content-Type"] = opts.body.type || "application/octet-stream";
-      var q = "?path=" + encodeURIComponent(path || "") + (opts.rename ? "&rename=1" : "");
+      var q = "?path=" + encodeURIComponent(path || "") + (opts.rename ? "&rename=1" : "") + (opts.query || "");
       var res;
       try{
         res = await fetch(cfg.api.replace(/\/$/, "") + "/" + azione + q, { method: method, headers: h, body: opts.body, cache: "no-store" });
@@ -973,11 +973,45 @@ var QUALITA_CONFIG = {
       ul.appendChild(el("li", null, [a]));
     });
     $("elencoVuoto").hidden = voci.length > 0;
+    $("riepiloghi").hidden = !configured || !!c;
     $("elencoVuoto").textContent = elencoVoci.length
       ? "Nessun risultato."
       : (job ? "Nessun componente in questo JOB." : c ? "Nessun JOB in questa commessa." : "Nessuna commessa: crea la prima scheda con \"Nuovo componente\".");
   }
   $("filtro").addEventListener("input", disegnaElenco);
+
+  /* ---------- Riepiloghi Excel ----------
+   * Il servizio li aggiorna da solo a ogni salvataggio. Questo pulsante (per
+   * l'ufficio) li ricostruisce da zero: serve per le schede create prima dei
+   * riepiloghi o dopo aver cancellato schede a mano su SharePoint.
+   */
+  $("riepiloghiBtn").addEventListener("click", async function(){
+    if(!confirm("Ricostruire i riepiloghi Excel di tutte le schede? Può richiedere qualche minuto: tieni aperta la pagina.")) return;
+    var btn = this, st = $("riepiloghiStato");
+    btn.disabled = true;
+    try{
+      st.textContent = "Ricerca delle schede…";
+      var schede = [];
+      var commesse = (await B.list("")).filter(function(x){ return x.folder; });
+      for(var i = 0; i < commesse.length; i++){
+        var jobs = (await B.list(commesse[i].name)).filter(function(x){ return x.folder; });
+        for(var k = 0; k < jobs.length; k++){
+          var tags = (await B.list(percorso([commesse[i].name, jobs[k].name]))).filter(function(x){ return x.folder; });
+          tags.forEach(function(t){ schede.push(percorso([commesse[i].name, jobs[k].name, t.name])); });
+        }
+      }
+      await B.api("GET", "aggiorna", "", { query: "&azzera=1" });
+      for(var n = 0; n < schede.length; n++){
+        st.textContent = "Aggiornamento " + (n + 1) + " di " + schede.length + ": " + schede[n];
+        await B.api("GET", "aggiorna", schede[n]);
+      }
+      st.textContent = "Riepiloghi aggiornati (" + schede.length + (schede.length === 1 ? " scheda)." : " schede).");
+    }catch(e){
+      st.textContent = "Ricostruzione non completata: " + (e.message || e);
+    }finally{
+      btn.disabled = false;
+    }
+  });
 
   /* ---------- Nuova scheda ---------- */
 

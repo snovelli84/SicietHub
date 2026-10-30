@@ -21,6 +21,8 @@
  *   SITE           sito SharePoint, es. srlsiciet.sharepoint.com:/sites/SICIETQualit
  *   FOLDER         cartella delle schede nella raccolta Documenti, es. Qualità/Schede componenti
  *   ORIGIN         (facoltativo) sito autorizzato a chiamare il servizio, es. https://hub.siciet.it
+ *   APP_URL        (facoltativo) indirizzo della pagina, per i link nei riepiloghi;
+ *                  di base ORIGIN + "/quality/"
  *
  * Richieste (path = percorso relativo alla cartella delle schede):
  *   GET /ping                      verifica il servizio (e il PIN, se impostato)
@@ -28,6 +30,15 @@
  *   GET /item?path=…               { etag, webUrl } di un file o cartella
  *   GET /json?path=…               { data, etag } di un file JSON
  *   PUT /file?path=…[&rename=1]    carica il corpo della richiesta (If-Match: etag facoltativo)
+ *   GET /aggiorna?path=C/J/T       aggiorna i riepiloghi Excel per una scheda
+ *   GET /aggiorna?azzera=1         svuota l'indice (prima di ricostruire tutti i riepiloghi)
+ *
+ * Riepiloghi Excel, aggiornati a ogni salvataggio di scheda, foto o documento:
+ *   Riepilogo componenti.xlsx                 tutte le schede (cartella principale)
+ *   <C>/Riepilogo commessa <C>.xlsx           le schede della commessa
+ *   <C>/<J>/Riepilogo JOB <J>.xlsx            le schede del JOB
+ * I dati vengono da indice.json nella cartella principale (una riga per scheda),
+ * così non serve rileggere tutte le schede ogni volta.
  */
 
 const GRAPH = "https://graph.microsoft.com/v1.0";
@@ -191,7 +202,7 @@ async function carica(env, parti, dati, tipo, etag, rename){
     if(etag) h["If-Match"] = etag;
     const q = rename ? "?@microsoft.graph.conflictBehavior=rename" : "";
     const it = await graphJson(env, "PUT", await urlItem(env, parti, "/content" + q), dati, h);
-    return { name: it.name, etag: it.eTag };
+    return { name: it.name, etag: it.eTag, webUrl: it.webUrl };
   }
   const s = await graphJson(env, "POST", await urlItem(env, parti, "/createUploadSession"), {
     item: { "@microsoft.graph.conflictBehavior": rename ? "rename" : "replace" }
@@ -207,10 +218,256 @@ async function carica(env, parti, dati, tipo, etag, rename){
     if(!res.ok) throw new Errore(502, "Caricamento su SharePoint non riuscito (" + res.status + ").");
     if(res.status === 200 || res.status === 201) it = await res.json();
   }
-  return it ? { name: it.name, etag: it.eTag } : {};
+  return it ? { name: it.name, etag: it.eTag, webUrl: it.webUrl } : {};
 }
 
-export async function handle(request, env){
+/* ---------- File Excel (.xlsx) ----------
+ * Un .xlsx è un archivio zip di file XML: lo si scrive a mano, senza
+ * librerie (il worker deve restare un file unico da incollare).
+ */
+
+const CRC_TAB = (() => {
+  const t = new Uint32Array(256);
+  for(let n = 0; n < 256; n++){ let c = n; for(let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+  return t;
+})();
+function crc32(b){
+  let c = 0xFFFFFFFF;
+  for(let i = 0; i < b.length; i++) c = CRC_TAB[(c ^ b[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+// Archivio zip senza compressione: [{ nome, testo }] → Uint8Array.
+function zip(files){
+  const enc = new TextEncoder(), parti = [], centrale = [];
+  let off = 0;
+  for(const f of files){
+    const nome = enc.encode(f.nome), dati = enc.encode(f.testo), crc = crc32(dati);
+    const loc = new DataView(new ArrayBuffer(30));
+    loc.setUint32(0, 0x04034b50, true); loc.setUint16(4, 20, true); loc.setUint16(6, 0x0800, true);
+    loc.setUint16(8, 0, true); loc.setUint16(10, 0, true); loc.setUint16(12, 0x21, true);
+    loc.setUint32(14, crc, true); loc.setUint32(18, dati.length, true); loc.setUint32(22, dati.length, true);
+    loc.setUint16(26, nome.length, true); loc.setUint16(28, 0, true);
+    const cen = new DataView(new ArrayBuffer(46));
+    cen.setUint32(0, 0x02014b50, true); cen.setUint16(4, 20, true); cen.setUint16(6, 20, true); cen.setUint16(8, 0x0800, true);
+    cen.setUint16(10, 0, true); cen.setUint16(12, 0, true); cen.setUint16(14, 0x21, true);
+    cen.setUint32(16, crc, true); cen.setUint32(20, dati.length, true); cen.setUint32(24, dati.length, true);
+    cen.setUint16(28, nome.length, true); cen.setUint32(42, off, true);
+    parti.push(new Uint8Array(loc.buffer), nome, dati);
+    centrale.push(new Uint8Array(cen.buffer), nome);
+    off += 30 + nome.length + dati.length;
+  }
+  const dimC = centrale.reduce((a, b) => a + b.length, 0);
+  const fine = new DataView(new ArrayBuffer(22));
+  fine.setUint32(0, 0x06054b50, true); fine.setUint16(8, files.length, true); fine.setUint16(10, files.length, true);
+  fine.setUint32(12, dimC, true); fine.setUint32(16, off, true);
+  const tutto = parti.concat(centrale, [new Uint8Array(fine.buffer)]);
+  const out = new Uint8Array(tutto.reduce((a, b) => a + b.length, 0));
+  let p = 0;
+  for(const x of tutto){ out.set(x, p); p += x.length; }
+  return out;
+}
+
+const XML_SPECIALI = /[&<>"\u0000-\u0008\u000B\u000C\u000E-\u001F]/;
+function xml(s){
+  s = String(s);
+  if(!XML_SPECIALI.test(s)) return s;
+  return s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function colonna(i){ let s = ""; i++; while(i){ const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = (i - m - 1) / 26; } return s; }
+
+// Data ISO → numero di serie Excel, nell'ora italiana (ora legale europea:
+// dall'ultima domenica di marzo all'ultima di ottobre, alle 01:00 UTC).
+// Calcolata a mano perché Intl è lento e il piano gratuito dà pochi ms.
+function ultimaDomenica(anno, mese){ const d = new Date(Date.UTC(anno, mese + 1, 0, 1)); d.setUTCDate(d.getUTCDate() - d.getUTCDay()); return d.getTime(); }
+function serieExcel(iso){
+  const t = Date.parse(iso);
+  if(isNaN(t)) return null;
+  const anno = new Date(t).getUTCFullYear();
+  const legale = t >= ultimaDomenica(anno, 2) && t < ultimaDomenica(anno, 9);
+  return (t + (legale ? 2 : 1) * 3600000) / 86400000 + 25569;
+}
+
+/*
+ * Riga del foglio come XML, senza indirizzi di cella (le celle vuote sono
+ * <c/>): così la si può conservare nell'indice e riusare in qualsiasi
+ * posizione e in qualsiasi file. colonne: [{ titolo, larghezza, tipo:
+ * "testo"|"numero"|"data"|"link" }]; valori: per "link" { testo, url }.
+ * Restituisce { x: xml, l: [[colonna, url], …] }.
+ */
+function rigaXml(colonne, valori){
+  const out = ["<row>"], link = [];
+  for(let i = 0; i < colonne.length; i++){
+    const v = valori[i], tipo = colonne[i].tipo;
+    if(v === null || v === undefined || v === "" || (tipo === "link" && !v.url)){ out.push("<c/>"); continue; }
+    if(tipo === "numero") out.push("<c><v>", +v || 0, "</v></c>");
+    else if(tipo === "data"){ const x = serieExcel(v); out.push(x === null ? "<c/>" : '<c s="2"><v>' + x + "</v></c>"); }
+    else if(tipo === "link"){ link.push([i, v.url]); out.push('<c t="inlineStr" s="3"><is><t>', xml(v.testo), "</t></is></c>"); }
+    else out.push('<c t="inlineStr" s="4"><is><t xml:space="preserve">', xml(v), "</t></is></c>");
+  }
+  out.push("</row>");
+  return { x: out.join(""), l: link };
+}
+
+// File .xlsx con un foglio: intestazione + righe preparate con rigaXml.
+function xlsx(nomeFoglio, colonne, righe){
+  const ultima = colonna(colonne.length - 1), fine = Math.max(1, righe.length + 1);
+  const rels = [];
+  righe.forEach((r, k) => { for(const [i, url] of r.l) rels.push({ ref: colonna(i) + (k + 2), url }); });
+  const dati = "<row>" + colonne.map(c => '<c t="inlineStr" s="1"><is><t>' + xml(c.titolo) + "</t></is></c>").join("") + "</row>" +
+    righe.map(r => r.x).join("");
+  const area = "A1:" + ultima + fine;
+  const foglio = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+    '<dimension ref="' + area + '"/>' +
+    '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>' +
+    '<sheetFormatPr defaultRowHeight="15"/>' +
+    "<cols>" + colonne.map((c, i) => '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + (c.larghezza || 14) + '" customWidth="1"/>').join("") + "</cols>" +
+    "<sheetData>" + dati + "</sheetData>" +
+    '<autoFilter ref="' + area + '"/>' +
+    (rels.length ? "<hyperlinks>" + rels.map((h, i) => '<hyperlink ref="' + h.ref + '" r:id="rId' + (i + 1) + '"/>').join("") + "</hyperlinks>" : "") +
+    '<pageMargins left="0.5" right="0.5" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>' +
+    "</worksheet>";
+  const nf = xml(nomeFoglio.slice(0, 31));
+  const files = [
+    { nome: "[Content_Types].xml", testo: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>' },
+    { nome: "_rels/.rels", testo: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+    { nome: "xl/workbook.xml", testo: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="' + nf + '" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">\'' + nf.replace(/'/g, "''") + "\'!$A$1:$" + ultima + "$" + fine + "</definedName></definedNames></workbook>" },
+    { nome: "xl/_rels/workbook.xml.rels", testo: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+    { nome: "xl/worksheets/sheet1.xml", testo: foglio },
+    { nome: "xl/styles.xml", testo: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="dd/mm/yyyy hh:mm"/></numFmts><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><u/><sz val="11"/><color rgb="FF005BAA"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF005BAA"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="left"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>' }
+  ];
+  if(rels.length) files.push({ nome: "xl/worksheets/_rels/sheet1.xml.rels", testo: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    rels.map((h, i) => '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="' + xml(h.url) + '" TargetMode="External"/>').join("") + "</Relationships>" });
+  return zip(files);
+}
+
+/* ---------- Riepiloghi ---------- */
+
+const INDICE = "indice.json";
+const NOMI_CAMPI = { descrizione: "Descrizione componente", fornitore: "Fornitore", posizione: "Posizione / area", ddt: "DDT / ordine" };
+const TIPO_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+async function leggiJson(env, parti){
+  const it = await graphJson(env, "GET", await urlItem(env, parti));
+  if(!it) return null;
+  const res = await fetch(it["@microsoft.graph.downloadUrl"]);
+  if(!res.ok) throw new Errore(502, "Lettura da SharePoint non riuscita.");
+  return { data: await res.json(), etag: it.eTag, webUrl: it.webUrl };
+}
+async function contaFile(env, parti){
+  const r = await graphJson(env, "GET", await urlItem(env, parti, "?$select=folder"));
+  return r && r.folder ? r.folder.childCount : 0;
+}
+
+// Riga dell'indice da una scheda.
+function rigaDa(s, vecchia){
+  const ultima = s.note && s.note.length ? s.note[s.note.length - 1] : null;
+  return Object.assign({}, vecchia, {
+    commessa: s.commessa, job: s.job, tag: s.tag,
+    tagOriginale: s.tagOriginale || "",
+    campi: s.campi || {},
+    stato: s.stato || "",
+    creataIl: s.creata && s.creata.il, creataDa: s.creata && s.creata.da,
+    aggiornataIl: (s.aggiornata && s.aggiornata.il) || (s.creata && s.creata.il),
+    aggiornataDa: (s.aggiornata && s.aggiornata.da) || (s.creata && s.creata.da),
+    note: (s.note || []).filter(n => n.testo).length,
+    ultimaNota: ultima ? (ultima.testo || (ultima.stato ? "Stato: " + ultima.stato : "")) : ""
+  });
+}
+
+// Colonne dei riepiloghi: i dati della scheda (campi standard sempre presenti,
+// più eventuali altri campi usati), poi stato, conteggi, date e link.
+function colonneRiepilogo(righe){
+  const campi = Object.keys(NOMI_CAMPI);
+  for(const r of righe) for(const k of Object.keys(r.campi || {})) if(!campi.includes(k)) campi.push(k);
+  return [
+    { titolo: "Commessa SICIET", larghezza: 16 }, { titolo: "JOB", larghezza: 14 }, { titolo: "TAG", larghezza: 16 },
+    { titolo: "TAG scritto come", larghezza: 16 }
+  ].concat(campi.map(k => ({ campo: k, titolo: NOMI_CAMPI[k] || k.charAt(0).toUpperCase() + k.slice(1), larghezza: 24 })), [
+    { titolo: "Stato", larghezza: 14 },
+    { titolo: "Foto", larghezza: 7, tipo: "numero" }, { titolo: "Documenti", larghezza: 11, tipo: "numero" },
+    { titolo: "Note", larghezza: 7, tipo: "numero" }, { titolo: "Ultima nota", larghezza: 40 },
+    { titolo: "Creata il", larghezza: 17, tipo: "data" }, { titolo: "Creata da", larghezza: 18 },
+    { titolo: "Ultimo aggiornamento", larghezza: 20, tipo: "data" }, { titolo: "Aggiornata da", larghezza: 18 },
+    { titolo: "Scheda", larghezza: 13, tipo: "link" }, { titolo: "Cartella", larghezza: 13, tipo: "link" }
+  ]);
+}
+function valoriRiga(env, colonne, r){
+  const app = env.APP_URL || (env.ORIGIN || "https://hub.siciet.it") + "/quality/";
+  return [r.commessa, r.job, r.tag, r.tagOriginale]
+    .concat(colonne.filter(c => c.campo).map(c => (r.campi || {})[c.campo] || ""), [
+      r.stato, r.foto || 0, r.documenti || 0, r.note || 0, r.ultimaNota,
+      r.creataIl, r.creataDa, r.aggiornataIl, r.aggiornataDa,
+      { testo: "Apri scheda", url: app + "?c=" + encodeURIComponent(r.commessa) + "&job=" + encodeURIComponent(r.job) + "&tag=" + encodeURIComponent(r.tag) },
+      { testo: "Apri cartella", url: r.cartella }
+    ]);
+}
+
+// Prepara (o riprende dalla cache dell'indice) l'XML di ogni riga. La cache
+// si azzera se cambiano le colonne o l'indirizzo della pagina.
+function preparaRighe(env, indice, colonne){
+  const firma = colonne.map(c => c.titolo).join("|") + "|" + (env.APP_URL || env.ORIGIN || "");
+  if(!indice.cache || indice.cache.firma !== firma) indice.cache = { firma, righe: {} };
+  const cache = indice.cache.righe;
+  for(const k of Object.keys(cache)) if(!indice.schede[k]) delete cache[k];
+  for(const [k, r] of Object.entries(indice.schede)) if(!cache[k]) cache[k] = rigaXml(colonne, valoriRiga(env, colonne, r));
+}
+
+/*
+ * Aggiorna la riga di una scheda nell'indice (rileggendo scheda.json e
+ * contando foto e documenti) e rigenera i tre riepiloghi interessati.
+ * Se un file Excel è aperto e bloccato, verrà aggiornato la volta successiva.
+ */
+async function aggiornaRiepiloghi(env, dir){
+  const [c, j] = dir;
+  const chiave = dir.join("/");
+  const scheda = await leggiJson(env, dir.concat("scheda.json"));
+  const foto = scheda ? await contaFile(env, dir.concat("Foto")) : 0;
+  const documenti = scheda ? await contaFile(env, dir.concat("Documenti")) : 0;
+  let indice;
+  for(let tentativo = 0; ; tentativo++){
+    const letto = await leggiJson(env, [INDICE]);
+    indice = letto ? letto.data : { versione: 1, schede: {} };
+    if(scheda){
+      indice.schede[chiave] = Object.assign(rigaDa(scheda.data, indice.schede[chiave]), {
+        foto, documenti, cartella: scheda.webUrl.replace(/\/scheda\.json$/, "")
+      });
+    }else{
+      delete indice.schede[chiave];
+    }
+    if(indice.cache) delete indice.cache.righe[chiave];
+    var colonne = colonneRiepilogo(Object.values(indice.schede));
+    preparaRighe(env, indice, colonne);
+    const dati = new TextEncoder().encode(JSON.stringify(indice));
+    try{
+      await carica(env, [INDICE], dati.buffer, "application/json", letto && letto.etag, false);
+      break;
+    }catch(e){
+      if(e.status !== 412 || tentativo >= 3) throw e;
+    }
+  }
+  // Righe nell'ordine di inserimento: una scheda nuova va in fondo, una
+  // modificata resta al suo posto (per ordinare, i filtri di Excel).
+  const tutte = Object.values(indice.schede);
+  const chiaveDi = r => r.commessa + "/" + r.job + "/" + r.tag;
+  const file = [
+    { parti: ["Riepilogo componenti.xlsx"], righe: tutte, titolo: "Componenti" },
+    { parti: [c, "Riepilogo commessa " + c + ".xlsx"], righe: tutte.filter(r => r.commessa === c), titolo: "Commessa " + c },
+    { parti: [c, j, "Riepilogo JOB " + j + ".xlsx"], righe: tutte.filter(r => r.commessa === c && r.job === j), titolo: "JOB " + j }
+  ];
+  for(const f of file){
+    if(!f.righe.length) continue;
+    try{
+      const x = xlsx(f.titolo, colonne, f.righe.map(r => indice.cache.righe[chiaveDi(r)]));
+      await carica(env, f.parti, x.buffer, TIPO_XLSX, null, false);
+    }catch(e){
+      console.warn("Riepilogo non aggiornato:", f.parti.join("/"), e.message);
+    }
+  }
+}
+
+export async function handle(request, env, ctx){
   if(request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(env) });
   try{
     if(!env.TENANT_ID || !env.CLIENT_ID || !env.CLIENT_SECRET || !env.SITE || !env.FOLDER){
@@ -255,7 +512,24 @@ export async function handle(request, env){
         if(!s || s.commessa !== parti[0] || s.job !== parti[1] || s.tag !== parti[2] || !Array.isArray(s.note)) throw new Errore(400, "Scheda non valida.");
       }
       const r = await carica(env, parti, dati, tipo, request.headers.get("If-Match"), regola.rename);
+      // Riepiloghi Excel (scheda, foto, documenti): su Cloudflare dopo aver
+      // risposto, così l'invio non rallenta.
+      if(regola.json || parti.length === 5){
+        const lavoro = aggiornaRiepiloghi(env, parti.slice(0, 3)).catch(e => console.warn("Riepiloghi:", e.message));
+        if(ctx && ctx.waitUntil) ctx.waitUntil(lavoro); else await lavoro;
+      }
       return json(env, 200, r);
+    }
+
+    if(request.method === "GET" && azione === "aggiorna"){
+      if(url.searchParams.get("azzera") === "1"){
+        const letto = await leggiJson(env, [INDICE]);
+        await carica(env, [INDICE], new TextEncoder().encode(JSON.stringify({ versione: 1, schede: {} })).buffer, "application/json", letto && letto.etag, false);
+        return json(env, 200, { ok: true });
+      }
+      if(parti.length !== 3) throw new Errore(400, "Indicare commessa/JOB/TAG.");
+      await aggiornaRiepiloghi(env, parti);
+      return json(env, 200, { ok: true });
     }
 
     throw new Errore(404, "Richiesta sconosciuta.");
