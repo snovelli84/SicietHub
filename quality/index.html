@@ -112,7 +112,7 @@ legend,.label{font-weight:600;font-size:15px;margin-bottom:2px}
 .with-btn{display:flex;gap:8px}
 .with-btn input{flex:1;min-width:0}
 
-input[type=text],input[type=search],textarea{
+input[type=text],input[type=search],input[type=password],textarea{
   width:100%;
   font:inherit;
   font-size:16px; /* 16px evita lo zoom automatico su iOS */
@@ -276,7 +276,6 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
       <h1><a class="logo" href="./"><img src="icons/logo.png" alt="SICIET Quality" width="447" height="340"></a></h1>
       <div class="user">
         <div id="operatore" hidden><span id="operatoreTesto"></span><button type="button" id="operatoreCambia">Cambia</button></div>
-        <div id="account" hidden><span id="userName"></span><button type="button" id="logout">Esci</button></div>
       </div>
     </div>
     <p>Controllo qualità di fornitura e installazione: foto, note e documenti dei componenti per JOB e TAG.</p>
@@ -285,7 +284,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 
 <main>
   <p class="notice" id="demo" hidden>
-    Modalità prova: le schede e le foto restano solo su questo dispositivo. Per salvarle nella cartella condivisa di OneDrive va completata la configurazione (vedi README nella cartella quality).
+    Modalità prova: le schede e le foto restano solo su questo dispositivo. Per salvarle su SharePoint va attivato il servizio quality/api (vedi README nella cartella quality).
   </p>
   <p class="msg error" id="msg" role="alert"></p>
   <div class="queue" id="queue" hidden>
@@ -293,11 +292,18 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     <button class="btn small" type="button" id="queueRetry">Riprova ora</button>
   </div>
 
-  <!-- Accesso con l'account Microsoft 365 -->
-  <section class="card" id="viewLogin" hidden>
-    <h2>Accedi</h2>
-    <p id="loginText">Per vedere e aggiungere schede accedi con il tuo account Microsoft aziendale.</p>
-    <button class="btn primary block" type="button" id="login">Accedi con Microsoft</button>
+  <!-- PIN aziendale, chiesto una volta per dispositivo -->
+  <section class="card" id="viewPin" hidden>
+    <h2>PIN aziendale</h2>
+    <p id="pinTesto"></p>
+    <form id="pinForm" novalidate>
+      <div class="field">
+        <label for="pin">PIN</label>
+        <input type="password" class="big" id="pin" inputmode="numeric" autocomplete="off" maxlength="40" required>
+      </div>
+      <p class="msg error" id="pinErr" role="alert"></p>
+      <button class="btn primary block" type="submit">Entra</button>
+    </form>
   </section>
 
   <!-- Nome di chi usa l'app su questo dispositivo -->
@@ -406,7 +412,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
       <div class="btns">
         <button class="btn" type="button" id="etichettaBtn">🏷️ Etichetta QR</button>
         <button class="btn" type="button" id="modificaBtn">✏️ Modifica dati</button>
-        <a class="btn" id="cartellaBtn" target="_blank" rel="noopener" hidden>📁 Apri cartella</a>
+        <a class="btn" id="cartellaBtn" target="_blank" rel="noopener" hidden title="Per l'ufficio: apre la cartella su SharePoint (serve l'account Microsoft)">📁 Apri in SharePoint</a>
       </div>
       <form id="modificaForm" hidden>
         <div class="row" id="campiModifica"></div>
@@ -456,7 +462,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   </section>
 </main>
 
-<footer>SICIET Quality · versione 7</footer>
+<footer>SICIET Quality · versione 8</footer>
 
 <!-- Lettura del TAG da foto -->
 <div class="overlay" id="ocrDlg" hidden>
@@ -487,7 +493,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 <div class="overlay" id="etichettaDlg" hidden>
   <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="etichettaTitle">
     <h2 id="etichettaTitle">Etichetta QR</h2>
-    <p class="hint">Inquadrando il QR code con la fotocamera del telefono si apre questa scheda (serve l'account aziendale).</p>
+    <p class="hint">Inquadrando il QR code con la fotocamera del telefono si apre questa scheda (la prima volta su un telefono serve il PIN aziendale).</p>
     <div class="label-preview"><img id="etichettaImg" alt="Anteprima etichetta"></div>
     <p class="hint" id="etichettaUrl" style="overflow-wrap:anywhere"></p>
     <div class="btns">
@@ -501,6 +507,6 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
 <!-- Aumentare ?v= a ogni modifica di quality.js, altrimenti i telefoni usano la versione in cache. -->
-<script src="quality.js?v=7"></script>
+<script src="quality.js?v=8"></script>
 </body>
 </html>

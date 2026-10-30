@@ -1,0 +1,30 @@
+# Pubblica il servizio di SICIET Quality (quality/api) su Azure Functions.
+# Si attiva solo quando nel repository sono impostati la variabile
+# AZURE_FUNCTIONAPP_NAME e il segreto AZURE_FUNCTIONAPP_PUBLISH_PROFILE
+# (vedi quality/README.md).
+name: SICIET Quality – servizio
+
+on:
+  push:
+    branches: [main]
+    paths: ["quality/api/**", ".github/workflows/quality-api.yml"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: vars.AZURE_FUNCTIONAPP_NAME != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Installa le dipendenze
+        working-directory: quality/api
+        run: npm install --omit=dev
+      - name: Pubblica su Azure Functions
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ vars.AZURE_FUNCTIONAPP_NAME }}
+          package: quality/api
+          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}

@@ -34,26 +34,51 @@ Schede componenti/                        (sito SharePoint "SICIET Qualità")
 
 JOB e TAG diventano nomi di cartella in maiuscolo; i caratteri non ammessi da OneDrive (`\ / : * ? " < > | # %`) diventano `-` (es. `P-101/A` → `P-101-A`, il TAG scritto originale resta nella scheda). Nella scheda **📁 Apri cartella** apre la cartella in OneDrive/SharePoint.
 
-**Accesso e operatore** – Si accede con un account Microsoft 365 (sui telefoni di cantiere un account condiviso, inserito una volta: l'accesso resta memorizzato). Al primo uso la pagina chiede **nome e cognome dell'operatore**, memorizzato sul telefono (si cambia con **Cambia** in alto): finisce nelle note, in Scheda.txt e nel nome delle foto, così si sa chi ha fatto cosa anche con l'account condiviso. Si disattiva con `chiediOperatore: false`.
+**Accesso: PIN e operatore, niente account Microsoft** – Chi usa la pagina non accede a Microsoft 365. Sul telefono si inserisce **una volta** il **PIN aziendale** e poi **nome e cognome dell'operatore** (si cambia con **Cambia** in alto); restano memorizzati. Il nome finisce nelle note, in Scheda.txt e nel nome delle foto. Se il PIN aziendale viene cambiato, al primo uso la pagina lo richiede.
 
-**Configurazione** – Attiva: cartella **Schede componenti** del team Teams **SICIET Qualità** e app **SICIET Quality** registrata in Entra ID (ID in `QUALITA_CONFIG`). Se `clientId`, `tenantId` o `cartella` sono vuoti la pagina funziona **in prova** e salva tutto solo nel browser del dispositivo. Passi per rifare la configurazione: I parametri sono in `QUALITA_CONFIG` all'inizio di [`quality.js`](quality.js):
+**Come funziona il salvataggio** – La pagina manda foto e dati al **servizio** in [`api/`](api/) (una Azure Function), insieme al PIN. Il servizio controlla il PIN e scrive nella cartella **Schede componenti** del team **SICIET Qualità** con le credenziali dell'app **SICIET Quality** registrata in Entra ID, che può accedere solo a quel sito. Le credenziali restano nelle impostazioni del servizio, mai nella pagina. Il PIN protegge dall'uso di chi trova il link, ma è condiviso: se esce dall'azienda va cambiato (impostazione `PIN` del servizio).
 
-1. **Cartella**: creare la cartella delle schede in un **sito SharePoint** (es. il team Teams "Qualità" → scheda *File*, oppure un sito SharePoint dedicato), non nel OneDrive personale di un dipendente: il OneDrive personale appartiene all'utente e viene eliminato quando l'account viene chiuso, mentre il sito SharePoint è dell'azienda. Dare accesso in **modifica** al gruppo di chi la userà (cantiere e ufficio). Poi **Condividi → Copia collegamento** (con "Persone con accesso esistente") e incollarlo in `cartella`.
-2. **Registrazione dell'app** in [Microsoft Entra ID](https://entra.microsoft.com) → *Registrazioni app → Nuova registrazione*:
-   - nome: `SICIET Quality`; tipi di account: *solo questa directory*;
-   - URI di reindirizzamento: piattaforma **Applicazione a pagina singola (SPA)**, `https://hub.siciet.it/quality/` (la pagina usa sempre questo indirizzo, anche se aperta come `…/quality/index.html`);
-   - *Autorizzazioni API → Microsoft Graph → Autorizzazioni delegate*: `User.Read` e `Files.ReadWrite.All`, poi **Concedi consenso amministratore**;
-   - copiare *ID applicazione (client)* in `clientId` e *ID directory (tenant)* in `tenantId`.
+Finché `api` in `QUALITA_CONFIG` (all'inizio di [`quality.js`](quality.js)) è vuoto, la pagina funziona **in prova** e salva tutto solo nel browser del dispositivo.
 
-L'app non ha segreti né permessi propri: ogni utente lavora con il proprio account e vede solo le cartelle a cui ha accesso. `Files.ReadWrite.All` serve per scrivere in una cartella condivisa da altri.
+**Attivazione** (una volta, da amministratore Microsoft 365/Azure)
+
+1. **Entra ID** → *Registrazioni app* → **SICIET Quality**:
+   - *Certificati e segreti* → **Nuovo segreto client** (descrizione "Servizio", scadenza 24 mesi) → copiare subito il **Valore** (si vede una volta sola). Annotare la scadenza: prima di allora va creato un segreto nuovo e aggiornato `CLIENT_SECRET`.
+   - *Autorizzazioni API* → **Aggiungi** → Microsoft Graph → **Autorizzazioni applicazione** → `Sites.Selected` → **Concedi consenso amministratore**. Le autorizzazioni delegate e l'URI di reindirizzamento SPA non servono più e si possono togliere.
+   - Dare all'app l'accesso in scrittura **solo** al sito SICIET Qualità, da [Graph Explorer](https://developer.microsoft.com/graph/graph-explorer) con l'account amministratore (consenso `Sites.FullControl.All` se richiesto):
+     - `GET https://graph.microsoft.com/v1.0/sites/srlsiciet.sharepoint.com:/sites/SICIETQualit` → copiare `id`;
+     - `POST https://graph.microsoft.com/v1.0/sites/<id>/permissions` con corpo
+       `{"roles":["write"],"grantedToIdentities":[{"application":{"id":"7b0cf16f-9dc4-4763-83e7-0ce9bef8e4df","displayName":"SICIET Quality"}}]}`
+   - (Più semplice ma meno restrittivo: autorizzazione applicazione `Sites.ReadWrite.All` al posto di `Sites.Selected`, senza il passo con Graph Explorer: l'app potrebbe però scrivere in tutti i siti.)
+2. **Azure** ([portal.azure.com](https://portal.azure.com), serve una sottoscrizione; per questo uso il costo è praticamente nullo) → *Crea una risorsa* → **App per le funzioni** → piano **Consumo** → nome es. `siciet-quality`, stack **Node.js 20**, sistema operativo **Windows**, area Europa → *Crea*. Poi, nell'app creata:
+   - *Impostazioni → Variabili d'ambiente*, aggiungere:
+     | Nome | Valore |
+     |---|---|
+     | `PIN` | il PIN aziendale (es. 6 cifre) |
+     | `TENANT_ID` | `5c055224-300a-4b03-8742-552b7dd79f62` |
+     | `CLIENT_ID` | `7b0cf16f-9dc4-4763-83e7-0ce9bef8e4df` |
+     | `CLIENT_SECRET` | il valore del segreto client |
+     | `SITE` | `srlsiciet.sharepoint.com:/sites/SICIETQualit` |
+     | `FOLDER` | `Qualità/Schede componenti` |
+     | `ORIGIN` | `https://hub.siciet.it` |
+   - *Impostazioni → Configurazione → Impostazioni generali*: **Credenziali di pubblicazione di autenticazione di base SCM** → Attivato → Salva.
+   - *Panoramica* → **Scarica profilo di pubblicazione**, e annotare il **Dominio predefinito** (es. `siciet-quality.azurewebsites.net`).
+   - La sezione CORS dell'app va lasciata vuota: le intestazioni le gestisce il servizio.
+3. **GitHub** → repository → *Settings → Secrets and variables → Actions*:
+   - scheda *Secrets* → **New repository secret** `AZURE_FUNCTIONAPP_PUBLISH_PROFILE` = contenuto del file del profilo di pubblicazione;
+   - scheda *Variables* → **New repository variable** `AZURE_FUNCTIONAPP_NAME` = nome dell'app (es. `siciet-quality`);
+   - *Actions* → **SICIET Quality – servizio** → **Run workflow**. Da quel momento il servizio si aggiorna da solo a ogni modifica di `quality/api`.
+4. In `quality.js` impostare `api: "https://<dominio predefinito>/api"` e aumentare `?v=` in `index.html`.
+
+Verifica: `https://<dominio predefinito>/api/ping` aperto nel browser risponde `{"errore":"PIN non corretto."}` (giusto: manca il PIN); se risponde "Servizio non configurato" manca una variabile d'ambiente. Il servizio funziona anche su Cloudflare Workers ([`api/worker.js`](api/worker.js) così com'è, con le stesse variabili).
 
 Nella stessa configurazione si cambiano i dati aggiuntivi (`campi`), gli stati (`stati`), le fasi delle foto (`fasi`, la prima è quella della foto della targhetta) e la riduzione delle foto (`foto`).
 
 **Limiti**
 
-- Per aprire la scheda dal QR serve un account Microsoft 365 aziendale con accesso alla cartella: un cliente o un fornitore esterno vede solo la richiesta di accesso. Per loro si può condividere da OneDrive la singola cartella del TAG.
+- Per aprire la scheda dal QR serve il PIN aziendale (una volta per telefono). A un cliente o fornitore esterno si può condividere da SharePoint la singola cartella del TAG. Il pulsante **Apri in SharePoint** della scheda è per l'ufficio: SharePoint chiede l'account Microsoft.
 - La lettura del TAG dà i risultati migliori riquadrando **solo il TAG**, con la foto dritta e ben illuminata: il riquadro viene ingrandito in base alla sua altezza, portato in bianco e nero (anche per scritte chiare su targhe scure) e letto più volte; tra le righe lette si preferisce il testo dopo "TAG" e la scritta più grande. Su targhette di prova lette con il riquadro, il TAG giusto è il primo proposto in circa 3 casi su 4. Sbaglia ancora con incisioni poco contrastate, riflessi e caratteri simili (B/8, I/1, O/0): il TAG va sempre controllato. In alternativa, su iPhone, toccando il campo TAG si può usare **Scansiona testo** (riconoscimento di Apple, di solito più preciso). La prima lettura scarica circa 10 MB (motore e dati della lingua), poi resta nella cache del browser.
-- Le librerie (MSAL per l'accesso Microsoft, Tesseract.js, generatore di QR) sono caricate da `cdn.jsdelivr.net`: deve essere raggiungibile dalla rete aziendale e dai telefoni.
+- Le librerie (Tesseract.js, generatore di QR) sono caricate da `cdn.jsdelivr.net`: deve essere raggiungibile dalla rete aziendale e dai telefoni.
 - Le foto in attesa di invio restano nel browser in cui sono state scattate: se si cancellano i dati del browser prima dell'invio vanno perse.
 
 **Aggiornamenti** – A ogni modifica di `quality.js` aumentare il numero in `quality.js?v=…` in fondo a `index.html`: altrimenti i telefoni possono continuare a usare per qualche tempo lo script vecchio insieme alla pagina nuova, con errori come "null is not an object".
