@@ -416,6 +416,8 @@ function rigaDa(s, vecchia){
     aggiornataIl: (s.aggiornata && s.aggiornata.il) || (s.creata && s.creata.il),
     aggiornataDa: (s.aggiornata && s.aggiornata.da) || (s.creata && s.creata.da),
     note: (s.note || []).filter(n => n.testo).length,
+    // Passaggi di stato (il primo è lo stato alla creazione).
+    storicoStati: (s.note || []).filter(n => n.stato).map(n => ({ stato: n.stato, il: n.il })),
     ultimaNota: ultima ? (ultima.testo || (ultima.stato ? "Stato: " + ultima.stato : "")) : ""
   });
 }
@@ -430,18 +432,43 @@ function colonneRiepilogo(righe){
     { titolo: "TAG scritto come", larghezza: 16 }
   ].concat(campi.map(k => ({ campo: k, titolo: NOMI_CAMPI[k] || k.charAt(0).toUpperCase() + k.slice(1), larghezza: 24 })), [
     { titolo: "Stato", larghezza: 14 },
+    { titolo: "Variazioni di stato", larghezza: 11, tipo: "numero" },
+    { titolo: "Non conformità", larghezza: 15 },
+    { titolo: "Ultima non conformità il", larghezza: 17, tipo: "data" },
+    { titolo: "Risolta il", larghezza: 17, tipo: "data" },
     { titolo: "Foto", larghezza: 7, tipo: "numero" }, { titolo: "Documenti", larghezza: 11, tipo: "numero" },
     { titolo: "Note", larghezza: 7, tipo: "numero" }, { titolo: "Ultima nota", larghezza: 40 },
+    { titolo: "Storico stati", larghezza: 60 },
     { titolo: "Creata il", larghezza: 17, tipo: "data" }, { titolo: "Creata da", larghezza: 18 },
     { titolo: "Ultimo aggiornamento", larghezza: 20, tipo: "data" }, { titolo: "Aggiornata da", larghezza: 18 },
     { titolo: "Scheda", larghezza: 13, tipo: "link" }, { titolo: "Cartella", larghezza: 13, tipo: "link" }
   ]);
 }
+// Data ISO → "gg/mm/aaaa" (ora italiana), per i testi.
+function dataIt(iso){
+  const x = serieExcel(iso);
+  if(x === null) return "";
+  const d = new Date((x - 25569) * 86400000);
+  return String(d.getUTCDate()).padStart(2, "0") + "/" + String(d.getUTCMonth() + 1).padStart(2, "0") + "/" + d.getUTCFullYear();
+}
+// Non conformità dallo storico degli stati: se c'è stata, quando l'ultima, e
+// quando è tornata "Conforme" dopo l'ultima.
+const NON_CONFORME = "Non conforme", CONFORME = "Conforme";
+function nonConformita(storico){
+  let ultima = -1;
+  storico.forEach((p, i) => { if(p.stato === NON_CONFORME) ultima = i; });
+  if(ultima < 0) return { si: "No", il: "", risolta: "" };
+  const dopo = storico.slice(ultima + 1).find(p => p.stato === CONFORME);
+  return { si: dopo ? "Sì, risolta" : "Sì, aperta", il: storico[ultima].il, risolta: dopo ? dopo.il : "" };
+}
 function valoriRiga(env, colonne, r){
   const app = env.APP_URL || (env.ORIGIN || "https://hub.siciet.it") + "/quality/";
+  const storico = r.storicoStati || [], nc = nonConformita(storico);
   return [r.commessa, r.job, r.tag, r.tagOriginale]
     .concat(colonne.filter(c => c.campo).map(c => (r.campi || {})[c.campo] || ""), [
-      r.stato, r.foto || 0, r.documenti || 0, r.note || 0, r.ultimaNota,
+      r.stato, Math.max(0, storico.length - 1), storico.length ? nc.si : "", nc.il, nc.risolta,
+      r.foto || 0, r.documenti || 0, r.note || 0, r.ultimaNota,
+      storico.map(p => p.stato + " " + dataIt(p.il)).join(" → "),
       r.creataIl, r.creataDa, r.aggiornataIl, r.aggiornataDa,
       { testo: "Apri scheda", url: app + "?c=" + encodeURIComponent(r.commessa) + "&job=" + encodeURIComponent(r.job) + "&tag=" + encodeURIComponent(r.tag) },
       { testo: "Apri cartella", url: r.cartella }
