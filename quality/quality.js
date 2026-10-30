@@ -62,6 +62,9 @@ var QUALITA_CONFIG = {
   var OPERATORE_KEY = "siciet-qualita-operatore";
   var PIN_KEY = "siciet-qualita-pin";
   var PIN_SERVE_KEY = "siciet-qualita-pin-richiesto";
+  var QR_KEY = "siciet-qualita-qr";            // sessione aperta da un QR
+  var ACCESSO_KEY = "siciet-qualita-accesso";  // scadenze delle password dei tecnici
+  var ORE_ACCESSO = 12;
   // Indirizzo dell'app senza "index.html", scritto nei QR code.
   var BASE_URL = location.origin + location.pathname.replace(/index\.html$/, "");
 
@@ -190,6 +193,7 @@ var QUALITA_CONFIG = {
       opts = opts || {};
       var h = { "X-Pin": opts.pin || this.pin() };
       if(opts.etag) h["If-Match"] = opts.etag;
+      if(opts.password !== undefined) h["X-Password"] = opts.password;
       if(opts.body) h["Content-Type"] = opts.body.type || "application/octet-stream";
       var q = "?path=" + encodeURIComponent(path || "") + (opts.rename ? "&rename=1" : "") + (opts.query || "");
       var res;
@@ -213,6 +217,10 @@ var QUALITA_CONFIG = {
       storage(function(){ localStorage.setItem(PIN_KEY, pin); });
     },
     list: async function(path){ return (await this.api("GET", "list", path)) || []; },
+    // Password dei tecnici (accesso dal QR). { protetto: false } se non impostata.
+    verifica: function(livello, password){
+      return this.api("GET", "verifica", "", { query: "&livello=" + livello, password: password || "" });
+    },
     // Elenco sintetico di tutte le schede (dall'indice del servizio), per la ricerca.
     schede: async function(){ return (await this.api("GET", "schede", "")) || []; },
     info: function(path){ return this.api("GET", "item", path); },
@@ -533,7 +541,7 @@ var QUALITA_CONFIG = {
   // Salva le foto scelte nella scheda (in coda di invio) e, se c'è, la nota che le accompagna.
   async function salvaFoto(){
     var s = stato.scheda, p = fotoScheda, fase = p.fase(), testo = p.testo();
-    if(!s || !p.sel.length) return;
+    if(!s || !p.sel.length || solaLettura()) return;
     var btn = $("fotoSalva"), salvate = false;
     btn.disabled = true;
     $("fotoErr").textContent = "";
@@ -802,7 +810,7 @@ var QUALITA_CONFIG = {
     var qr;
     ["M", "L"].some(function(liv){
       qr = qrcode(0, liv);
-      qr.addData(urlScheda(s));
+      qr.addData(urlScheda(s) + "&qr=1");
       qr.make();
       return Math.floor(punti / qr.getModuleCount()) >= 3;
     });
@@ -865,7 +873,7 @@ var QUALITA_CONFIG = {
     var nome = "Etichetta " + nomeFile([s.commessa, s.job, s.tag].filter(Boolean).join(" ")) + ".png";
     $("etichettaImg").src = url;
     $("etichettaImg").dataset.w = misureEtichetta(c).w;
-    $("etichettaUrl").textContent = urlScheda(s);
+    $("etichettaUrl").textContent = urlScheda(s) + "&qr=1";
     $("etichettaMisure").textContent = "Misure: " + misureEtichetta(c).w + " × " + cfg.etichetta.altezzaMm + " mm di stampa (nastro da 24 mm).";
     $("etichettaScarica").href = url;
     $("etichettaScarica").download = nome;
@@ -929,12 +937,17 @@ var QUALITA_CONFIG = {
   window.addEventListener("popstate", mostra);
 
   function soloVista(id){
-    ["viewPin", "viewOperatore", "viewElenco", "viewNuovo", "viewScheda"].forEach(function(v){ $(v).hidden = v !== id; });
+    ["viewPin", "viewAccesso", "viewOperatore", "viewElenco", "viewNuovo", "viewScheda"].forEach(function(v){ $(v).hidden = v !== id; });
   }
 
   function mostra(){
     var q = new URLSearchParams(location.search);
     var c = q.get("c"), job = q.get("job"), tag = q.get("tag");
+    // Arrivo da un QR: la sessione resta "da QR" e il segno sparisce dall'indirizzo.
+    if(q.get("qr") === "1"){
+      storage(function(){ sessionStorage.setItem(QR_KEY, "1"); });
+      history.replaceState(null, "", location.pathname + qs(c, job, tag));
+    }
     mostraErrore(null);
     $("ocrDlg").hidden = $("etichettaDlg").hidden = $("lightbox").hidden = true;
 
@@ -947,15 +960,88 @@ var QUALITA_CONFIG = {
       $("pin").focus();
       return;
     }
-    if(cfg.chiediOperatore && !operatore()){
+    if(daQr() && !accesso("lettura")) return mostraAccesso("lettura");
+    if(stato.chiediModifica && !accesso("modifica")) return mostraAccesso("modifica");
+    stato.chiediModifica = false;
+    applicaSolaLettura();
+    if(cfg.chiediOperatore && !operatore() && !solaLettura()){
       stato.vista = "operatore";
       soloVista("viewOperatore");
       $("operatoreNome").focus();
       return;
     }
-    if(q.has("nuovo")) return mostraNuovo(c, job);
+    if(q.has("nuovo") && !solaLettura()) return mostraNuovo(c, job);
     if(c && job && tag) return mostraScheda(c, job, tag);
     return mostraElenco(c, c && job);
+  }
+
+  /* ---------- Accesso dei tecnici dal QR ----------
+   * Chi entra da un QR deve inserire la password di visualizzazione (vede
+   * tutte le schede senza modificarle) e, per modificare, quella di modifica.
+   * Le password le controlla il servizio; valgono ORE_ACCESSO ore sul dispositivo.
+   * Chi apre la pagina normalmente non vede nessuna richiesta.
+   */
+  function daQr(){ return configured && storage(function(){ return sessionStorage.getItem(QR_KEY); }) === "1"; }
+  function accessi(){ return storage(function(){ return JSON.parse(localStorage.getItem(ACCESSO_KEY)); }) || {}; }
+  function accesso(livello){ return (accessi()[livello] || 0) > Date.now(); }
+  function concediAccesso(livello){
+    var a = accessi(), scade = Date.now() + ORE_ACCESSO * 3600000;
+    a[livello] = scade;
+    if(livello === "modifica") a.lettura = Math.max(a.lettura || 0, scade);
+    storage(function(){ localStorage.setItem(ACCESSO_KEY, JSON.stringify(a)); });
+  }
+  function solaLettura(){ return daQr() && !accesso("modifica"); }
+
+  function mostraAccesso(livello){
+    stato.vista = "accesso";
+    stato.livelloAccesso = livello;
+    soloVista("viewAccesso");
+    $("accessoTitolo").textContent = livello === "modifica" ? "Password di modifica" : "Accesso tecnici";
+    $("accessoTesto").textContent = livello === "modifica"
+      ? "Per modificare la scheda (foto, note, documenti, dati) inserisci la password di modifica dei tecnici."
+      : "Per vedere le schede inserisci la password di visualizzazione dei tecnici.";
+    $("accessoAnnulla").hidden = livello !== "modifica";
+    $("accessoErr").textContent = "";
+    $("accessoPassword").value = "";
+    // Se il servizio non ha password impostate si entra direttamente
+    // (senza password di modifica, anche con la modifica abilitata).
+    B.verifica(livello, "").then(async function(r){
+      if(!r || r.protetto !== false || stato.vista !== "accesso") return;
+      concediAccesso(livello);
+      if(livello === "lettura"){
+        var m = await B.verifica("modifica", "").catch(function(){ return null; });
+        if(m && m.protetto === false) concediAccesso("modifica");
+      }
+      stato.chiediModifica = false;
+      mostra();
+    }).catch(function(){});
+    $("accessoPassword").focus();
+  }
+  $("accessoForm").addEventListener("submit", async function(ev){
+    ev.preventDefault();
+    var livello = stato.livelloAccesso, pwd = $("accessoPassword").value, btn = this.querySelector("button[type=submit]");
+    if(!pwd){ $("accessoPassword").focus(); return; }
+    btn.disabled = true;
+    $("accessoErr").textContent = "";
+    try{
+      await B.verifica(livello, pwd);
+      concediAccesso(livello);
+      stato.chiediModifica = false;
+      mostra();
+    }catch(e){
+      $("accessoErr").textContent = e.status === 403 ? "Password non corretta." : e.message;
+    }finally{
+      btn.disabled = false;
+    }
+  });
+  $("accessoAnnulla").addEventListener("click", function(){ stato.chiediModifica = false; mostra(); });
+  $("qrModifica").addEventListener("click", function(){ stato.chiediModifica = true; mostra(); });
+
+  // In sola visualizzazione spariscono i comandi che modificano.
+  function applicaSolaLettura(){
+    var ro = solaLettura();
+    $("qrBar").hidden = !ro;
+    document.body.classList.toggle("sola-lettura", ro);
   }
 
   /* ---------- Operatore ---------- */
@@ -1415,7 +1501,7 @@ var QUALITA_CONFIG = {
   $("docBtn").addEventListener("click", function(){ $("docInput").click(); });
   async function aggiungiDocumenti(files){
     var s = stato.scheda;
-    if(!s || !files.length) return;
+    if(!s || !files.length || solaLettura()) return;
     try{
       for(var i = 0; i < files.length; i++) await accoda(cartellaScheda(s), "Documenti", nomeFile(files[i].name), files[i]);
       await mostraCoda();
@@ -1443,7 +1529,7 @@ var QUALITA_CONFIG = {
   $("notaForm").addEventListener("submit", async function(ev){
     ev.preventDefault();
     var s = stato.scheda, testo = $("notaTesto").value.trim(), nuovo = valoreScelto($("statiNota"));
-    if(!s) return;
+    if(!s || solaLettura()) return;
     var cambio = nuovo && nuovo !== s.stato;
     if(!testo && !cambio){ $("notaTesto").focus(); return; }
     var btn = $("notaSubmit");
@@ -1469,7 +1555,7 @@ var QUALITA_CONFIG = {
   $("modificaForm").addEventListener("submit", async function(ev){
     ev.preventDefault();
     var s = stato.scheda, campi = leggiCampi("m-");
-    if(!s) return;
+    if(!s || solaLettura()) return;
     try{
       stato.scheda = await aggiornaScheda(s, function(d){ d.campi = campi; });
       $("modificaForm").hidden = true;
