@@ -11,10 +11,11 @@
  *                          Foto/2026-10-30 14.32.05 Installazione - Mario Rossi.jpg
  *                          Documenti/<nome originale del file>
  *
- * Chi usa la pagina non accede a Microsoft 365: inserisce una volta il PIN
- * aziendale e il proprio nome. A leggere e scrivere su SharePoint è il
- * servizio in quality/api (indirizzo in "api"), con le credenziali
- * dell'azienda; vedi quality/README.md.
+ * Chi usa la pagina non accede a Microsoft 365: inserisce una volta il
+ * proprio nome. A leggere e scrivere su SharePoint è il servizio in
+ * quality/api (indirizzo in "api"), con le credenziali dell'azienda; vedi
+ * quality/README.md. Se nel servizio è impostato un PIN, la pagina lo chiede
+ * una volta per dispositivo.
  * Se "api" è vuoto la pagina funziona in prova: salva tutto solo nel
  * browser di questo dispositivo.
  */
@@ -58,6 +59,7 @@ var QUALITA_CONFIG = {
   var COMMESSA_KEY = "siciet-qualita-commessa";
   var OPERATORE_KEY = "siciet-qualita-operatore";
   var PIN_KEY = "siciet-qualita-pin";
+  var PIN_SERVE_KEY = "siciet-qualita-pin-richiesto";
   // Indirizzo dell'app senza "index.html", scritto nei QR code.
   var BASE_URL = location.origin + location.pathname.replace(/index\.html$/, "");
 
@@ -179,8 +181,9 @@ var QUALITA_CONFIG = {
   var Server = {
     init: async function(){},
     pin: function(){ return storage(function(){ return localStorage.getItem(PIN_KEY); }) || ""; },
-    signedIn: function(){ return !!this.pin(); },
-    // Chiamata al servizio. 404 → null; PIN sbagliato → torna alla richiesta del PIN.
+    // Il PIN si chiede solo se il servizio ha risposto che serve (401).
+    signedIn: function(){ return !!this.pin() || !storage(function(){ return localStorage.getItem(PIN_SERVE_KEY); }); },
+    // Chiamata al servizio. 404 → null; PIN mancante o sbagliato → richiesta del PIN.
     api: async function(method, azione, path, opts){
       opts = opts || {};
       var h = { "X-Pin": opts.pin || this.pin() };
@@ -196,7 +199,7 @@ var QUALITA_CONFIG = {
       if(res.status === 404) return null;
       var info = await res.json().catch(function(){ return {}; });
       if(res.status === 401 && !opts.pin){
-        storage(function(){ localStorage.removeItem(PIN_KEY); });
+        storage(function(){ localStorage.removeItem(PIN_KEY); localStorage.setItem(PIN_SERVE_KEY, "1"); });
         setTimeout(mostra, 0);
       }
       if(!res.ok) throw errore(info.errore || "Errore del servizio (" + res.status + ").", res.status);
