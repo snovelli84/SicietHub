@@ -184,9 +184,13 @@ window.SICIET_APPS = [
     description: "Gestore delle password: accessi e credenziali aziendali in una cassaforte cifrata.",
     category: "Sicurezza",
     emoji: "🔑",
-    // Scheme non documentato: sul telefono si apre la pagina dello store,
-    // che mostra "Apri" se l'app è già installata. Da PC la cassaforte web.
+    // iOS: lo scheme "bitwarden" è registrato dall'app (Info.plist nel codice
+    // sorgente pubblico), quindi l'app si apre direttamente.
+    // Android: lo scheme "bitwarden" non è apribile dal browser (manca la
+    // categoria BROWSABLE nel manifest), quindi si apre il Play Store, che
+    // mostra "Apri" se l'app è già installata. Da PC la cassaforte web.
     ios: {
+      scheme: "bitwarden://",
       store: "https://apps.apple.com/it/app/bitwarden-password-manager/id1137397744"
     },
     android: {
