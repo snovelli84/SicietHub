@@ -203,6 +203,7 @@ input:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:1px}
 .list .name{font-weight:600;overflow-wrap:anywhere}
 .list .meta{color:var(--muted);font-size:13px;white-space:nowrap}
 .empty{color:var(--muted);font-size:14px}
+.riepiloghi{display:grid;gap:8px;justify-items:start;border-top:1px solid var(--border);padding-top:14px}
 
 /* Scheda */
 .title-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
@@ -329,6 +330,11 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
     </div>
     <ul class="list" id="elenco"></ul>
     <p class="empty" id="elencoVuoto" hidden></p>
+    <div class="riepiloghi" id="riepiloghi" hidden>
+      <p class="hint">I riepiloghi Excel (in Schede componenti, in ogni commessa e in ogni JOB) si aggiornano da soli a ogni salvataggio.</p>
+      <button class="btn small" type="button" id="riepiloghiBtn">📊 Ricostruisci riepiloghi Excel</button>
+      <p class="hint" id="riepiloghiStato" aria-live="polite"></p>
+    </div>
   </section>
 
   <!-- Nuova scheda -->
@@ -462,7 +468,7 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   </section>
 </main>
 
-<footer>SICIET Quality · versione 11</footer>
+<footer>SICIET Quality · versione 12</footer>
 
 <!-- Lettura del TAG da foto -->
 <div class="overlay" id="ocrDlg" hidden>
@@ -507,6 +513,6 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
 
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
 <!-- Aumentare ?v= a ogni modifica di quality.js, altrimenti i telefoni usano la versione in cache. -->
-<script src="quality.js?v=11"></script>
+<script src="quality.js?v=12"></script>
 </body>
 </html>
