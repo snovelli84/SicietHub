@@ -6,11 +6,12 @@ Per ogni componente di una commessa si crea una scheda identificata da **JOB** e
 
 **Uso in cantiere**
 
-1. **Nuovo componente** – In cima **Commessa SICIET** e **JOB**: restano memorizzati sul telefono e vengono riproposti. Poi un unico modulo in quattro passi:
+1. **Nuovo componente** – In cima **Commessa SICIET** e **JOB**: restano memorizzati sul telefono e vengono riproposti. Poi un unico modulo in cinque passi:
    1. **Foto della targhetta** → si riquadra il TAG col dito e il testo viene letto in automatico (OCR con [Tesseract.js](https://tesseract.projectnaptha.com), direttamente sul telefono). Se la lettura non riesce lo si scrive a mano (**Scrivo a mano**). La foto della targhetta viene comunque salvata (fase "Targhetta").
    2. **TAG**, da controllare sempre. Il JOB in cima viene ricordato.
-   3. **Altri dati**, facoltativi: descrizione, fornitore, posizione, DDT, stato, note.
-   4. **Foto del componente**: si sceglie la fase, si scattano una o più foto (o si prendono dalla galleria), si tolgono con × quelle venute male e si scrive una nota facoltativa.
+   3. **Stato del componente**, obbligatorio: Da verificare, Conforme o Non conforme (tre pulsanti colorati, nessuno preselezionato). Con "Non conforme" la descrizione è obbligatoria.
+   4. **Altri dati**, facoltativi: descrizione, fornitore, posizione, DDT.
+   5. **Foto del componente**: si sceglie la fase, si scattano una o più foto (o si prendono dalla galleria), si tolgono con × quelle venute male e si scrive una nota facoltativa.
    Con **Salva e inserisci il prossimo** la scheda viene salvata e il modulo si svuota, tenendo commessa e JOB: si passa subito al componente successivo. In alto compare l'elenco dei componenti inseriti, con il link a ciascuna scheda. **Salva e apri la scheda** salva e apre la scheda appena creata.
 2. **Altre foto in seguito** – Nella scheda del componente, riquadro **Aggiungi foto**: stessa procedura, poi **Salva foto**. Le note delle foto compaiono nello storico della scheda e sotto ogni foto quando la si ingrandisce.
 3. **Stato e note, documenti** – Nel riquadro **Cambia stato o aggiungi una nota** si sceglie il nuovo stato (Da verificare / Conforme / Non conforme): la **motivazione è obbligatoria** (da Non conforme a Conforme la domanda è "Come è stata risolta la non conformità?") e si possono aggiungere foto (fasi "Non conformità" e "Risoluzione"). Il pulsante **✅ Conferma: stato …** salva, e la pagina conferma cosa è stato registrato, quando e da chi (anche per foto e documenti). Il riquadro **Storico stato** mostra tutti i passaggi con data, autore, motivazione e foto; lo storico non si può cancellare né modificare dalla pagina ed è anche in Scheda.txt ("Da verificare → Non conforme"). Documenti: DDT, certificati, schede tecniche, verbali.

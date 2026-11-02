@@ -1360,14 +1360,17 @@ var QUALITA_CONFIG = {
     cfg.campi.forEach(function(c){ var v = $(prefisso + c.id).value.trim(); if(v) o[c.id] = v; });
     return o;
   }
+  // Pulsanti degli stati, colorati secondo il tipo. attuale === null: nessuno
+  // scelto (il nuovo componente obbliga a scegliere).
   function sceltaStati(contenitore, nome, attuale){
     contenitore.textContent = "";
     cfg.stati.forEach(function(s){
-      contenitore.appendChild(el("label", { class: "choice" }, [
+      contenitore.appendChild(el("label", { class: "choice stato-" + s.tipo }, [
         el("input", { type: "radio", name: nome, value: s.nome }),
         el("span", { text: s.nome })
       ]));
     });
+    if(attuale === null) return;
     var r = contenitore.querySelector("input[value=\"" + (attuale || cfg.stati[0].nome).replace(/"/g, "") + "\"]");
     if(r) r.checked = true;
   }
@@ -1416,8 +1419,18 @@ var QUALITA_CONFIG = {
     fotoNuovo.reset();
     mostraTarghetta();
     campiForm($("campiNuovo"), "n-");
-    sceltaStati($("statiNuovo"), "statoNuovo");
+    sceltaStati($("statiNuovo"), "statoNuovo", null);
+    aggiornaStatoNuovo();
   }
+
+  // Stato del nuovo componente: con "Non conforme" la descrizione è obbligatoria.
+  function aggiornaStatoNuovo(){
+    var st = valoreScelto($("statiNuovo")), ko = st && statoInfo(st).tipo === "ko";
+    $("notaNuovoLabel").textContent = ko ? "Descrivi la non conformità (obbligatorio)" : "Note (facoltative)";
+    $("notaNuovo").placeholder = ko ? "Es. flangia lato mandata danneggiata durante il trasporto." : "";
+    if(st){ $("statoStep").classList.remove("invalid"); }
+  }
+  $("statiNuovo").addEventListener("change", aggiornaStatoNuovo);
 
   // Componenti inseriti di seguito: elenco con il link a ciascuna scheda.
   function mostraInseriti(){
@@ -1448,6 +1461,20 @@ var QUALITA_CONFIG = {
     $("job").classList.toggle("invalid", !job);
     $("tag").classList.toggle("invalid", !tag);
     if(!commessa || !job || !tag){ err.textContent = "Indica commessa SICIET, JOB e TAG."; return; }
+    var statoScelto = valoreScelto($("statiNuovo"));
+    $("statoStep").classList.toggle("invalid", !statoScelto);
+    if(!statoScelto){
+      err.textContent = "Scegli lo stato del componente: Da verificare, Conforme o Non conforme.";
+      $("statoStep").scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    if(statoInfo(statoScelto).tipo === "ko" && !$("notaNuovo").value.trim()){
+      err.textContent = "Descrivi la non conformità: è obbligatoria.";
+      $("notaNuovo").classList.add("invalid");
+      $("notaNuovo").focus();
+      return;
+    }
+    $("notaNuovo").classList.remove("invalid");
     err.textContent = "";
     var btn = dopo === "apri" ? $("nuovoApri") : $("nuovoSubmit"), testoBtn = btn.textContent;
     $("nuovoApri").disabled = $("nuovoSubmit").disabled = true;
@@ -1564,13 +1591,16 @@ var QUALITA_CONFIG = {
 
     var ul = $("note");
     ul.textContent = "";
-    s.note.slice().reverse().forEach(function(n){
+    // Solo le note senza cambio di stato: i cambi (con la loro motivazione)
+    // sono nello storico dello stato.
+    var note = s.note.filter(function(n){ return !n.stato; });
+    note.slice().reverse().forEach(function(n){
       var li = el("li", null, [el("span", { class: "who", text: fmtData(n.il) + " – " + n.da +
         (n.foto ? " · 📷 " + (n.foto.length === 1 ? "1 foto" : n.foto.length + " foto") + (n.fase ? " (" + n.fase + ")" : "") : "") })]);
-      if(n.stato) li.appendChild(el("span", null, [el("span", { class: "badge " + statoInfo(n.stato).tipo, text: n.stato })]));
       if(n.testo) li.appendChild(el("span", { class: "txt", text: n.testo }));
       ul.appendChild(li);
     });
+    if(!note.length) ul.appendChild(el("li", { class: "empty", text: "Nessuna nota." }));
     sceltaStati($("statiNota"), "statoNota", s.stato);
     disegnaStorico();
     aggiornaFormNota();

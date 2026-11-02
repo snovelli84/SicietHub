@@ -282,6 +282,22 @@ footer{text-align:center;padding:24px 16px 88px;color:var(--muted);font-size:12p
 }
 @media (prefers-color-scheme: dark){.toast{background:#1e7d3c}}
 .toast.via{opacity:0}
+/* Stati: pulsanti colorati, grandi nel nuovo componente */
+.choice.stato-ok input:checked + span{background:var(--ok);color:#fff}
+.choice.stato-warn input:checked + span{background:#c79a00;color:#fff}
+.choice.stato-ko input:checked + span{background:var(--error);color:#fff}
+@media (prefers-color-scheme: dark){
+  .choice.stato-ok input:checked + span{background:#1e7d3c}
+  .choice.stato-ko input:checked + span{background:#b3261e}
+}
+.stati-grandi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stati-grandi .choice span{display:flex;align-items:center;justify-content:center;text-align:center;min-height:64px;border-radius:14px;font-size:16px;font-weight:700;padding:8px}
+.stati-grandi .choice.stato-ok span{border-color:var(--ok)}
+.stati-grandi .choice.stato-warn span{border-color:#c79a00}
+.stati-grandi .choice.stato-ko span{border-color:var(--error)}
+@media (max-width:360px){.stati-grandi{grid-template-columns:1fr}}
+.stato-step.invalid{border-color:var(--error);box-shadow:0 0 0 2px var(--error)}
+.badge.grande{font-size:17px;padding:8px 16px}
 .sub-title{font-size:14px;color:var(--muted);font-weight:600;margin-top:4px}
 .nota-form{border:1px solid var(--border);border-radius:14px;padding:14px}
 .conferma-btn{min-height:56px;font-size:17px}
@@ -445,22 +461,22 @@ footer{text-align:center;padding:24px 16px 88px;color:var(--muted);font-size:12p
         <span class="hint" id="ocrHint">Letto dalla foto oppure scritto a mano: controllalo sempre.</span>
         <span class="hint">Su iPhone puoi anche toccare il campo e scegliere <strong>Scansiona testo</strong> per inquadrare il TAG con la fotocamera.</span>
       </fieldset>
+      <fieldset class="step stato-step" id="statoStep">
+        <legend>3. Stato del componente <span class="hint">(obbligatorio)</span></legend>
+        <div class="choices stati-grandi" id="statiNuovo" role="radiogroup" aria-label="Stato del componente"></div>
+        <div class="field">
+          <label for="notaNuovo" id="notaNuovoLabel">Note (facoltative)</label>
+          <textarea id="notaNuovo" maxlength="4000"></textarea>
+        </div>
+      </fieldset>
       <details class="altri step">
-        <summary>3. Altri dati <span class="hint">(facoltativi: descrizione, fornitore, stato, note…)</span></summary>
+        <summary>4. Altri dati <span class="hint">(facoltativi: descrizione, fornitore, posizione, DDT)</span></summary>
         <div class="altri-body">
           <div class="row" id="campiNuovo"></div>
-          <fieldset>
-            <legend>Stato</legend>
-            <div class="choices" id="statiNuovo"></div>
-          </fieldset>
-          <div class="field">
-            <label for="notaNuovo">Note</label>
-            <textarea id="notaNuovo" maxlength="4000"></textarea>
-          </div>
         </div>
       </details>
       <fieldset class="step">
-        <legend>4. Foto del componente</legend>
+        <legend>5. Foto del componente</legend>
         <p class="hint">Foto che attestano lo stato del componente, con una nota facoltativa. Altre foto si possono aggiungere in seguito dalla scheda.</p>
         <div class="add-foto" id="fotoNuovo"></div>
       </fieldset>
@@ -481,7 +497,7 @@ footer{text-align:center;padding:24px 16px 88px;color:var(--muted);font-size:12p
           <div class="hint">TAG</div>
           <h2 class="tag-title" id="schedaTag"></h2>
         </div>
-        <span class="badge" id="schedaStato"></span>
+        <span class="badge grande" id="schedaStato"></span>
       </div>
       <dl class="data" id="schedaDati"></dl>
       <div class="btns">
@@ -536,7 +552,7 @@ footer{text-align:center;padding:24px 16px 88px;color:var(--muted);font-size:12p
         <button class="btn primary block conferma-btn" type="submit" id="notaSubmit">✅ Aggiungi nota</button>
         <p class="msg ok" id="notaOk" role="status" hidden></p>
       </form>
-      <h4 class="sub-title">Tutte le note</h4>
+      <h4 class="sub-title">Note</h4>
       <ul class="notes" id="note"></ul>
     </div>
 
@@ -550,7 +566,7 @@ footer{text-align:center;padding:24px 16px 88px;color:var(--muted);font-size:12p
   </section>
 </main>
 
-<footer>SICIET Quality · versione 20</footer>
+<footer>SICIET Quality · versione 21</footer>
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
@@ -602,6 +618,6 @@ footer{text-align:center;padding:24px 16px 88px;color:var(--muted);font-size:12p
 
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
 <!-- Aumentare ?v= a ogni modifica di quality.js, altrimenti i telefoni usano la versione in cache. -->
-<script src="quality.js?v=20"></script>
+<script src="quality.js?v=21"></script>
 </body>
 </html>
