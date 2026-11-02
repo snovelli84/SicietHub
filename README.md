@@ -12,6 +12,8 @@ Dopo il tocco compare sempre anche un pannello con i pulsanti "Apri" e "Scarica"
 Il sito è statico (HTML/JS, nessun build): basta pubblicare la cartella su un qualsiasi hosting HTTPS (GitHub Pages, IIS, Apache, Azure Static Web Apps…).
 I dipendenti possono aggiungerlo alla schermata Home ("Aggiungi a Home" su iOS / "Installa app" su Android): si apre a schermo intero come un'app.
 
+**Visualizzazione PC / smartphone** – In fondo alla pagina il selettore *Automatica · PC · Smartphone*. "Automatica" (predefinita) segue il dispositivo; scegliendo PC o Smartphone si vedono le app dell'altra visualizzazione e la scelta resta memorizzata su quel dispositivo finché non si torna su "Automatica". In vista Smartphone da PC le app mostrano i link agli store (da PC non si possono aprire); in vista PC da smartphone si aprono le versioni web.
+
 ## Aggiungere o modificare un'app
 
 Tutto si configura in [`apps.js`](apps.js). Esempio:
