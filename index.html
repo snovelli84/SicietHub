@@ -158,7 +158,24 @@ main{
 
 .empty{text-align:center;color:var(--muted);padding:40px 0}
 
-footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
+footer{text-align:center;padding:24px 16px calc(24px + env(safe-area-inset-bottom));color:var(--muted);font-size:12px;display:grid;gap:8px;justify-items:center}
+
+/* Selettore Automatica / PC / Smartphone */
+.view-switch{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px}
+.view-label{font-size:13px;margin-right:4px}
+.view-switch button{
+  border:0;
+  border-radius:999px;
+  padding:7px 12px;
+  font:inherit;
+  font-size:13px;
+  background:var(--chip);
+  color:var(--text);
+  cursor:pointer;
+}
+.view-switch button[aria-pressed="true"]{background:var(--brand);color:#fff}
+.view-switch button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.view-hint{font-size:12px}
 
 /* Pannello in basso */
 .backdrop{
@@ -218,7 +235,16 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   <div class="list" id="list"></div>
 </main>
 
-<footer>SICIET HUB</footer>
+<footer>
+  <div class="view-switch" id="viewSwitch" role="group" aria-label="Visualizzazione">
+    <span class="view-label">Visualizzazione</span>
+    <button type="button" data-view="auto">Automatica</button>
+    <button type="button" data-view="pc">PC</button>
+    <button type="button" data-view="mobile">Smartphone</button>
+  </div>
+  <p class="view-hint" id="viewHint"></p>
+  <p>SICIET HUB</p>
+</footer>
 
 <div id="sheetWrap" aria-hidden="true">
   <div class="backdrop" id="backdrop"></div>
@@ -236,13 +262,33 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   "use strict";
 
   var L = window.SicietLauncher;
-  var platform = L.detectPlatform();
-  // Da PC non si mostrano le app solo per smartphone, e viceversa.
-  var apps = (window.SICIET_APPS || []).filter(function(a){
-    if(a.soloMobile && platform === "desktop") return false;
-    if(a.soloDesktop && platform !== "desktop") return false;
-    return true;
-  });
+  var realPlatform = L.detectPlatform();
+
+  /* ---------- Visualizzazione PC / smartphone ----------
+     "auto" segue il dispositivo; "pc" e "mobile" si scelgono a mano in fondo
+     alla pagina e restano memorizzate su questo dispositivo.
+     platform vale "desktop", "ios", "android" oppure "anteprima" (vista
+     smartphone su un PC: le app non si possono aprire, si mostrano i link). */
+  var VIEW_KEY = "siciet-vista";
+  var view = "auto";
+  try{
+    var savedView = localStorage.getItem(VIEW_KEY);
+    if(savedView === "pc" || savedView === "mobile") view = savedView;
+  }catch(e){}
+
+  var platform, apps;
+  function autoView(){ return realPlatform === "desktop" ? "pc" : "mobile"; }
+  function applyView(){
+    var eff = view === "auto" ? autoView() : view;
+    platform = eff === "pc" ? "desktop" : (realPlatform === "desktop" ? "anteprima" : realPlatform);
+    // Da PC non si mostrano le app solo per smartphone, e viceversa.
+    apps = (window.SICIET_APPS || []).filter(function(a){
+      if(a.soloMobile && eff === "pc") return false;
+      if(a.soloDesktop && eff !== "pc") return false;
+      return true;
+    });
+  }
+  applyView();
 
   var listEl = document.getElementById("list");
   var chipsEl = document.getElementById("chips");
@@ -447,6 +493,12 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
       return;
     }
 
+    // Vista smartphone su un PC: le app non si possono aprire da qui.
+    if(platform === "anteprima"){
+      showDesktopSheet(app);
+      return;
+    }
+
     var res = L.launch(app, platform);
     if(res.action === "none") return;
 
@@ -562,7 +614,39 @@ footer{text-align:center;padding:24px 16px;color:var(--muted);font-size:12px}
   // Si verifica subito la rete se serve (app desktop da PC, indirizzi per la sede).
   if(platform === "desktop" || apps.some(function(a){ return a.webSede; })) L.isOfficeNetwork();
 
+  /* ---------- Selettore della visualizzazione ---------- */
+
+  var viewButtons = document.querySelectorAll("#viewSwitch button");
+  var VIEW_NAMES = { pc: "PC", mobile: "smartphone" };
+
+  function renderViewSwitch(){
+    viewButtons.forEach(function(b){
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-view") === view));
+    });
+    document.getElementById("viewHint").textContent = view === "auto"
+      ? "Rilevato automaticamente: " + VIEW_NAMES[autoView()] + "."
+      : "Scelta manuale. \"Automatica\" torna a seguire il dispositivo (" + VIEW_NAMES[autoView()] + ").";
+  }
+
+  viewButtons.forEach(function(b){
+    b.addEventListener("click", function(){
+      view = b.getAttribute("data-view");
+      try{
+        if(view === "auto") localStorage.removeItem(VIEW_KEY);
+        else localStorage.setItem(VIEW_KEY, view);
+      }catch(e){}
+      applyView();
+      if(!apps.some(function(a){ return a.category === currentCat; })) currentCat = "Tutte";
+      renderViewSwitch();
+      renderChips();
+      renderList();
+      loadStoreIcons();
+      if(platform === "desktop") L.isOfficeNetwork();
+    });
+  });
+
   qEl.addEventListener("input", renderList);
+  renderViewSwitch();
   renderChips();
   renderList();
   loadStoreIcons();
