@@ -105,3 +105,5 @@ Nello stesso punto di `richieste.html` si possono cambiare i tipi di richiesta (
 ## Altri progetti
 
 La cartella [`quality/`](quality/) contiene **SICIET Quality** (controllo qualità dei componenti per JOB e TAG), un progetto separato che non compare nel portale: vedi [`quality/README.md`](quality/README.md).
+
+La cartella [`hr/`](hr/) contiene **SICIET HR** (comunicazione delle nuove assunzioni al consulente del lavoro e agli uffici interni), raggiungibile solo all'indirizzo `https://hub.siciet.it/hr` e protetta da password: vedi [`hr/README.md`](hr/README.md).
