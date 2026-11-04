@@ -42,7 +42,7 @@ var QUALITA_CONFIG = {
   ],
   // Fasi delle foto: finiscono nel nome del file. La prima è usata per la
   // foto della targhetta scattata con "Leggi TAG".
-  fasi: ["Targhetta", "Ricevimento", "Installazione", "Collaudo", "Non conformità", "Risoluzione", "Altro"],
+  fasi: ["Targhetta", "Interno", "Esterno", "Installazione", "Collaudo", "Non conformità", "Risoluzione", "Altro"],
   // Le foto vengono ridotte a questo lato massimo (pixel) e qualità JPEG.
   foto: { latoMax: 2560, qualita: 0.85 },
   // Etichetta per stampanti a nastro Brother con nastro TZe da 24 mm: l'area
