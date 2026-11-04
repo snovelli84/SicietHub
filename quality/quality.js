@@ -657,8 +657,9 @@ var QUALITA_CONFIG = {
     return out;
   }
   // info: dati per la fascia sulla foto (vedi comprimi).
-  async function accodaFoto(dir, files, nomi, info){
-    for(var i = 0; i < files.length; i++) await accoda(dir, "Foto", nomi[i], await comprimi(files[i], info));
+  // cartella: di base "Foto" della scheda; per le foto generiche del JOB "Generico".
+  async function accodaFoto(dir, files, nomi, info, cartella){
+    for(var i = 0; i < files.length; i++) await accoda(dir, cartella || "Foto", nomi[i], await comprimi(files[i], info));
   }
 
   var fotoNuovo, fotoScheda;
@@ -1234,8 +1235,9 @@ var QUALITA_CONFIG = {
     $("elenco").textContent = "";
     $("elencoVuoto").hidden = false;
     $("elencoVuoto").textContent = "Caricamento…";
+    preparaGeneriche(c, job);
     try{
-      var voci = (await B.list(percorso([c, job]))).filter(function(v){ return v.folder; });
+      var voci = (await B.list(percorso([c, job]))).filter(function(v){ return v.folder && !(job && eGenerico(v.name)); });
       if(stato.vista !== "elenco" || stato.c !== c || stato.job !== job) return;
       elencoVoci = voci.sort(function(a, b){ return a.name.localeCompare(b.name, "it", { numeric: true }); });
       disegnaElenco();
@@ -1282,6 +1284,81 @@ var QUALITA_CONFIG = {
   }
   $("filtro").addEventListener("input", disegnaElenco);
 
+  /* ---------- Foto generiche di un JOB ----------
+   * Foto non legate a un componente (es. viste d'insieme, area di lavoro),
+   * salvate in <COMMESSA>/<JOB>/Generico. Dalla pagina iniziale si sceglie il
+   * JOB; nella pagina del JOB è già scelto e sotto ci sono le foto salvate.
+   */
+  var GENERICO = "Generico", fotoGeneriche;
+  function eGenerico(nome){ return String(nome || "").toUpperCase() === GENERICO.toUpperCase(); }
+
+  function preparaGeneriche(c, job){
+    var box = $("genericheBox"), suJob = !!(c && job);
+    // Non nella pagina di una commessa (manca il JOB); in sola visualizzazione solo le foto del JOB.
+    box.hidden = !!(c && !job) || (solaLettura() && !suJob);
+    $("genericheCampi").hidden = suJob;
+    $("genericheTitolo").textContent = suJob ? "📷 Foto generiche del JOB " + job : "📷 Foto generiche di un JOB";
+    $("genericheErr").textContent = "";
+    fotoGeneriche.reset();
+    if(!suJob){
+      $("gCommessa").value = storage(function(){ return localStorage.getItem(COMMESSA_KEY); }) || "";
+      $("gJob").value = storage(function(){ return localStorage.getItem(LAST_JOB_KEY); }) || "";
+      suggerimenti($("commessaList"), "");
+      suggerimenti($("jobList"), nomeCartella($("gCommessa").value) || null);
+    }
+    var gal = $("genericheGalleria");
+    gal.textContent = "";
+    $("genericheSalvate").hidden = !suJob;
+    if(suJob) caricaGeneriche(c, job);
+  }
+
+  async function caricaGeneriche(c, job){
+    var gal = $("genericheGalleria");
+    try{
+      var foto = (await B.list(percorso([c, job, GENERICO]))).filter(function(f){ return !f.folder; });
+      if(stato.vista !== "elenco" || stato.c !== c || stato.job !== job) return;
+      gal.textContent = "";
+      foto.sort(function(a, b){ return a.name.localeCompare(b.name); }).forEach(function(f){
+        var i = leggiNomeFoto(f.name), when = fmtData(i.data || f.modified);
+        gal.appendChild(el("button", { type: "button", class: "thumb", onclick: function(){ apriFoto(f.large || f.url, f.url || f.webUrl, when + (i.operatore ? " – " + i.operatore : ""), ""); } }, [
+          f.thumb ? el("img", { src: f.thumb, alt: "Foto generica " + when, loading: "lazy" }) : el("span", { class: "when", text: f.name }),
+          el("span", { class: "when", text: when.slice(0, 10) })
+        ]));
+      });
+      if(!foto.length) gal.appendChild(el("p", { class: "empty", text: "Nessuna foto generica per questo JOB." }));
+    }catch(e){ mostraErrore(e); }
+  }
+
+  $("genericheForm").addEventListener("submit", async function(ev){
+    ev.preventDefault();
+    var suJob = !!(stato.c && stato.job), err = $("genericheErr");
+    var c = suJob ? stato.c : nomeCartella($("gCommessa").value), job = suJob ? stato.job : nomeCartella($("gJob").value);
+    if(solaLettura()) return;
+    if(!c || !job){ err.textContent = "Indica commessa SICIET e JOB."; return; }
+    if(!fotoGeneriche.sel.length){ err.textContent = "Scatta o scegli almeno una foto."; return; }
+    err.textContent = "";
+    var btn = $("genericheSalva");
+    btn.disabled = true;
+    btn.textContent = "Salvataggio…";
+    try{
+      var nomi = nomiFoto(new Date(), GENERICO, fotoGeneriche.sel.length);
+      await accodaFoto(percorso([c, job]), fotoGeneriche.sel.map(function(x){ return x.file; }), nomi,
+        { commessa: c, job: job, fase: "Foto generica" }, GENERICO);
+      storage(function(){ localStorage.setItem(COMMESSA_KEY, c); localStorage.setItem(LAST_JOB_KEY, job); });
+      fotoGeneriche.reset();
+      await mostraCoda();
+      svuotaCoda();
+      if(suJob) caricaGeneriche(c, job);
+      conferma((nomi.length === 1 ? "1 foto generica salvata" : nomi.length + " foto generiche salvate") + " nel JOB " + job + " (commessa " + c + "), cartella Generico.");
+    }catch(e){
+      err.textContent = "Non salvate: " + (e.message || e);
+    }finally{
+      btn.disabled = false;
+      fotoGeneriche.disegna(); // ripristina il testo del pulsante secondo le foto rimaste
+    }
+  });
+  $("gCommessa").addEventListener("change", function(){ suggerimenti($("jobList"), nomeCartella(this.value) || null); });
+
   /* ---------- Riepiloghi Excel ed etichette ----------
    * Il servizio aggiorna da solo i riepiloghi a ogni salvataggio. Questi
    * pulsanti (per l'ufficio) rifanno tutto da zero: riepiloghi (schede create
@@ -1298,7 +1375,7 @@ var QUALITA_CONFIG = {
       var jobs = (await B.list(commesse[i].name)).filter(function(x){ return x.folder; });
       for(var k = 0; k < jobs.length; k++){
         var tags = (await B.list(percorso([commesse[i].name, jobs[k].name]))).filter(function(x){ return x.folder; });
-        tags.forEach(function(t){ schede.push([commesse[i].name, jobs[k].name, t.name]); });
+        tags.forEach(function(t){ if(!eGenerico(t.name)) schede.push([commesse[i].name, jobs[k].name, t.name]); });
       }
     }
     return schede;
@@ -1461,6 +1538,7 @@ var QUALITA_CONFIG = {
     $("job").classList.toggle("invalid", !job);
     $("tag").classList.toggle("invalid", !tag);
     if(!commessa || !job || !tag){ err.textContent = "Indica commessa SICIET, JOB e TAG."; return; }
+    if(eGenerico(tag)){ $("tag").classList.add("invalid"); err.textContent = "Il TAG non può chiamarsi \"" + tag + "\": è il nome della cartella delle foto generiche del JOB."; return; }
     var statoScelto = valoreScelto($("statiNuovo"));
     $("statoStep").classList.toggle("invalid", !statoScelto);
     if(!statoScelto){
@@ -1828,6 +1906,9 @@ var QUALITA_CONFIG = {
 
   fotoNuovo = new PannelloFoto($("fotoNuovo"));
   fotoStato = new PannelloFoto($("fotoNota"), null, { senzaFase: true, senzaNota: true });
+  fotoGeneriche = new PannelloFoto($("fotoGeneriche"), function(n){
+    $("genericheSalva").textContent = n ? (n === 1 ? "✅ Salva 1 foto generica" : "✅ Salva " + n + " foto generiche") : "✅ Salva foto generiche";
+  }, { senzaFase: true, senzaNota: true });
   fotoScheda = new PannelloFoto($("fotoScheda"), function(n){
     $("fotoSalva").hidden = !n;
     $("fotoSalva").textContent = n === 1 ? "Salva 1 foto" : "Salva " + n + " foto";
