@@ -92,6 +92,7 @@ const MB = 1024 * 1024;
 //   scheda.json, Scheda.txt, Etichetta QR.png   nella cartella del TAG
 //   Foto/<file immagine>                        mai sovrascritte
 //   Documenti/<file>                            mai sovrascritti, niente eseguibili
+//   <COMMESSA>/<JOB>/Generico/<file immagine>   foto generiche del JOB, mai sovrascritte
 function controllaScrittura(parti, tipo, dimensione){
   const nome = parti[parti.length - 1];
   if(parti.length === 4){
@@ -103,6 +104,11 @@ function controllaScrittura(parti, tipo, dimensione){
       if(dimensione > 2 * MB) throw new Errore(413, "Etichetta troppo grande.");
       return { rename: false };
     }
+  }
+  if(parti.length === 4 && parti[2] === "Generico"){
+    if(!/^image\//.test(tipo || "") || !/\.(jpe?g|png|heic|webp)$/i.test(nome)) throw new Errore(415, "Nella cartella Generico si possono caricare solo immagini.");
+    if(dimensione > 25 * MB) throw new Errore(413, "Foto troppo grande (massimo 25 MB).");
+    return { rename: true };
   }
   if(parti.length === 5 && parti[3] === "Foto"){
     if(!/^image\//.test(tipo || "") || !/\.(jpe?g|png|heic|webp)$/i.test(nome)) throw new Errore(415, "Nella cartella Foto si possono caricare solo immagini.");
