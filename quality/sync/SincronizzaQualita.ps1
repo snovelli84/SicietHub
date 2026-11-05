@@ -6,9 +6,11 @@
   unico (Teams → server). Si avvia ogni 15 minuti dall'Utilità di
   pianificazione (vedi Installa.ps1 e README.md).
 
-  Dove finiscono i file: la commessa dell'app (es. S1852V02) indica la
-  cartella di commessa sul server:
-    <BaseCommesse>\1852 …\V02-…\Qualità Componenti APP\<JOB>\<TAG>\…
+  Dove finiscono i file: la commessa dell'app (es. S1852V31) indica la
+  cartella di commessa sul server, che corrisponde già al JOB (la cartella
+  del JOB di Teams non si ripete):
+    <BaseCommesse>\1852 …\V31-…\Qualità Componenti APP\<TAG>\…
+    <BaseCommesse>\1852 …\V31-…\Qualità Componenti APP\Generico\…
   (cartella che inizia con il numero 1852, poi sotto-cartella che inizia con
   V02). Le eccezioni si scrivono in mappa-commesse.csv.
 
@@ -39,6 +41,8 @@ param(
   # Dove vanno sul server.
   [string]$BaseCommesse = "D:\Siciet\SICIET Commesse",
   [string]$Sottocartella = "Qualità Componenti APP",
+  # $true: sul server non si crea la cartella del JOB (la cartella di commessa è già quella del JOB).
+  [bool]$SaltaCartellaJob = $true,
   [string]$FileMappa = "",
 
   # Stato della sincronizzazione e registri.
@@ -194,13 +198,16 @@ function Cartella-Commessa([string]$commessa){
 }
 
 # Percorso sul server di un file, dal percorso relativo su SharePoint
-# ("S1852V02/1104043/P-1/Foto/x.jpg"); $null se la commessa non ha cartella.
+# ("S1852V31/1105618/P-1/Foto/x.jpg" → "…\Qualità Componenti APP\P-1\Foto\x.jpg");
+# $null se la commessa non ha cartella.
 function Percorso-Locale([string]$rel){
   $parti = $rel.Split("/")
   if($parti.Count -lt 2){ return $null }
   $dir = Cartella-Commessa $parti[0]
   if(-not $dir){ return $null }
-  $resto = $parti[1..($parti.Count - 1)]
+  $da = 1
+  if($SaltaCartellaJob -and $parti.Count -ge 3){ $da = 2 }   # salta la cartella del JOB
+  $resto = $parti[$da..($parti.Count - 1)]
   return [IO.Path]::Combine([string[]](@($dir) + $resto))
 }
 
