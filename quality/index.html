@@ -206,6 +206,7 @@ input:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:1px}
 .qr-bar{background:var(--warn-bg);color:var(--warn);font-weight:600}
 .sola-lettura .modifica-solo,.sola-lettura #riepiloghi,.sola-lettura #modificaForm{display:none!important}
 .schede-box{display:grid;gap:8px}
+input[readonly].auto{background:var(--chip);border-style:dashed;color:var(--text)}
 .generiche summary{cursor:pointer;font-weight:600;font-size:16px;padding:4px 0}
 .generiche-body{display:grid;gap:14px;margin-top:12px}
 .schede-box h3{font-size:15px}
@@ -424,14 +425,15 @@ footer{text-align:center;padding:24px 16px 88px;color:var(--muted);font-size:12p
           <p class="hint">Foto non legate a un componente (es. viste d'insieme, area di lavoro): vanno nella cartella "Generico" del JOB.</p>
           <div class="row" id="genericheCampi">
             <div class="field">
-              <label for="gCommessa">Commessa SICIET</label>
-              <input type="text" id="gCommessa" list="commessaList" autocomplete="off" autocapitalize="characters">
-            </div>
-            <div class="field">
               <label for="gJob">JOB</label>
               <input type="text" id="gJob" list="jobList" autocomplete="off" autocapitalize="characters">
             </div>
+            <div class="field">
+              <label for="gCommessa">Commessa SICIET</label>
+              <input type="text" id="gCommessa" list="commessaList" autocomplete="off" autocapitalize="characters">
+            </div>
           </div>
+          <span class="hint" id="gCommessaHint"></span>
           <div class="add-foto" id="fotoGeneriche"></div>
           <p class="msg error" id="genericheErr" role="alert"></p>
           <button class="btn primary block conferma-btn" type="submit" id="genericheSalva">✅ Salva foto generiche</button>
@@ -456,17 +458,17 @@ footer{text-align:center;padding:24px 16px 88px;color:var(--muted);font-size:12p
     <form id="nuovoForm" novalidate>
       <div class="row">
       <div class="field">
+        <label for="job">JOB</label>
+        <input type="text" class="big" id="job" list="jobList" autocomplete="off" autocapitalize="characters" inputmode="text" required>
+        <datalist id="jobList"></datalist>
+      </div>
+      <div class="field">
         <label for="commessa">Commessa SICIET</label>
         <input type="text" class="big" id="commessa" list="commessaList" autocomplete="off" autocapitalize="characters" required>
         <datalist id="commessaList"></datalist>
       </div>
-      <div class="field">
-        <label for="job">JOB</label>
-        <input type="text" class="big" id="job" list="jobList" autocomplete="off" autocapitalize="characters" required>
-        <datalist id="jobList"></datalist>
       </div>
-      </div>
-      <span class="hint" style="margin-top:-10px">Commessa e JOB restano memorizzati per i componenti successivi.</span>
+      <span class="hint" id="commessaHint" style="margin-top:-10px">Scrivi il JOB: la Commessa SICIET si compila da sola. Il JOB resta memorizzato per i componenti successivi.</span>
       <fieldset class="step">
         <legend>1. Foto della targhetta</legend>
         <p class="hint">Fotografa la targhetta del componente: il TAG viene letto in automatico e la foto viene salvata nella scheda.</p>
@@ -592,7 +594,7 @@ footer{text-align:center;padding:24px 16px 88px;color:var(--muted);font-size:12p
   </section>
 </main>
 
-<footer>SICIET Quality · versione 24</footer>
+<footer>SICIET Quality · versione 25</footer>
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
@@ -644,6 +646,7 @@ footer{text-align:center;padding:24px 16px 88px;color:var(--muted);font-size:12p
 
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
 <!-- Aumentare ?v= a ogni modifica di quality.js, altrimenti i telefoni usano la versione in cache. -->
-<script src="quality.js?v=24"></script>
+<script src="commesse.js?v=1"></script>
+<script src="quality.js?v=25"></script>
 </body>
 </html>
