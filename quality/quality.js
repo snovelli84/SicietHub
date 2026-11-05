@@ -1302,9 +1302,11 @@ var QUALITA_CONFIG = {
     fotoGeneriche.reset();
     if(!suJob){
       $("gCommessa").value = storage(function(){ return localStorage.getItem(COMMESSA_KEY); }) || "";
+      $("gCommessa").dataset.auto = "1";
       $("gJob").value = storage(function(){ return localStorage.getItem(LAST_JOB_KEY); }) || "";
+      aggiornaCommessaGeneriche();
       suggerimenti($("commessaList"), "");
-      suggerimenti($("jobList"), nomeCartella($("gCommessa").value) || null);
+      suggerimentiJob();
     }
     var gal = $("genericheGalleria");
     gal.textContent = "";
@@ -1334,7 +1336,12 @@ var QUALITA_CONFIG = {
     var suJob = !!(stato.c && stato.job), err = $("genericheErr");
     var c = suJob ? stato.c : nomeCartella($("gCommessa").value), job = suJob ? stato.job : nomeCartella($("gJob").value);
     if(solaLettura()) return;
-    if(!c || !job){ err.textContent = "Indica commessa SICIET e JOB."; return; }
+    if(!job){ err.textContent = "Indica il JOB."; return; }
+    if(!suJob){
+      if(commessaDelJob(job)) c = commessaDelJob(job);
+      var erroreC = controllaCommessa(c);
+      if(erroreC){ err.textContent = erroreC; return; }
+    }
     if(!fotoGeneriche.sel.length){ err.textContent = "Scatta o scegli almeno una foto."; return; }
     err.textContent = "";
     var btn = $("genericheSalva");
@@ -1357,7 +1364,7 @@ var QUALITA_CONFIG = {
       fotoGeneriche.disegna(); // ripristina il testo del pulsante secondo le foto rimaste
     }
   });
-  $("gCommessa").addEventListener("change", function(){ suggerimenti($("jobList"), nomeCartella(this.value) || null); });
+
 
   /* ---------- Riepiloghi Excel ed etichette ----------
    * Il servizio aggiorna da solo i riepiloghi a ogni salvataggio. Questi
@@ -1420,6 +1427,58 @@ var QUALITA_CONFIG = {
     }
   });
 
+  /* ---------- JOB → Commessa SICIET ----------
+   * In cantiere si scrive il JOB; la commessa viene dalla tabella in
+   * commesse.js. Se il JOB non c'è, la commessa si scrive a mano nel formato
+   * S1852V31 (serve alla copia sul server per trovare la cartella).
+   */
+  var TABELLA_JOB = {};
+  Object.keys(window.QUALITA_JOB || {}).forEach(function(j){ TABELLA_JOB[nomeCartella(j)] = nomeCartella(QUALITA_JOB[j]); });
+  var FORMATO_COMMESSA = /^S\d{3,5}(V\d{1,3})?$/;
+  function commessaDelJob(job){ return TABELLA_JOB[nomeCartella(job)] || ""; }
+
+  // Collega un campo JOB al suo campo commessa: compila, blocca o sblocca.
+  function collegaJob(jobInput, commessaInput, hint){
+    function aggiorna(){
+      var job = nomeCartella(jobInput.value), c = commessaDelJob(job);
+      if(c){
+        commessaInput.value = c;
+        commessaInput.readOnly = true;
+        commessaInput.classList.add("auto");
+        commessaInput.dataset.auto = "1";
+        commessaInput.classList.remove("invalid");
+        hint.textContent = "🔒 Commessa SICIET del JOB " + job + " (dalla tabella dei JOB).";
+      }else{
+        if(commessaInput.dataset.auto === "1") commessaInput.value = "";
+        commessaInput.readOnly = false;
+        commessaInput.classList.remove("auto");
+        commessaInput.dataset.auto = "";
+        hint.textContent = job
+          ? "JOB " + job + " non in tabella: scrivi la Commessa SICIET (es. S1852V31) e comunica l'abbinamento all'ufficio."
+          : "Scrivi il JOB: la Commessa SICIET si compila da sola.";
+      }
+    }
+    jobInput.addEventListener("input", aggiorna);
+    jobInput.addEventListener("change", aggiorna);
+    return aggiorna;
+  }
+  var aggiornaCommessaNuovo = collegaJob($("job"), $("commessa"), $("commessaHint"));
+  var aggiornaCommessaGeneriche = collegaJob($("gJob"), $("gCommessa"), $("gCommessaHint"));
+
+  // Suggerimenti per il campo JOB: i JOB della tabella, con la loro commessa.
+  function suggerimentiJob(){
+    var dl = $("jobList");
+    dl.textContent = "";
+    Object.keys(TABELLA_JOB).sort().forEach(function(j){ dl.appendChild(el("option", { value: j, label: j + " – " + TABELLA_JOB[j] })); });
+  }
+
+  // Commessa SICIET valida (formato) o messaggio d'errore.
+  function controllaCommessa(c){
+    if(!c) return "Indica la Commessa SICIET.";
+    if(!FORMATO_COMMESSA.test(c)) return "La Commessa SICIET va scritta come S1852V31 (S, numero, V e variante).";
+    return "";
+  }
+
   /* ---------- Nuova scheda ---------- */
 
   function campiForm(contenitore, prefisso, valori){
@@ -1464,10 +1523,13 @@ var QUALITA_CONFIG = {
       c || storage(function(){ return localStorage.getItem(COMMESSA_KEY); }) || "",
       job || (c ? "" : storage(function(){ return localStorage.getItem(LAST_JOB_KEY); })) || ""
     );
-    if(!$("commessa").value) $("commessa").focus();
-    else if(!$("job").value) $("job").focus();
+    // La commessa memorizzata vale solo se il JOB non è in tabella; quella dell'indirizzo resta.
+    $("commessa").dataset.auto = c ? "" : "1";
+    aggiornaCommessaNuovo();
+    if(!$("job").value) $("job").focus();
+    else if(!$("commessa").value) $("commessa").focus();
     suggerimenti($("commessaList"), "");
-    suggerimenti($("jobList"), nomeCartella($("commessa").value));
+    suggerimentiJob();
   }
 
   // Suggerimenti per i campi commessa e JOB: le cartelle già presenti.
@@ -1478,10 +1540,7 @@ var QUALITA_CONFIG = {
       v.filter(function(x){ return x.folder; }).forEach(function(x){ dl.appendChild(el("option", { value: x.name })); });
     }).catch(function(){});
   }
-  $("commessa").addEventListener("change", function(){
-    var c = nomeCartella(this.value);
-    suggerimenti($("jobList"), c || null);
-  });
+
 
   // Svuota il modulo per un nuovo componente, tenendo commessa SICIET e JOB.
   function pulisciNuovo(c, job){
@@ -1534,10 +1593,14 @@ var QUALITA_CONFIG = {
     var commessa = nomeCartella($("commessa").value), job = nomeCartella($("job").value), tag = nomeCartella($("tag").value), err = $("nuovoErr");
     var dopo = stato.dopo || "prossimo";
     stato.dopo = null;
-    $("commessa").classList.toggle("invalid", !commessa);
     $("job").classList.toggle("invalid", !job);
     $("tag").classList.toggle("invalid", !tag);
-    if(!commessa || !job || !tag){ err.textContent = "Indica commessa SICIET, JOB e TAG."; return; }
+    if(!job){ err.textContent = "Indica il JOB."; $("job").focus(); return; }
+    if(commessaDelJob(job)) commessa = commessaDelJob(job);
+    var erroreCommessa = controllaCommessa(commessa);
+    $("commessa").classList.toggle("invalid", !!erroreCommessa);
+    if(erroreCommessa){ err.textContent = erroreCommessa; $("commessa").focus(); return; }
+    if(!tag){ err.textContent = "Indica il TAG."; return; }
     if(eGenerico(tag)){ $("tag").classList.add("invalid"); err.textContent = "Il TAG non può chiamarsi \"" + tag + "\": è il nome della cartella delle foto generiche del JOB."; return; }
     var statoScelto = valoreScelto($("statiNuovo"));
     $("statoStep").classList.toggle("invalid", !statoScelto);
@@ -1598,6 +1661,7 @@ var QUALITA_CONFIG = {
         vai(qs(commessa, job, tag));
       }else{
         pulisciNuovo(commessa, job);
+        aggiornaCommessaNuovo();
         mostraInseriti();
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
