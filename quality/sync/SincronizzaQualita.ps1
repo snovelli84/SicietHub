@@ -7,10 +7,10 @@
   pianificazione (vedi Installa.ps1 e README.md).
 
   Dove finiscono i file: la commessa dell'app (es. S1852V31) indica la
-  cartella di commessa sul server, che corrisponde già al JOB (la cartella
-  del JOB di Teams non si ripete):
-    <BaseCommesse>\1852 …\V31-…\Qualità Componenti APP\<TAG>\…
-    <BaseCommesse>\1852 …\V31-…\Qualità Componenti APP\Generico\…
+  cartella di commessa sul server; dentro, una cartella per JOB (una
+  commessa può avere più JOB) e una per TAG:
+    <BaseCommesse>\1852 …\V31-…\Qualità Componenti APP\<JOB>\<TAG>\…
+    <BaseCommesse>\1852 …\V31-…\Qualità Componenti APP\<JOB>\Generico\…
   (cartella che inizia con il numero 1852, poi sotto-cartella che inizia con
   V02). Le eccezioni si scrivono in mappa-commesse.csv.
 
@@ -41,8 +41,8 @@ param(
   # Dove vanno sul server.
   [string]$BaseCommesse = "D:\Siciet\SICIET Commesse",
   [string]$Sottocartella = "Qualità Componenti APP",
-  # $true: sul server non si crea la cartella del JOB (la cartella di commessa è già quella del JOB).
-  [bool]$SaltaCartellaJob = $true,
+  # $true: sul server non si crea la cartella del JOB (solo se ogni commessa ha un solo JOB).
+  [bool]$SaltaCartellaJob = $false,
   [string]$FileMappa = "",
 
   # Stato della sincronizzazione e registri.
@@ -198,7 +198,7 @@ function Cartella-Commessa([string]$commessa){
 }
 
 # Percorso sul server di un file, dal percorso relativo su SharePoint
-# ("S1852V31/1105618/P-1/Foto/x.jpg" → "…\Qualità Componenti APP\P-1\Foto\x.jpg");
+# ("S1852V31/1105618/P-101A/Foto/x.jpg" → "…\Qualità Componenti APP\1105618\P-101A\Foto\x.jpg");
 # $null se la commessa non ha cartella.
 function Percorso-Locale([string]$rel){
   $parti = $rel.Split("/")
