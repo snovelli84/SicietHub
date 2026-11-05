@@ -102,3 +102,23 @@ Nella stessa configurazione si cambiano i dati aggiuntivi (`campi`), gli stati (
 **Aggiornamenti** – A ogni modifica di `quality.js` aumentare il numero in `quality.js?v=…` in fondo a `index.html`: altrimenti i telefoni possono continuare a usare per qualche tempo lo script vecchio insieme alla pagina nuova, con errori come "null is not an object".
 
 **Logo e icone** – In [`icons/`](icons/): marchio SICIET con la scritta QUALITY (font Orbitron, gradiente blu → verde come in SICIET HUB). `logo.png` è usato nell'intestazione, le altre sono le icone per la schermata Home e il browser.
+
+## Copia sul server dei file (sincronizzazione Teams → server)
+
+La cartella [`sync/`](sync/) contiene lo script che copia sul server dei file (Windows Server 2016) quello che l'app salva su Teams, **a senso unico** (Teams → server), ogni 15 minuti.
+
+**Dove finiscono i file** – La commessa dell'app indica la cartella di commessa sul server: `S1852V02` → in `D:\Siciet\SICIET Commesse` la cartella che inizia con **1852**, al suo interno quella che inizia con **V02**, e lì la sottocartella **Qualità Componenti APP** con la stessa struttura di Teams (`<JOB>\<TAG>\Foto`, `Documenti`, `Generico`, `Scheda.txt`, etichette, riepiloghi Excel del JOB e della commessa). Una commessa senza Vxx (es. `S1852`) va nella cartella principale della commessa. Se una cartella non si trova da sola (nessuna o più di una), si aggiunge una riga in `mappa-commesse.csv` (`Commessa;Cartella`); finché non c'è, i file di quella commessa restano in attesa e il registro lo segnala. Non vengono copiati il riepilogo di tutte le commesse né la cartella dei dati (JSON).
+
+**Modifiche e cancellazioni** – File nuovi e modificati vengono copiati o aggiornati (con la data di modifica di Teams); file spostati o rinominati su Teams vengono spostati anche sul server. I file **cancellati su Teams non vengono cancellati sul server**: vengono rinominati `CANCELLED_<nome>` (anche quelli di una cartella cancellata); se vengono ripristinati dal cestino di Teams riprendono il nome originale. Lo script legge da SharePoint solo le modifiche dall'ultimo giro (Microsoft Graph "delta"), quindi resta leggero anche con molti file.
+
+**Installazione** (una volta)
+
+1. **Entra ID → Registrazioni app → Nuova registrazione**: nome `SICIET Quality Sync`, solo questa directory, nessun URI di reindirizzamento. Poi:
+   - *Autorizzazioni API* → Microsoft Graph → **Autorizzazioni applicazione** → `Sites.Selected` → **Concedi consenso amministratore**;
+   - *Certificati e segreti* → **Nuovo segreto client** (24 mesi) → copiare il **Valore**;
+   - da [Graph Explorer](https://developer.microsoft.com/graph/graph-explorer), come per l'app SICIET Quality, accesso in **sola lettura** al sito: `POST https://graph.microsoft.com/v1.0/sites/srlsiciet.sharepoint.com,e1580ad5-aeb3-432a-8011-d0baf026f9d3,c3e8db60-972e-4363-90bb-2a9b77a5bd53/permissions` con corpo `{"roles":["read"],"grantedToIdentities":[{"application":{"id":"<ID applicazione di SICIET Quality Sync>","displayName":"SICIET Quality Sync"}}]}` (risposta 201).
+2. Sul server dei file copiare la cartella `sync` (es. sul desktop), aprire **PowerShell come amministratore** in quella cartella ed eseguire `powershell -ExecutionPolicy Bypass -File .\Installa.ps1`: chiede ID applicazione e segreto, salva il segreto cifrato in `C:\SicietQualitySync\segreto.dat` (leggibile solo da quel computer, file accessibile solo a SYSTEM e Amministratori) e crea l'attività pianificata **SICIET Quality - sincronizzazione Teams** (ogni 15 minuti, come SYSTEM, senza utenti collegati).
+3. Registro in `C:\SicietQualitySync\log\sincronizzazione-AAAA-MM.log` (una riga per giro, più file annullati, commesse senza cartella ed errori). Le eccezioni si scrivono in `C:\SicietQualitySync\mappa-commesse.csv`.
+
+Alla scadenza del segreto se ne crea uno nuovo in Entra e si riesegue `Installa.ps1`. Lo stato (ultimo punto letto e file già copiati) è in `C:\SicietQualitySync\stato.json`: cancellandolo, il giro successivo ricontrolla tutto (senza ricopiare i file già presenti e invariati).
+

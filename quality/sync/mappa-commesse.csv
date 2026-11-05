@@ -1,0 +1,4 @@
+﻿Commessa;Cartella
+# Eccezioni: commesse dell'app la cui cartella sul server non si trova da sola (numero + Vxx).
+# Cartella: percorso completo, oppure relativo a D:\Siciet\SICIET Commesse. Le righe che iniziano con # sono ignorate.
+# S1852V99;1852 NP BH LAVORI MASSA\V99-NOME CARTELLA
