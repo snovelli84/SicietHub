@@ -123,24 +123,51 @@ $script:token = $null
 $script:scade = Get-Date
 function Token {
   if($script:token -and (Get-Date) -lt $script:scade){ return $script:token }
-  $r = Invoke-RestMethod -Method Post -Uri "$LoginBase/$TenantId/oauth2/v2.0/token" -Body @{
-    client_id = $ClientId; client_secret = (Segreto); scope = "https://graph.microsoft.com/.default"; grant_type = "client_credentials"
+  try{
+    $r = Invoke-RestMethod -Method Post -Uri "$LoginBase/$TenantId/oauth2/v2.0/token" -Body @{
+      client_id = $ClientId; client_secret = (Segreto); scope = "https://graph.microsoft.com/.default"; grant_type = "client_credentials"
+    }
+  }catch{
+    # Es. AADSTS7000215 = segreto client sbagliato, AADSTS7000222 = segreto scaduto: rieseguire Installa.ps1.
+    $motivo = $_.Exception.Message
+    if($_.ErrorDetails -and $_.ErrorDetails.Message){
+      try{ $motivo = ($_.ErrorDetails.Message | ConvertFrom-Json).error_description }catch{ $motivo = $_.ErrorDetails.Message }
+    }
+    throw ("Accesso a Microsoft non riuscito (controllare ID applicazione e segreto, rieseguendo Installa.ps1): " + $motivo)
   }
   $script:token = $r.access_token
   $script:scade = (Get-Date).AddSeconds([int]$r.expires_in - 120)
   return $script:token
 }
+# Autorizzazioni (roles) contenute nell'accesso: per capire gli errori 401/403.
+function Ruoli-Token {
+  try{
+    $p = $script:token.Split(".")[1].Replace("-", "+").Replace("_", "/")
+    while($p.Length % 4){ $p += "=" }
+    $d = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($p)) | ConvertFrom-Json
+    $r = @($d.roles) -join ", "
+    if(-not $r){ $r = "nessuna" }
+    return $r + " (app " + $d.appid + ", tenant " + $d.tid + ")"
+  }catch{ return "non leggibili" }
+}
 function Graph([string]$url){
   if(-not $url.StartsWith("http")){ $url = $GraphBase + $url }
   for($t = 1; ; $t++){
+    $accesso = Token   # fuori dal try: un errore di accesso non va scambiato per un errore di SharePoint
     try{
-      return Invoke-RestMethod -Method Get -Uri $url -Headers @{ Authorization = "Bearer " + (Token) }
+      return Invoke-RestMethod -Method Get -Uri $url -Headers @{ Authorization = "Bearer " + $accesso }
     }catch{
       $codice = 0
       if($_.Exception.Response){ $codice = [int]$_.Exception.Response.StatusCode }
       # Troppe richieste o servizio occupato: si riprova con attese crescenti.
       if(($codice -eq 429 -or $codice -ge 500) -and $t -lt 5){ Start-Sleep -Seconds (5 * $t); continue }
-      $e = New-Object Exception("Graph $codice su $url : " + $_.Exception.Message)
+      # Motivo dato da Microsoft (corpo della risposta) e, per 401/403, le autorizzazioni dell'accesso.
+      $motivo = ""
+      if($_.ErrorDetails -and $_.ErrorDetails.Message){
+        try{ $motivo = " – " + (($_.ErrorDetails.Message | ConvertFrom-Json).error.message) }catch{ $motivo = " – " + $_.ErrorDetails.Message }
+      }
+      if($codice -eq 401 -or $codice -eq 403){ $motivo += " – autorizzazioni dell'accesso: " + (Ruoli-Token) }
+      $e = New-Object Exception("Graph $codice su $url : " + $_.Exception.Message + $motivo)
       $e.Data["codice"] = $codice
       throw $e
     }
