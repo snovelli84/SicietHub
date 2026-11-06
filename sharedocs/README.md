@@ -1,12 +1,13 @@
 # SICIET ShareDocs
 
-**SICIET ShareDocs** è il sistema di gestione dei transmittal e del ciclo di revisione documentale con i clienti: registro documenti (VDRL), transmittal con file allegati, codici di ritorno e commenti del cliente, portale per il cliente. È un progetto separato da SICIET HUB, pubblicato all'indirizzo **`https://hub.siciet.it/sharedoc/`** (cartella [`sharedoc/`](.) di questa repository), e non compare nel portale.
+**SICIET ShareDocs** è il sistema di gestione dei transmittal e del ciclo di revisione documentale con i clienti: registro documenti (VDRL), transmittal con file allegati, codici di ritorno e commenti del cliente, portale per il cliente. È un progetto separato da SICIET HUB, pubblicato all'indirizzo **`https://hub.siciet.it/sharedocs/`** (cartella [`sharedocs/`](.) di questa repository), e non compare nel portale.
 
 | File | Cosa contiene |
 |---|---|
-| [`index.html`](index.html), [`sharedoc.js`](sharedoc.js) | l'app: accesso Microsoft, registro, transmittal, commenti, portale cliente |
+| [`index.html`](index.html), [`sharedocs.js`](sharedocs.js) | l'app: accesso Microsoft, registro, transmittal, commenti, portale cliente |
 | [`api/worker.js`](api/worker.js) | il servizio su Cloudflare che legge e scrive su SharePoint (sezione 7) |
-| [`test/index.html`](test/index.html) | la pagina di test della connessione a Microsoft 365 (`https://hub.siciet.it/sharedoc/test/`) |
+| `../sharedoc/` | rimando automatico dal vecchio indirizzo `https://hub.siciet.it/sharedoc/` al nuovo |
+| [`test/index.html`](test/index.html) | la pagina di test della connessione a Microsoft 365 (`https://hub.siciet.it/sharedocs/test/`) |
 
 ## Uso dell'app
 
@@ -26,7 +27,7 @@
 ## Configurazione di Entra ID e Microsoft Graph
 
 Questa guida prepara il collegamento di ShareDocs a Microsoft 365, sullo stesso schema di SICIET Quality.
-Alla fine la pagina `https://hub.siciet.it/sharedoc/test/` (**test di connessione**, file [`test/index.html`](test/index.html)) verifica sul tenant SICIET che:
+Alla fine la pagina `https://hub.siciet.it/sharedocs/test/` (**test di connessione**, file [`test/index.html`](test/index.html)) verifica sul tenant SICIET che:
 
 - l'accesso con l'account aziendale funzioni e l'utente abbia un **ruolo** ShareDocs;
 - l'app raggiunga la cartella SharePoint dei transmittal;
@@ -58,14 +59,14 @@ Portale: <https://entra.microsoft.com> → **Identità → Applicazioni → Regi
 |---|---|
 | Nome | `SICIET ShareDocs` |
 | Tipi di account supportati | **Solo gli account in questa directory organizzativa** (tenant singolo). Gli ospiti del cliente, una volta invitati, fanno parte della directory e possono accedere lo stesso. |
-| URI di reindirizzamento | Piattaforma **Applicazione a pagina singola (SPA)** → `https://hub.siciet.it/sharedoc/` |
+| URI di reindirizzamento | Piattaforma **Applicazione a pagina singola (SPA)** → `https://hub.siciet.it/sharedocs/` |
 
 Consiglio una registrazione **separata da SICIET Quality**: permessi, utenti assegnati e ospiti restano distinti e il cliente non vede mai Quality.
 
 Dopo la creazione:
 
 1. **Panoramica** → copia *ID applicazione (client)* e *ID directory (tenant)*.
-2. **Autenticazione** → gli URI SPA devono essere esattamente `https://hub.siciet.it/sharedoc/` (l'app) e `https://hub.siciet.it/sharedoc/test/` (la pagina di test), barra finale compresa (la pagina torna sempre a quell'indirizzo, anche se aperta come `.../index.html`). Per provare in locale si può aggiungere `http://localhost:8080/`.
+2. **Autenticazione** → gli URI SPA devono essere esattamente `https://hub.siciet.it/sharedocs/` (l'app) e `https://hub.siciet.it/sharedocs/test/` (la pagina di test), barra finale compresa (la pagina torna sempre a quell'indirizzo, anche se aperta come `.../index.html`). Per provare in locale si può aggiungere `http://localhost:8080/`.
    Non serve nessun *segreto client*: l'app è una SPA con accesso PKCE, come Quality. Non crearne.
 3. **Autorizzazioni API → Aggiungi autorizzazione → Microsoft Graph → Autorizzazioni delegate**:
    - `User.Read` (di solito già presente)
@@ -103,8 +104,8 @@ Dopo la creazione:
    };
    ```
    Con il solo `clientId` si provano già accesso e ruoli; il test dei file parte quando c'è anche `cartella`.
-   Salva su GitHub: dopo un minuto circa la pagina è aggiornata su `https://hub.siciet.it/sharedoc/`.
-2. Apri `https://hub.siciet.it/sharedoc/` → **Accedi con Microsoft**. In alto compare il ruolo assegnato (Document Controller, Tecnico SICIET o Cliente).
+   Salva su GitHub: dopo un minuto circa la pagina è aggiornata su `https://hub.siciet.it/sharedocs/`.
+2. Apri `https://hub.siciet.it/sharedocs/` → **Accedi con Microsoft**. In alto compare il ruolo assegnato (Document Controller, Tecnico SICIET o Cliente).
 3. **Avvia il test**. I passi diventano verdi uno alla volta:
    1. Profilo utente
    2. Ruolo nell'app ShareDocs
@@ -121,7 +122,7 @@ Dopo la creazione:
 
 | Messaggio | Causa e soluzione |
 |---|---|
-| `AADSTS50011` (redirect URI mismatch) | `https://hub.siciet.it/sharedoc/` non è tra gli URI SPA del punto 2.2. Aggiungilo identico, barra finale compresa. |
+| `AADSTS50011` (redirect URI mismatch) | `https://hub.siciet.it/sharedocs/` non è tra gli URI SPA del punto 2.2. Aggiungilo identico, barra finale compresa. |
 | "Nessun ruolo ShareDocs assegnato" | Assegna un ruolo all'utente o al suo gruppo (punto 2.5), poi **Esci** e rientra. |
 | `AADSTS65001` / richiesta di consenso | Manca il consenso amministratore: punto 2.3. |
 | `AADSTS50105` | È attiva l'assegnazione obbligatoria e l'utente non è nel gruppo: punto 2.4. |
@@ -192,7 +193,7 @@ Il codice è in [`api/worker.js`](api/worker.js): verifica l'utente (token Entra
    Poi `https://<indirizzo del worker>/api/ping?sharepoint=1`: deve rispondere `"sharepoint":"ok"` con l'indirizzo della raccolta Documenti di SICIET Docs. Altrimenti il messaggio dice cosa manca (segreto errato, permesso dell'app, sito).
 4. Mandami l'indirizzo del worker (es. `https://siciet-sharedocs.<account>.workers.dev`): va nella configurazione della pagina.
 
-Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo, aumentando `VERSIONE_SERVIZIO` (e `SERVIZIO_ATTESO` in `sharedoc.js`). In fondo alla pagina compare la versione del servizio in uso: se è più vecchia di quella attesa compare un avviso rosso.
+Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo, aumentando `VERSIONE_SERVIZIO` (e `SERVIZIO_ATTESO` in `sharedocs.js`). In fondo alla pagina compare la versione del servizio in uso: se è più vecchia di quella attesa compare un avviso rosso.
 
 ### 7.3 Cosa crea su SharePoint
 
@@ -226,7 +227,7 @@ Il test di questa pagina usa invece le autorizzazioni **delegate** (`Files.ReadW
 
 ## Versione delle pagine
 
-**App** (`index.html` + `sharedoc.js`): versione 10 del 06/11/2026 (eliminazione dei transmittal emessi per prova; servizio v10; v9: importazione dell'archivio; v8: più file per documento con il nome originale; v7: pagina Commenti con una scheda per ogni risposta del cliente; v6: in fondo alla pagina la versione del servizio, con avviso se su Cloudflare è vecchio; v5: allegati del cliente nella risposta; v4: controllo dei file scaricati; v3: anteprima dei PDF dentro ShareDocs; v2: pulsante *Aggiorna Excel*; v1: prima versione collegata al servizio). A ogni modifica di `sharedoc.js` aumentare `VERSIONE`, il numero in `sharedoc.js?v=` e il footer di `index.html`.
+**App** (`index.html` + `sharedocs.js`): versione 11 del 06/11/2026 (nuovo indirizzo https://hub.siciet.it/sharedocs/; v10: eliminazione dei transmittal emessi per prova; servizio v10; v9: importazione dell'archivio; v8: più file per documento con il nome originale; v7: pagina Commenti con una scheda per ogni risposta del cliente; v6: in fondo alla pagina la versione del servizio, con avviso se su Cloudflare è vecchio; v5: allegati del cliente nella risposta; v4: controllo dei file scaricati; v3: anteprima dei PDF dentro ShareDocs; v2: pulsante *Aggiorna Excel*; v1: prima versione collegata al servizio). A ogni modifica di `sharedocs.js` aumentare `VERSIONE`, il numero in `sharedocs.js?v=` e il footer di `index.html`.
 
 **Pagina di test** (`test/index.html`):
 

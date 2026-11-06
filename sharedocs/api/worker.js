@@ -1,7 +1,7 @@
 /*
  * SICIET SHAREDOCS – SERVIZIO PER SHAREPOINT
  * -------------------------------------------
- * La pagina (hub.siciet.it/sharedoc/) fa accedere l'utente con Entra ID e
+ * La pagina (hub.siciet.it/sharedocs/) fa accedere l'utente con Entra ID e
  * manda a questo servizio il suo token. Il servizio:
  *   1. verifica il token (firma Microsoft, tenant SICIET, destinatario = app
  *      "SICIET ShareDocs") e legge i ruoli app: DocControl, Engineer, Client;
@@ -24,7 +24,7 @@
  *   ORIGIN         sito autorizzato a chiamare il servizio, es. https://hub.siciet.it
  *   FOLDER_DATI    (facoltativo) cartella dei dati nella raccolta Documenti;
  *                  di base "ShareDocs - dati (non modificare)"
- *   APP_URL        (facoltativo) indirizzo della pagina, di base ORIGIN + "/sharedoc/"
+ *   APP_URL        (facoltativo) indirizzo della pagina, di base ORIGIN + "/sharedocs/"
  *
  * Struttura su SharePoint (raccolta Documenti del sito):
  *   <cartella commessa>/Transmittals/<n. transmittal>/<file con nome standard>
