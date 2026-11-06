@@ -17,7 +17,7 @@ var SHAREDOCS_CONFIG = {
   api: "https://siciet-sharedocs.amministrazione-c44.workers.dev/api",   // servizio su Cloudflare
   scope: "api://9e9b873b-2e7c-4011-aebd-7470627d55ec/access_as_user"
 };
-const VERSIONE = 2;
+const VERSIONE = 3;
 const LOGO_URL = new URL("icons/siciet-mark.png", location.href).href;
 
 /* ---------- Lingua dell'interfaccia (per utente) ----------
@@ -67,7 +67,7 @@ const DEFAULT_CFG = {project:"",projectName:"",customer:"",endClient:"",client:"
 /* Intestazione societaria, come nei transmittal SICIET in uso */
 const COMPANY = {name:"S.I.C.I.E.T. s.r.l.",addr:"Via Puglia 6, Fraz. Albinia – 58015 Orbetello (GR) – Italy",ids:"VAT IT01164350538 · Tel. +39 0564 870512 · www.siciet.it · info@siciet.it"};
 const TABS = [["cruscotto","Cruscotto","Dashboard"],["documenti","Registro documenti","Document register"],["transmittal","Transmittal","Transmittals"],["commenti","Commenti","Comments"]];
-const FORM_DRAWERS = ["newTr","newDoc","import","newCmt","settings","newCommessa"];
+const FORM_DRAWERS = ["newTr","newDoc","import","newCmt","settings","newCommessa","pdf"];
 
 /* ---------- Stato ---------- */
 const S = {docs:[],trs:[],cmts:[],cfg:{...DEFAULT_CFG},screen:"avvio",errore:"",me:null,commesse:[],c:null,canWrite:false,canComment:false,realClient:false,
@@ -168,16 +168,36 @@ async function caricaFile(trId, file, nome, avanzamento){
   if(!ultimo || !ultimo.id) throw new Error(tx("SharePoint non ha confermato il file ","SharePoint did not confirm the file ") + nome);
   return ultimo;
 }
+// Anteprima dentro ShareDocs: il PDF viene scaricato dal link temporaneo e mostrato in un
+// pannello con il visualizzatore del browser. Niente schede aperte "in ritardo" (che i browser
+// bloccano) e niente accesso a SharePoint: funziona uguale per i colleghi e per il cliente.
 async function viewFile(id){
-  const w = window.open("", "_blank");
-  if(w) w.document.title = tx("Apertura…","Opening…");
+  const back = S.drawer ? (S.drawer.type === "pdf" ? S.drawer.back : Object.assign({}, S.drawer)) : null;
+  openDrawer({ type: "pdf", id, name: "", back });
   try {
     const r = await api("GET", "/file" + qc() + "&item=" + encodeURIComponent(id));
-    if(r.webUrl && !isClient()){ if(w) w.location = r.webUrl; else location.href = r.webUrl; return; }
+    if(!S.drawer || S.drawer.id !== id) return;
+    Object.assign(S.drawer, { name: r.name, size: r.size, webUrl: !isClient() && r.webUrl, pdf: /\.pdf$/i.test(r.name) });
+    if(!S.drawer.pdf){ renderDrawer(); return; }
+    renderDrawer();
     const b = await (await fetch(r.url)).blob();
-    const u = URL.createObjectURL(new Blob([b], { type: /\.pdf$/i.test(r.name) ? "application/pdf" : (b.type || "application/octet-stream") }));
-    if(w) w.location = u; else { salvaBlob(r.name, b); }
-  } catch(e){ if(w) w.close(); fail(e); }
+    if(!S.drawer || S.drawer.id !== id) return;
+    if(S.pdfUrl) URL.revokeObjectURL(S.pdfUrl);
+    S.pdfUrl = URL.createObjectURL(new Blob([b], { type: "application/pdf" }));
+    S.drawer.url = S.pdfUrl; renderDrawer();
+  } catch(e){ fail(e); if(S.drawer && S.drawer.id === id){ S.drawer.errore = e.message || "errore"; renderDrawer(); } }
+}
+function pdfPanel(d){
+  const head = `${d.url ? `<a class="btn small" href="${d.url}" target="_blank" rel="noopener">${tx("Apri in nuova scheda","Open in new tab")}</a>` : ""}
+    ${d.webUrl ? `<a class="btn small" href="${esc(d.webUrl)}" target="_blank" rel="noopener">${tx("Apri su SharePoint","Open on SharePoint")}</a>` : ""}
+    <button class="btn small" data-act="dlFile" data-id="${esc(d.id)}">${tx("Scarica","Download")}</button>
+    ${d.back ? `<button class="btn small" data-act="pdfBack">${tx("Indietro","Back")}</button>` : ""}`;
+  let body;
+  if(d.errore) body = `<div class="notice warn">${esc(d.errore)}</div>`;
+  else if(d.name && !d.pdf) body = `<div class="notice">${tx("L'anteprima è disponibile solo per i PDF. Usa «Scarica» per aprire il file con il programma adatto.","Preview is available for PDFs only. Use “Download” to open the file with the right program.")}</div>`;
+  else if(d.url) body = `<iframe class="pdfview" src="${d.url}" title="${esc(d.name)}"></iframe>`;
+  else body = `<div class="empty">${tx("Caricamento del documento…","Loading document…")}${d.size ? " (" + fsize(d.size) + ")" : ""}</div>`;
+  return { title: `<span class="mono" style="font-size:15px">${esc(d.name || tx("Documento","Document"))}</span>`, head, body };
 }
 async function dlFile(id){
   try {
@@ -500,6 +520,7 @@ function renderDrawer(){
     body=clientTr(tr, d.replying);
   } else if(d.type==="newTr") { title=d.editId?tx("Modifica bozza transmittal","Edit draft transmittal"):tx("Nuovo transmittal","New transmittal"); body=trForm(d); }
   else if(d.type==="newCommessa") { title=tx("Nuova commessa","New project"); body=commessaForm(); }
+  else if(d.type==="pdf") { ({title, head, body} = pdfPanel(d)); }
   else if(d.type==="newDoc") { title=tx("Nuovo documento","New document"); body=docForm(); }
   else if(d.type==="import") { title=tx("Incolla elenco documenti","Paste document list"); body=importForm(); }
   else if(d.type==="newCmt") { title=tx("Registra commento del cliente","Log client comment"); body=cmtForm(d); }
@@ -776,6 +797,7 @@ document.addEventListener("click", async e=>{
     try{ const r=await api("POST","/excel"+qc()); toast(r.esito); if(r.vdrl) S.excelUrl=r.vdrl; render(); }catch(err){ fail(err); } finally{ t.disabled=false; } }
   else if(a==="dlFile") dlFile(id);
   else if(a==="viewFile") viewFile(id);
+  else if(a==="pdfBack"){ const b=S.drawer&&S.drawer.back; if(b) openDrawer(b); else closeDrawer(); }
   else if(a==="crStart"){ S.drawer.replying=true; renderDrawer(); }
   else if(a==="crCancel"){ S.drawer.replying=false; renderDrawer(); }
 });
