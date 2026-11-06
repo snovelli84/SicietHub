@@ -17,8 +17,8 @@ var SHAREDOCS_CONFIG = {
   api: "https://siciet-sharedocs.amministrazione-c44.workers.dev/api",   // servizio su Cloudflare
   scope: "api://9e9b873b-2e7c-4011-aebd-7470627d55ec/access_as_user"
 };
-const VERSIONE = 8;
-const SERVIZIO_ATTESO = 8;   // versione minima del servizio su Cloudflare (VERSIONE_SERVIZIO in api/worker.js)
+const VERSIONE = 9;
+const SERVIZIO_ATTESO = 9;   // versione minima del servizio su Cloudflare (VERSIONE_SERVIZIO in api/worker.js)
 const LOGO_URL = new URL("icons/siciet-mark.png", location.href).href;
 
 /* ---------- Lingua dell'interfaccia (per utente) ----------
@@ -68,7 +68,7 @@ const DEFAULT_CFG = {project:"",projectName:"",customer:"",endClient:"",client:"
 /* Intestazione societaria, come nei transmittal SICIET in uso */
 const COMPANY = {name:"S.I.C.I.E.T. s.r.l.",addr:"Via Puglia 6, Fraz. Albinia – 58015 Orbetello (GR) – Italy",ids:"VAT IT01164350538 · Tel. +39 0564 870512 · www.siciet.it · info@siciet.it"};
 const TABS = [["cruscotto","Cruscotto","Dashboard"],["documenti","Registro documenti","Document register"],["transmittal","Transmittal","Transmittals"],["commenti","Commenti","Comments"]];
-const FORM_DRAWERS = ["newTr","newDoc","import","newCmt","settings","newCommessa","pdf"];
+const FORM_DRAWERS = ["newTr","newDoc","import","newCmt","settings","newCommessa","pdf","archivio"];
 
 /* ---------- Stato ---------- */
 const S = {docs:[],trs:[],cmts:[],cfg:{...DEFAULT_CFG},screen:"avvio",errore:"",me:null,commesse:[],c:null,canWrite:false,canComment:false,realClient:false,
@@ -403,7 +403,7 @@ function viewTrs(){
   const list=[...S.trs].sort((a,b)=>((b.status==="bozza")-(a.status==="bozza"))||String(b.date||"").localeCompare(String(a.date||""))||b.seq-a.seq);   // bozze in cima, poi dal più recente
   return `
   <div class="pagehead"><div><h1>${tx("Transmittal","Transmittals")}</h1><p>${S.excelUrl?`<a href="${esc(S.excelUrl)}" target="_blank" rel="noopener">${tx("Apri VDRL su SharePoint","Open VDRL on SharePoint")}</a> · `:""}${tx(`Registro di tutti i transmittal della commessa, numerati in automatico ${esc(S.cfg.prefix)}nn. Il foglio inviato al cliente è sempre in inglese.`,`Log of all project transmittals, numbered automatically ${esc(S.cfg.prefix)}nn. The sheet sent to the client is always in English.`)}</p></div>
-    <div class="actions">${S.canComment?`<button class="btn" data-act="excel" title="${tx("Rigenera subito VDRL e CRS nella cartella SharePoint della commessa","Regenerate VDRL and CRS now in the project's SharePoint folder")}">${tx("Aggiorna Excel","Update Excel")}</button>`:""}<button class="btn" data-act="settings">${tx("Impostazioni commessa","Project settings")}</button><button class="btn primary" data-act="newTr" ${S.canWrite&&S.docs.length?"":"disabled"}>${tx("Nuovo transmittal","New transmittal")}</button></div></div>
+    <div class="actions">${S.canWrite?`<button class="btn" data-act="archivio" title="${tx("Collega ai transmittal emessi i file già trasmessi, riconoscendo documento e revisione dal nome","Link already transmitted files to issued transmittals, recognising document and revision from the name")}">${tx("Importa archivio","Import archive")}</button>`:""}${S.canComment?`<button class="btn" data-act="excel" title="${tx("Rigenera subito VDRL e CRS nella cartella SharePoint della commessa","Regenerate VDRL and CRS now in the project's SharePoint folder")}">${tx("Aggiorna Excel","Update Excel")}</button>`:""}<button class="btn" data-act="settings">${tx("Impostazioni commessa","Project settings")}</button><button class="btn primary" data-act="newTr" ${S.canWrite&&S.docs.length?"":"disabled"}>${tx("Nuovo transmittal","New transmittal")}</button></div></div>
   <div class="tablebox"><table>
     <thead><tr><th>${tx("Numero","Number")}</th><th>${tx("Data","Date")}</th><th>${tx("Destinatario","To")}</th><th>${tx("Documenti","Documents")}</th><th>${tx("Scopo","Purpose")}</th><th>${tx("Risposta entro","Reply due")}</th><th>${tx("Stato","Status")}</th></tr></thead>
     <tbody>${list.length?list.map(tr=>{const st=trState(tr), pois=[...new Set((tr.items||[]).map(i=>i.poi))];
@@ -606,6 +606,7 @@ function renderDrawer(){
     body = d.respond ? respondForm(tr) :
       (missing?`<div class="notice warn" style="margin-bottom:14px">${tx(`${missing} documenti non hanno il titolo in inglese: nel foglio compare il titolo italiano. Aggiungilo dalla scheda del documento.`,`${missing} documents have no English title, so the Italian title appears on the sheet. Add it from the document record.`)}</div>`:"")
       + `<p class="hint" style="margin:0 0 10px">${tx("Foglio ufficiale per il cliente, sempre in inglese.","Official sheet for the client, always in English.")}</p>`
+      + (tr.sheet?`<div class="notice" style="margin-bottom:12px;display:grid;gap:6px"><b>${tx("Transmittal originale (PDF inviato al cliente)","Original transmittal (PDF sent to the client)")}</b>${fileCell(tr.sheet,{sp:true})}</div>`:"")
       + sheetHtml(tr)
       + (tr.status==="bozza"&&S.canWrite?`<p style="margin-top:16px">${S.pendingDel===tr.id?`<span class="confirm">${tx(`Eliminare la bozza ${esc(trNum(tr))}?`,`Delete draft ${esc(trNum(tr))}?`)} <button class="btn small danger" data-act="delTrYes" data-id="${esc(tr.id)}">${tx("Elimina","Delete")}</button><button class="btn small" data-act="delNo">${tx("Annulla","Cancel")}</button></span>`:`<button class="link" style="color:var(--bad)" data-act="delTr" data-id="${esc(tr.id)}">${tx("Elimina bozza","Delete draft")}</button>`}</p>`:"")
       + (tr.status!=="bozza"?`<p class="hint" style="margin-top:12px">${tx(`Emesso il ${fmt(tr.date)}`,`Issued on ${fmt(tr.date)}`)}${(tr.issuedBy||tr.by)?` ${tx("da","by")} ${esc((tr.issuedBy||tr.by).nome||"")}`:""}. ${tx("Il file scaricato si può stampare in PDF e allegare alla mail per il cliente.","The downloaded file can be printed to PDF and attached to the email to the client.")}</p>`:"")
@@ -615,10 +616,11 @@ function renderDrawer(){
     const st=clientState(tr);
     title=`Transmittal ${esc(trNum(tr))}`;
     head=`<span class="chip t-${st.tone}">${esc(st.label)}</span><button class="btn small" data-act="dlTr" data-id="${esc(tr.id)}">Transmittal sheet (.html)</button>`;
-    body=clientTr(tr, d.replying);
+    body=(tr.sheet?`<div class="notice" style="margin-bottom:12px;display:grid;gap:6px"><b>Original transmittal (PDF)</b>${fileCell(tr.sheet)}</div>`:"")+clientTr(tr, d.replying);
   } else if(d.type==="newTr") { title=d.editId?tx("Modifica bozza transmittal","Edit draft transmittal"):tx("Nuovo transmittal","New transmittal"); body=trForm(d); }
   else if(d.type==="newCommessa") { title=tx("Nuova commessa","New project"); body=commessaForm(); }
   else if(d.type==="pdf") { ({title, head, body} = pdfPanel(d)); }
+  else if(d.type==="archivio") { title=tx("Importa archivio","Import archive"); body=archivioPanel(d); }
   else if(d.type==="newDoc") { title=tx("Nuovo documento","New document"); body=docForm(); }
   else if(d.type==="import") { title=tx("Incolla elenco documenti","Paste document list"); body=importForm(); }
   else if(d.type==="newCmt") { title=tx("Registra commento del cliente","Log client comment"); body=cmtForm(d); }
@@ -792,6 +794,38 @@ function mostraVersioni(){
     (vecchio && !S.realClient ? ` · <b style="color:var(--bad)">${tx(`servizio da aggiornare su Cloudflare (serve v${SERVIZIO_ATTESO})`,`service to update on Cloudflare (v${SERVIZIO_ATTESO} needed)`)}</b>` : "");
 }
 
+/* ---------- Importazione dell'archivio ---------- */
+function archivioPanel(d){
+  const r=d.rapporto;
+  const intro=`<p class="hint" style="margin:0">${tx("Sposta (o copia) su SharePoint la cartella dei file già trasmessi dentro quella della commessa, poi analizzala. ShareDocs riconosce documento e revisione dal nome dei file (es. SOK976701376_005_A.pdf, SOK976701379 GA_REV5.dwg) e i PDF dei transmittal (S2040-T03.pdf), e li collega ai transmittal emessi. I file non vengono spostati né copiati: restano dove sono.","Move (or copy) the folder of already transmitted files into the project folder on SharePoint, then analyse it. ShareDocs recognises document and revision from the file names (e.g. SOK976701376_005_A.pdf, SOK976701379 GA_REV5.dwg) and the transmittal PDFs (S2040-T03.pdf), and links them to the issued transmittals. Files are not moved or copied: they stay where they are.")}</p>`;
+  const form=`<div class="row" style="align-items:end"><label class="f">${tx("Cartella su SICIET Docs (dentro la commessa)","Folder on SICIET Docs (inside the project)")}<input id="a_cart" class="mono" value="${esc(d.cartella||S.cfg.cartella)}"></label>
+    <div class="actions"><button class="btn" data-act="archAnalizza" ${d.busy?"disabled":""}>${d.busy==="analisi"?tx("Analisi in corso…","Analysing…"):tx("Analizza","Analyse")}</button></div></div>`;
+  if(!r) return `<div class="form">${intro}${form}${d.errore?`<div class="notice warn">${esc(d.errore)}</div>`:""}</div>`;
+  const righeTr=r.transmittal.map(t=>`<tr><td class="mono num"><b>${esc(t.tr)}</b><br><span class="muted">${fmt(t.data)}</span></td>
+    <td>${t.foglio?`<span class="mono" style="font-size:12px">${esc(t.foglio.name)}</span> ${t.foglio.nuovo?`<span class="chip t-ok">${tx("nuovo","new")}</span>`:`<span class="chip t-muted">${tx("già collegato","linked")}</span>`}`:`<span class="muted">—</span>`}</td>
+    <td>${t.righe.map(x=>`<div style="margin-bottom:6px"><span class="mono">${esc(x.doc)} rev ${esc(x.rev)}</span>: ${x.nuovi.length?x.nuovi.map(n=>`<span class="chip t-ok" title="${esc(n.path)}">${esc(n.name)}</span>`).join(" "):""}${x.gia.length?` <span class="muted">${tx("già collegati","linked")}: ${esc(x.gia.join(", "))}</span>`:""}${!x.nuovi.length&&!x.gia.length?`<span class="chip t-warn">${tx("nessun file trovato","no file found")}</span>`:""}</div>`).join("")}</td></tr>`).join("");
+  return `<div class="form">${intro}${form}
+    <div class="notice"><b>${tx(`${r.file} file analizzati in ${esc(r.cartella)}`,`${r.file} files analysed in ${esc(r.cartella)}`)}</b> · ${tx(`da collegare: ${r.daCollegare}`,`to link: ${r.daCollegare}`)} · ${tx(`non abbinati: ${r.nonAbbinati.length}`,`not matched: ${r.nonAbbinati.length}`)}${r.ignorati?` · ${tx(`file di servizio ignorati: ${r.ignorati}`,`service files ignored: ${r.ignorati}`)}`:""}</div>
+    <div class="actions"><button class="btn primary" data-act="archCollega" ${r.daCollegare&&!d.busy?"":"disabled"}>${d.busy==="collega"?tx("Collegamento in corso…","Linking…"):tx(`Collega ${r.daCollegare} file`,`Link ${r.daCollegare} files`)}</button></div>
+    <div class="tablebox"><table><thead><tr><th>Transmittal</th><th>${tx("PDF del transmittal","Transmittal PDF")}</th><th>${tx("Documenti e file trovati","Documents and files found")}</th></tr></thead><tbody>${righeTr}</tbody></table></div>
+    ${r.nonAbbinati.length?`<h3 style="font-size:14px;margin:0">${tx("File non abbinati","Files not matched")}</h3><p class="hint" style="margin:0">${tx("Restano dove sono; se servono si allegano a mano (es. modelli 3D) oppure vanno nel prossimo transmittal.","They stay where they are; attach them manually if needed (e.g. 3D models) or use them in the next transmittal.")}</p>
+      <div class="tablebox"><table><thead><tr><th>File</th><th>${tx("Motivo","Reason")}</th></tr></thead><tbody>${r.nonAbbinati.map(x=>`<tr><td><span class="mono" style="font-size:12px">${esc(x.name)}</span><br><span class="muted" style="font-size:11px">${esc(x.path)}</span></td><td>${esc(x.motivo)}</td></tr>`).join("")}</tbody></table></div>`:""}
+  </div>`;
+}
+async function analizzaArchivio(){
+  const d=S.drawer; if(!d||d.type!=="archivio") return;
+  d.cartella=val("a_cart")||S.cfg.cartella; d.busy="analisi"; d.errore=""; renderDrawer();
+  try{ d.rapporto=await api("GET","/archivio"+qc()+"&cartella="+encodeURIComponent(d.cartella)); }
+  catch(e){ d.rapporto=null; d.errore=e.message; }
+  d.busy=""; if(S.drawer===d) renderDrawer();
+}
+async function collegaArchivio(){
+  const d=S.drawer; if(!d||d.type!=="archivio") return;
+  d.busy="collega"; renderDrawer();
+  try{ await op({op:"archivioCollega",cartella:d.cartella}); d.busy=""; await analizzaArchivio(); }
+  catch(e){ d.busy=""; renderDrawer(); fail(e); }
+}
+
 /* ---------- Azioni ---------- */
 const val = id => (document.getElementById(id)?.value ?? "").trim();
 const cleanCode = s => String(s||"").replace(/\s+/g,"").toUpperCase();
@@ -911,6 +945,9 @@ document.addEventListener("click", async e=>{
     try{ const r=await api("POST","/excel"+qc()); toast(r.esito); if(r.vdrl) S.excelUrl=r.vdrl; render(); }catch(err){ fail(err); } finally{ t.disabled=false; } }
   else if(a==="dlFile") dlFile(id);
   else if(a==="viewFile") viewFile(id);
+  else if(a==="archivio") openDrawer({type:"archivio",cartella:S.cfg.cartella});
+  else if(a==="archAnalizza") analizzaArchivio();
+  else if(a==="archCollega") collegaArchivio();
   else if(a==="pdfBack"){ const b=S.drawer&&S.drawer.back; if(b) openDrawer(b); else closeDrawer(); }
   else if(a==="crStart"){ S.drawer.replying=true; renderDrawer(); }
   else if(a==="crCancel"){ S.drawer.replying=false; renderDrawer(); }
