@@ -47,6 +47,8 @@
  *   POST /api/commessa  { id, nome, … }   crea una commessa (Document Controller)
  */
 
+// Aumentare a ogni modifica: la pagina la mostra in fondo, così si vede se su Cloudflare c'è l'ultima.
+const VERSIONE_SERVIZIO = 7;
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const MB = 1024 * 1024;
 const MAX_FILE = 2048 * MB;
@@ -670,7 +672,7 @@ export async function handle(request, env, ctx){
 
     if(via === "/ping"){
       // /api/ping?sharepoint=1 verifica anche che il servizio raggiunga il sito con le credenziali dell'app.
-      if(!q("sharepoint")) return json(env, 200, { ok: true, servizio: "SICIET ShareDocs" });
+      if(!q("sharepoint")) return json(env, 200, { ok: true, servizio: "SICIET ShareDocs", versione: VERSIONE_SERVIZIO });
       try {
         const d = await drive(env);
         const r = await graphJson(env, "GET", "/drives/" + d.drive + "/root?$select=webUrl");
@@ -682,7 +684,7 @@ export async function handle(request, env, ctx){
 
     if(via === "/me" && request.method === "GET"){
       const elenco = (await commesse(env)).data.commesse.filter(c => vedeCommessa(u, c)).map(c => ({ id: c.id, nome: c.nome }));
-      return json(env, 200, { nome: u.nome, email: u.email, ruoli: u.ruoli, cliente: u.cliente, documentController: u.dc, commesse: elenco });
+      return json(env, 200, { nome: u.nome, email: u.email, ruoli: u.ruoli, cliente: u.cliente, documentController: u.dc, commesse: elenco, versione: VERSIONE_SERVIZIO });
     }
     if(via === "/registro" && request.method === "GET"){
       const c = await commessaPer(env, u, q("c"));
