@@ -78,7 +78,8 @@ Dopo la creazione:
    var SHAREDOCS_CONFIG = {
      clientId: "…",   // ID applicazione (client) di "SICIET ShareDocs"
      tenantId: "5c055224-300a-4b03-8742-552b7dd79f62",   // tenant SICIET, già impostato
-     cartella: "https://srlsiciet.sharepoint.com/:f:/s/…",  // link del punto 1 (anche dopo)
+     sito: "https://srlsiciet.sharepoint.com/sites/SICIETDocs",
+     cartella: "2040 PEG ITALY HVAC NGFGT IRAQ/Transmittals",   // percorso dentro "Documenti"
      testSizeMB: 25
    };
    ```
@@ -143,6 +144,18 @@ SICIET Quality salva su SharePoint tramite un **servizio** (Cloudflare Worker) c
 4. il cliente **non ha bisogno di permessi su SharePoint**: vede solo ciò che il servizio gli mostra per la sua commessa. Niente condivisione esterna del sito da gestire.
 
 Il test di questa pagina usa invece le autorizzazioni **delegate** (`Files.ReadWrite.All`) per verificare in fretta accesso, ruoli, cartella e file grandi. Con l'architettura sopra, `Files.ReadWrite.All` si toglie.
+
+## Versione delle pagine
+
+In fondo a ogni pagina di ShareDocs c'è la riga **"versione N · data"**, come in SICIET Quality. A ogni modifica pubblicata si aumenta di uno il numero e si aggiorna la data nel `<footer>` della pagina. Se nel browser compare un numero più vecchio di quello su GitHub, la pagina è in cache: aggiornare con Ctrl+F5 (sul telefono chiudere e riaprire la scheda).
+
+| Versione | Data | Modifica |
+|---|---|---|
+| 5 | 06/11/2026 | Sito SICIET Docs e percorso della cartella al posto del link di condivisione; le cartelle mancanti si creano da sole |
+| 4 | 06/11/2026 | Numero di versione in fondo alla pagina |
+| 3 | 06/11/2026 | Link della cartella SharePoint dei transmittal |
+| 2 | 06/11/2026 | ID applicazione della registrazione Entra ID |
+| 1 | 06/11/2026 | Prima pubblicazione della pagina di test |
 
 ## Note di sicurezza
 
