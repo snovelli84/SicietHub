@@ -17,7 +17,8 @@ var SHAREDOCS_CONFIG = {
   api: "https://siciet-sharedocs.amministrazione-c44.workers.dev/api",   // servizio su Cloudflare
   scope: "api://9e9b873b-2e7c-4011-aebd-7470627d55ec/access_as_user"
 };
-const VERSIONE = 5;
+const VERSIONE = 6;
+const SERVIZIO_ATTESO = 7;   // versione minima del servizio su Cloudflare (VERSIONE_SERVIZIO in api/worker.js)
 const LOGO_URL = new URL("icons/siciet-mark.png", location.href).href;
 
 /* ---------- Lingua dell'interfaccia (per utente) ----------
@@ -725,6 +726,14 @@ function dopoRender(){
   if(S.screen){ document.getElementById("tabs").innerHTML = ""; }
 }
 
+// In fondo alla pagina: versione della pagina e del servizio, con avviso se il servizio è vecchio.
+function mostraVersioni(){
+  const f = document.getElementById("appver"); if(!f || !S.me) return;
+  const v = S.me.versione || 0, vecchio = v < SERVIZIO_ATTESO;
+  f.innerHTML = `SICIET ShareDocs · ${tx("pagina","page")} v${VERSIONE} · ${tx("servizio","service")} v${v || "?"}` +
+    (vecchio && !S.realClient ? ` · <b style="color:var(--bad)">${tx(`servizio da aggiornare su Cloudflare (serve v${SERVIZIO_ATTESO})`,`service to update on Cloudflare (v${SERVIZIO_ATTESO} needed)`)}</b>` : "");
+}
+
 /* ---------- Azioni ---------- */
 const val = id => (document.getElementById(id)?.value ?? "").trim();
 const cleanCode = s => String(s||"").replace(/\s+/g,"").toUpperCase();
@@ -883,6 +892,7 @@ window.addEventListener("hashchange", route);
   S.screen="caricamento"; render();
   try { S.me = await api("GET","/me"); }
   catch(e){ S.screen="errore"; S.errore = e.status===403 ? tx("Il tuo account non ha un ruolo in SICIET ShareDocs. Chiedi a SICIET di abilitarti.","Your account has no role in SICIET ShareDocs. Ask SICIET to enable you.") : e.message; render(); return; }
+  mostraVersioni();
   S.canWrite = !!S.me.documentController;
   S.canComment = S.me.ruoli.some(r=>r==="DocControl"||r==="Engineer");
   S.realClient = !!S.me.cliente;

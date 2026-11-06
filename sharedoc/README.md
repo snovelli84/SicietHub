@@ -191,7 +191,7 @@ Il codice è in [`api/worker.js`](api/worker.js): verifica l'utente (token Entra
    Poi `https://<indirizzo del worker>/api/ping?sharepoint=1`: deve rispondere `"sharepoint":"ok"` con l'indirizzo della raccolta Documenti di SICIET Docs. Altrimenti il messaggio dice cosa manca (segreto errato, permesso dell'app, sito).
 4. Mandami l'indirizzo del worker (es. `https://siciet-sharedocs.<account>.workers.dev`): va nella configurazione della pagina.
 
-Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo.
+Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo, aumentando `VERSIONE_SERVIZIO` (e `SERVIZIO_ATTESO` in `sharedoc.js`). In fondo alla pagina compare la versione del servizio in uso: se è più vecchia di quella attesa compare un avviso rosso.
 
 ### 7.3 Cosa crea su SharePoint
 
@@ -225,7 +225,7 @@ Il test di questa pagina usa invece le autorizzazioni **delegate** (`Files.ReadW
 
 ## Versione delle pagine
 
-**App** (`index.html` + `sharedoc.js`): versione 5 del 06/11/2026 (allegati del cliente nella risposta; v4: controllo dei file scaricati; v3: anteprima dei PDF dentro ShareDocs; v2: pulsante *Aggiorna Excel*; v1: prima versione collegata al servizio). A ogni modifica di `sharedoc.js` aumentare `VERSIONE`, il numero in `sharedoc.js?v=` e il footer di `index.html`.
+**App** (`index.html` + `sharedoc.js`): versione 6 del 06/11/2026 (in fondo alla pagina la versione del servizio, con avviso se su Cloudflare è vecchio; v5: allegati del cliente nella risposta; v4: controllo dei file scaricati; v3: anteprima dei PDF dentro ShareDocs; v2: pulsante *Aggiorna Excel*; v1: prima versione collegata al servizio). A ogni modifica di `sharedoc.js` aumentare `VERSIONE`, il numero in `sharedoc.js?v=` e il footer di `index.html`.
 
 **Pagina di test** (`test/index.html`):
 
