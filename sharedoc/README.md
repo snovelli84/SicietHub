@@ -134,6 +134,66 @@ Con il test verde si passa alla versione reale di ShareDocs:
 2. file allegati caricati direttamente nella cartella del transmittal, senza limite di 20 MB;
 3. portale per gli ospiti del cliente, con download e risposta.
 
+## 7. Servizio di ShareDocs (Cloudflare Worker)
+
+Il codice è in [`api/worker.js`](api/worker.js): verifica l'utente (token Entra ID e ruolo), legge e scrive su **SICIET Docs** con le credenziali dell'app, tiene il registro di ogni commessa e aggiorna da solo **VDRL** e **CRS** in Excel. Il cliente non ha permessi su SharePoint: vede solo i transmittal emessi della sua commessa, attraverso il servizio.
+
+### 7.1 Entra ID – registrazione "SICIET ShareDocs"
+
+1. **Esporre un'API** → *URI ID applicazione* → **Aggiungi** → lascia `api://9e9b873b-2e7c-4011-aebd-7470627d55ec` → **Salva**.
+   Poi **Aggiungi un ambito**:
+   | Campo | Valore |
+   |---|---|
+   | Nome ambito | `access_as_user` |
+   | Chi può fornire il consenso | Amministratori e utenti |
+   | Nome visualizzato consenso amministratore | Usare SICIET ShareDocs |
+   | Descrizione consenso amministratore | Permette alla pagina di SICIET ShareDocs di chiamare il servizio a nome dell'utente |
+   | Stato | Abilitato |
+2. **Autorizzazioni API** → **Aggiungi un'autorizzazione** → *Le mie API* → **SICIET ShareDocs** → delegate → `access_as_user` → **Aggiungi**.
+   Poi, sempre in *Aggiungi un'autorizzazione* → **Microsoft Graph** → **Autorizzazioni applicazione** → `Sites.Selected` → **Aggiungi**.
+   Infine **Concedi consenso amministratore per S.I.C.I.E.T.**: tutte le righe con la spunta verde.
+3. **Certificati e segreti** → **Nuovo segreto client** (descrizione "Servizio ShareDocs", scadenza 24 mesi) → copia subito il **Valore**, si vede una volta sola. Annota la scadenza: prima di allora si crea un segreto nuovo e si aggiorna `CLIENT_SECRET` su Cloudflare.
+4. **Accesso al solo sito SICIET Docs** (se non si riesce a concedere `Sites.FullControl.All` a Graph Explorer, in alternativa si usa l'autorizzazione applicazione `Sites.ReadWrite.All` al posto di `Sites.Selected`, senza questo passo: funziona subito ma l'app potrebbe scrivere in tutti i siti), da [Graph Explorer](https://developer.microsoft.com/graph/graph-explorer) con l'account amministratore (consenso `Sites.FullControl.All` se richiesto), come per SICIET Quality:
+   - `GET https://graph.microsoft.com/v1.0/sites/srlsiciet.sharepoint.com:/sites/SICIETDocs` → copia `id`;
+   - `POST https://graph.microsoft.com/v1.0/sites/<id>/permissions` con corpo
+     `{"roles":["write"],"grantedToIdentities":[{"application":{"id":"9e9b873b-2e7c-4011-aebd-7470627d55ec","displayName":"SICIET ShareDocs"}}]}` → risposta **201**.
+
+### 7.2 Cloudflare
+
+1. Nel worker creato → **Modifica codice** → cancella il codice di esempio, incolla il contenuto di [`api/worker.js`](api/worker.js) (su GitHub: *Raw*, seleziona tutto, copia) → **Distribuisci**.
+2. *Impostazioni → Variabili e segreti* → **Aggiungi** (tipo *Testo*, tranne `CLIENT_SECRET` di tipo *Segreto*):
+   | Nome | Valore |
+   |---|---|
+   | `TENANT_ID` | `5c055224-300a-4b03-8742-552b7dd79f62` |
+   | `CLIENT_ID` | `9e9b873b-2e7c-4011-aebd-7470627d55ec` |
+   | `CLIENT_SECRET` | il valore del segreto del punto 7.1.3 |
+   | `SITE` | `srlsiciet.sharepoint.com:/sites/SICIETDocs` |
+   | `ORIGIN` | `https://hub.siciet.it` |
+3. Verifica: `https://<indirizzo del worker>/api/ping` nel browser risponde `{"ok":true,…}`. Se risponde "Servizio non configurato" manca una variabile.
+   Poi `https://<indirizzo del worker>/api/ping?sharepoint=1`: deve rispondere `"sharepoint":"ok"` con l'indirizzo della raccolta Documenti di SICIET Docs. Altrimenti il messaggio dice cosa manca (segreto errato, permesso dell'app, sito).
+4. Mandami l'indirizzo del worker (es. `https://siciet-sharedocs.<account>.workers.dev`): va nella configurazione della pagina.
+
+Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo.
+
+### 7.3 Cosa crea su SharePoint
+
+```
+SICIET Docs / Documenti /
+  2040 PEG ITALY HVAC NGFGT IRAQ/
+    Transmittals/S2040-T08/SOK976701376_Rev5.pdf      file allegati, con nome standard
+    VDRL 2040.xlsx                                    aggiornato a ogni modifica (in inglese)
+    CRS 2040.xlsx                                     registro commenti (in inglese)
+  ShareDocs - dati (non modificare)/
+    commesse.json                                     elenco commesse e clienti ammessi
+    2040/registro.json                                registro: documenti, transmittal, commenti, storico operazioni
+```
+
+Ogni modifica al registro è controllata (ruolo, dati, cartella dei file) e registrata nello storico con autore e ora. Se due persone salvano insieme, il servizio rilegge e riapplica la modifica, senza perdite. I file del registro, se cancellati per errore, si recuperano dal Cestino del sito (93 giorni) e dalla cronologia versioni.
+
+**Clienti ammessi**: per ogni commessa c'è l'elenco degli indirizzi o domini dei clienti (es. `@pegitaly.it`). Un ospite con ruolo **Cliente** vede solo le commesse in cui compare il suo indirizzo o il suo dominio.
+
+Quando la pagina userà il servizio, l'autorizzazione delegata `Files.ReadWrite.All`, usata solo dal test, si potrà togliere.
+
 ## Architettura della versione reale (proposta)
 
 SICIET Quality salva su SharePoint tramite un **servizio** (Cloudflare Worker) che usa le credenziali dell'app con `Sites.Selected`, cioè con accesso al solo sito SICIET Qualità, e la pagina non fa accedere nessuno. Per ShareDocs l'accesso invece serve, perché le risposte del cliente sono atti ufficiali e vanno attribuite a una persona. La proposta unisce le due cose:
