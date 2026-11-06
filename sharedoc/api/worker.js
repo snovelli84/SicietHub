@@ -39,7 +39,9 @@
  *   GET  /api/me                          utente, ruoli e commesse visibili
  *   GET  /api/registro?c=ID               registro della commessa (filtrato per il cliente)
  *   POST /api/op?c=ID   { op, … }         modifica il registro (vedi OPERAZIONI)
- *   POST /api/upload?c=ID { tr, nome, dimensione }   sessione di caricamento di un file
+ *   POST /api/upload?c=ID { tr, nome, dimensione }   sessione di caricamento di un file del transmittal
+ *   POST /api/upload-risposta?c=ID { tr, k, nome, dimensione }   sessione per un allegato della
+ *                                         risposta del cliente (cartella "Client reply" del transmittal)
  *   GET  /api/file?c=ID&item=ID           link temporaneo per scaricare un file
  *   POST /api/excel?c=ID                  rigenera subito VDRL e CRS in Excel (colleghi SICIET)
  *   POST /api/commessa  { id, nome, … }   crea una commessa (Document Controller)
@@ -260,7 +262,7 @@ function prossimoSeq(reg){
 function vistaCliente(reg){
   const trs = reg.trs.filter(t => t.status !== "bozza").map(t => ({
     id: t.id, seq: t.seq, prefix: t.prefix, status: t.status, date: t.date, dueDays: t.dueDays, note: t.note, attn: t.attn, to: t.to, endClient: t.endClient, projectName: t.projectName,
-    items: (t.items || []).map(i => ({ docId: i.docId, rev: i.rev, poi: i.poi, ret: i.ret ? { code: i.ret.code, date: i.ret.date } : null, file: i.file ? { id: i.file.id, name: i.file.name, size: i.file.size } : null }))
+    items: (t.items || []).map(i => ({ docId: i.docId, rev: i.rev, poi: i.poi, ret: i.ret ? { code: i.ret.code, date: i.ret.date } : null, file: i.file ? { id: i.file.id, name: i.file.name, size: i.file.size } : null, clientFiles: (i.clientFiles || []).map(f => ({ id: f.id, name: f.name, size: f.size })) }))
   }));
   const ids = new Set(trs.flatMap(t => t.items.map(i => i.docId)));
   return {
@@ -303,15 +305,27 @@ function nuoviCommenti(reg, u, lista, trId, origine){
     reg.cmts.push({ id: nuovoId(), docId: doc.id, rev: r, trId: trId || "", n: conta[k], ref: testo(c.ref, 200), text: t, reply: "", status: "aperto", origin: origine, by: chi(u), createdAt: new Date().toISOString() });
   }
 }
-async function controllaFile(env, reg, tr, f){
-  // Il file deve essere stato caricato nella cartella di questo transmittal.
+const CARTELLA_RISPOSTA = "Client reply";
+const MAX_ALLEGATI = 20;
+async function controllaFile(env, reg, tr, f, sotto){
+  // Il file deve essere stato caricato nella cartella di questo transmittal (o nella sua sottocartella).
   const d = await drive(env);
   const it = await graphJson(env, "GET", "/drives/" + d.drive + "/items/" + encodeURIComponent(String(f.id || "")) + "?$select=id,name,size,webUrl,parentReference");
   if(!it) throw new Errore(400, "File allegato non trovato su SharePoint.");
-  const atteso = "/" + [reg.cfg.cartella, "Transmittals", trNum(reg, tr)].join("/");
+  const atteso = "/" + [reg.cfg.cartella, "Transmittals", trNum(reg, tr)].concat(sotto ? [sotto] : []).join("/");
   const path = decodeURIComponent(String((it.parentReference && it.parentReference.path) || "")).replace(/^.*?root:/, "");
   if(path !== atteso) throw new Errore(400, "Il file " + it.name + " non è nella cartella del transmittal.");
   return { id: it.id, name: it.name, size: it.size, webUrl: it.webUrl, path: atteso + "/" + it.name, orig: testo(f.orig, 255), uploadedAt: new Date().toISOString() };
+}
+// Allegati della risposta (disegni commentati, documenti di riferimento) per un documento del transmittal.
+async function aggiungiAllegati(env, u, reg, tr, it, files){
+  const lista = (files || []).filter(f => f && f.id).slice(0, MAX_ALLEGATI);
+  if(!lista.length) return 0;
+  const gia = new Set((it.clientFiles || []).map(f => f.id));
+  const nuovi = [];
+  for(const f of lista){ if(gia.has(f.id)) continue; nuovi.push(Object.assign(await controllaFile(env, reg, tr, f, CARTELLA_RISPOSTA), { by: chi(u) })); }
+  it.clientFiles = (it.clientFiles || []).concat(nuovi).slice(-MAX_ALLEGATI);
+  return nuovi.length;
 }
 
 const OPERAZIONI = {
@@ -415,6 +429,7 @@ const OPERAZIONI = {
     for(const r of x.items || []){
       const it = tr.items[Number(r.k)]; if(!it) continue;
       it.ret = r.code ? (RET[r.code] ? { code: String(r.code), date: data(r.date) || oggi(), origin: "siciet", by: chi(u) } : (() => { throw new Errore(400, "Codice di ritorno non valido."); })()) : null;
+      await aggiungiAllegati(env, u, reg, tr, it, r.files);
     }
     tr.status = tr.items.every(i => i.ret) ? "risposto" : "emesso";
     nuoviCommenti(reg, u, x.comments, tr.id, "siciet");
@@ -444,19 +459,20 @@ const OPERAZIONI = {
     serve(u, "cliente");
     const tr = trovaTr(reg, x.trId);
     if(tr.status === "bozza") throw new Errore(404, "Transmittal non trovato.");
-    let n = 0;
+    let n = 0, allegati = 0;
     for(const r of x.items || []){
       const it = tr.items[Number(r.k)];
       if(!it || it.ret || !r.code) continue;
       if(!RET[r.code]) throw new Errore(400, "Return code not valid.");
       it.ret = { code: String(r.code), date: oggi(), origin: "client", by: chi(u) }; n++;
+      allegati += await aggiungiAllegati(env, u, reg, tr, it, r.files);
     }
     const risposti = new Set(tr.items.filter(i => i.ret).map(i => i.docId));
     const commenti = (x.comments || []).filter(c => risposti.has(c.docId));
     if(!n && !commenti.length) throw new Errore(400, "Select at least one return code.");
     tr.status = tr.items.every(i => i.ret) ? "risposto" : "emesso";
     nuoviCommenti(reg, u, commenti, tr.id, "client");
-    return { msg: "Review sent to SICIET", n, comments: commenti.length };
+    return { msg: "Review sent to SICIET", n, comments: commenti.length, attachments: allegati };
   }
 };
 
@@ -493,11 +509,38 @@ async function caricamento(env, u, c, x){
   const s = await graphJson(env, "POST", await urlPercorso(env, parti, "/createUploadSession"), { item: { "@microsoft.graph.conflictBehavior": "replace" } });
   return { uploadUrl: s.uploadUrl, scade: s.expirationDateTime, percorso: parti.join("/") };
 }
+// Allegato della risposta: il cliente mentre risponde (documenti ancora senza codice),
+// il Document Controller quando registra una risposta arrivata per altre vie.
+async function caricamentoRisposta(env, u, c, x){
+  if(!u.cliente && !u.dc) throw new Errore(403, "Operazione non consentita al tuo ruolo.");
+  const { data: reg } = await leggiRegistro(env, c);
+  const tr = trovaTr(reg, x.tr);
+  if(tr.status === "bozza") throw new Errore(404, "Transmittal non trovato.");
+  const it = tr.items[Number(x.k)];
+  if(!it) throw new Errore(400, "Documento non trovato nel transmittal.");
+  if(u.cliente && it.ret) throw new Errore(409, "This document has already been reviewed.");
+  if((it.clientFiles || []).length >= MAX_ALLEGATI) throw new Errore(409, "Too many attachments for this document.");
+  const orig = testo(x.nome, 255, true, "il nome del file");
+  const est = (orig.match(/\.([A-Za-z0-9]{1,6})$/) || [])[1];
+  if(!est || VIETATE.test(orig)) throw new Errore(415, "File type not allowed: " + orig);
+  const base = orig.replace(/\.[A-Za-z0-9]{1,6}$/, "").normalize("NFKD").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "file";
+  const doc = trovaDoc(reg, it.docId);
+  const nome = String(doc.num).replace(/[^A-Za-z0-9._-]/g, "-") + "_Rev" + it.rev + "_Client_" + base + "." + est.toLowerCase();
+  const dim = Number(x.dimensione) || 0;
+  if(dim <= 0 || dim > MAX_FILE) throw new Errore(413, "File size not allowed.");
+  const parti = [reg.cfg.cartella, "Transmittals", trNum(reg, tr), CARTELLA_RISPOSTA, nome];
+  // Mai sovrascrivere: se il nome esiste già SharePoint aggiunge un numero.
+  const s = await graphJson(env, "POST", await urlPercorso(env, parti, "/createUploadSession"), { item: { "@microsoft.graph.conflictBehavior": "rename" } });
+  return { uploadUrl: s.uploadUrl, scade: s.expirationDateTime, nome };
+}
 async function linkFile(env, u, c, itemId){
   const { data: reg } = await leggiRegistro(env, c);
   const trs = u.cliente ? reg.trs.filter(t => t.status !== "bozza") : reg.trs;
   let f = null;
-  for(const t of trs) for(const i of t.items || []) if(i.file && i.file.id === itemId) f = i.file;
+  for(const t of trs) for(const i of t.items || []){
+    if(i.file && i.file.id === itemId) f = i.file;
+    for(const a of i.clientFiles || []) if(a.id === itemId) f = a;
+  }
   if(!f) throw new Errore(404, "File non trovato.");
   const d = await drive(env);
   // Niente $select: con $select SharePoint non restituisce il link temporaneo di download.
@@ -581,7 +624,7 @@ async function aggiornaExcel(env, reg){
     const aperti = reg.cmts.filter(c => c.docId === d.id && c.status !== "chiuso").length;
     return [d.vid ?? "", d.num, d.supNum || "", d.titleEn || d.title, d.disc || "", d.cls || "", d.planned || "", d.forecast || "",
       last ? last.i.rev : "", STATI[k], last ? trNum(reg, last.t) : "", last ? last.t.date : "", last ? last.i.poi : "",
-      last && last.i.ret ? last.i.ret.code : "", last && last.i.ret ? last.i.ret.date : "", aperti,
+      last && last.i.ret ? last.i.ret.code : "", last && last.i.ret ? last.i.ret.date : "", last ? (last.i.clientFiles || []).length : "", aperti,
       issues.map(x => x.i.rev + " (" + trNum(reg, x.t) + (x.i.ret ? ", code " + x.i.ret.code : "") + ")").join("; ")];
   });
   const colV = [
@@ -590,7 +633,7 @@ async function aggiornaExcel(env, reg){
     { titolo: "Planned submission", larghezza: 14, tipo: "data" }, { titolo: "Forecast", larghezza: 14, tipo: "data" },
     { titolo: "Current rev.", larghezza: 10 }, { titolo: "Status", larghezza: 26 }, { titolo: "Last transmittal", larghezza: 15 },
     { titolo: "Issue date", larghezza: 14, tipo: "data" }, { titolo: "Purpose", larghezza: 9 }, { titolo: "Return code", larghezza: 10 },
-    { titolo: "Return date", larghezza: 14, tipo: "data" }, { titolo: "Open comments", larghezza: 10, tipo: "numero" }, { titolo: "Revision history", larghezza: 60 }
+    { titolo: "Return date", larghezza: 14, tipo: "data" }, { titolo: "Client attachments", larghezza: 11, tipo: "numero" }, { titolo: "Open comments", larghezza: 10, tipo: "numero" }, { titolo: "Revision history", larghezza: 60 }
   ];
   const byId = new Map(reg.docs.map(d => [d.id, d])), trById = new Map(reg.trs.map(t => [t.id, t]));
   const crs = reg.cmts.slice().sort((a, b) => { const x = byId.get(a.docId) || {}, y = byId.get(b.docId) || {}; return (x.vid ?? 1e9) - (y.vid ?? 1e9) || String(a.rev).localeCompare(String(b.rev)) || a.n - b.n; })
@@ -645,6 +688,10 @@ export async function handle(request, env, ctx){
     if(via === "/op" && request.method === "POST"){
       const c = await commessaPer(env, u, q("c"));
       return json(env, 200, await applica(env, ctx, u, c, await corpo(request)));
+    }
+    if(via === "/upload-risposta" && request.method === "POST"){
+      const c = await commessaPer(env, u, q("c"));
+      return json(env, 200, await caricamentoRisposta(env, u, c, await corpo(request)));
     }
     if(via === "/upload" && request.method === "POST"){
       const c = await commessaPer(env, u, q("c"));

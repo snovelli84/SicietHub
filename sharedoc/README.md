@@ -13,7 +13,8 @@
 - **Accesso**: con l'account Microsoft. I colleghi SICIET usano l'account aziendale; i clienti l'account ospite invitato da SICIET. Cosa si può fare dipende dal **ruolo app** assegnato in Entra ID (applicazioni aziendali → SICIET ShareDocs → Utenti e gruppi):
   - **Document Controller**: crea commesse, gestisce il registro, prepara ed emette i transmittal con i file, registra le risposte arrivate per altre vie;
   - **Tecnico SICIET**: consulta tutto e risponde ai commenti del cliente;
-  - **Cliente**: vede solo i transmittal emessi delle commesse in cui il suo indirizzo o dominio è tra i *clienti ammessi*, scarica i file e risponde con codici e commenti. Il portale è sempre in inglese.
+  - **Cliente**: vede solo i transmittal emessi delle commesse in cui il suo indirizzo o dominio è tra i *clienti ammessi*, scarica i file e risponde con codici, commenti e **allegati** (disegni commentati, documenti di riferimento). Il portale è sempre in inglese.
+- **Allegati della risposta**: vanno in `<commessa>/Transmittals/<n. transmittal>/Client reply/` con nome `<n. documento>_Rev<rev>_Client_<nome originale>`; non sovrascrivono mai file esistenti. Anche il Document Controller può allegarli quando registra una risposta arrivata per email.
 - **Interfaccia** in italiano o inglese (selettore IT/EN); le comunicazioni ufficiali (foglio transmittal, VDRL, CRS) sono sempre in inglese.
 - **Transmittal**: si scelgono documenti, revisione, scopo e il file di ciascuno. I file vengono rinominati in modo standard (`<n. documento>_Rev<rev>.pdf`) e caricati a blocchi direttamente in `SICIET Docs / Documenti / <commessa> / Transmittals / <n. transmittal>/`, senza limite di dimensione. Senza file non si emette.
 - **Excel**: `VDRL <commessa>.xlsx` e `CRS <commessa>.xlsx` nella cartella della commessa si aggiornano da soli a ogni modifica.
@@ -224,7 +225,7 @@ Il test di questa pagina usa invece le autorizzazioni **delegate** (`Files.ReadW
 
 ## Versione delle pagine
 
-**App** (`index.html` + `sharedoc.js`): versione 4 del 06/11/2026 (controllo dei file scaricati; v3: anteprima dei PDF dentro ShareDocs; v2: pulsante *Aggiorna Excel*; v1: prima versione collegata al servizio). A ogni modifica di `sharedoc.js` aumentare `VERSIONE`, il numero in `sharedoc.js?v=` e il footer di `index.html`.
+**App** (`index.html` + `sharedoc.js`): versione 5 del 06/11/2026 (allegati del cliente nella risposta; v4: controllo dei file scaricati; v3: anteprima dei PDF dentro ShareDocs; v2: pulsante *Aggiorna Excel*; v1: prima versione collegata al servizio). A ogni modifica di `sharedoc.js` aumentare `VERSIONE`, il numero in `sharedoc.js?v=` e il footer di `index.html`.
 
 **Pagina di test** (`test/index.html`):
 
