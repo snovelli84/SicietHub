@@ -151,6 +151,7 @@ In fondo a ogni pagina di ShareDocs c'è la riga **"versione N · data"**, come 
 
 | Versione | Data | Modifica |
 |---|---|---|
+| 6 | 06/11/2026 | Il sito si apre anche senza `Sites.Read.All`, passando dalla raccolta Documenti |
 | 5 | 06/11/2026 | Sito SICIET Docs e percorso della cartella al posto del link di condivisione; le cartelle mancanti si creano da sole |
 | 4 | 06/11/2026 | Numero di versione in fondo alla pagina |
 | 3 | 06/11/2026 | Link della cartella SharePoint dei transmittal |
