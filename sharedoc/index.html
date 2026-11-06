@@ -92,7 +92,7 @@ label.file{display:grid;gap:6px;font-size:14px;color:var(--muted)}
 </main>
 
 <!-- Aumentare la versione (e la data) a ogni modifica pubblicata: serve a capire se il browser mostra l'ultima. -->
-<footer>SICIET ShareDocs · Test connessione · versione 4 · 06/11/2026</footer>
+<footer>SICIET ShareDocs · Test connessione · versione 5 · 06/11/2026</footer>
 
 <script>
 /* =====================================================================
@@ -102,8 +102,11 @@ var SHAREDOCS_CONFIG = {
   // Registrazione dell'app in Microsoft Entra ID → Panoramica
   clientId: "9e9b873b-2e7c-4011-aebd-7470627d55ec",   // ID applicazione (client) di "SICIET ShareDocs"
   tenantId: "5c055224-300a-4b03-8742-552b7dd79f62",   // ID directory (tenant) SICIET
-  // SharePoint → cartella dei transmittal → Condividi → Copia collegamento
-  cartella: "https://srlsiciet.sharepoint.com/:f:/g/IgCWfH2POP39QrY4y5Xn9vz1ATxo8pnrt3fbaIksrPm0WW0?e=Q6X08X",   // SICIET Docs / 2040 PEG ITALY HVAC NGFGT IRAQ / Transmittals
+  // Sito SharePoint di ShareDocs e cartella dei transmittal dentro "Documenti".
+  // Le cartelle mancanti vengono create dal test. (In alternativa a "cartella" si può
+  // mettere il link di condivisione di una cartella, che inizia con https://.)
+  sito: "https://srlsiciet.sharepoint.com/sites/SICIETDocs",
+  cartella: "2040 PEG ITALY HVAC NGFGT IRAQ/Transmittals",
   // Dimensione del file grande di prova, in MB (deve superare 20 per provare il limite)
   testSizeMB: 25
 };
@@ -147,7 +150,7 @@ var SHAREDOCS_CONFIG = {
     var m = (e && e.message) || String(e), st = e && e.status;
     if(st === 401) return m + "\nToken non valido: esci e rientra.";
     if(st === 403) return m + "\nPermesso negato: controlla il consenso amministratore (Files.ReadWrite.All) e che il tuo utente abbia accesso in modifica alla cartella.";
-    if(st === 404) return m + "\nNon trovato: controlla il link in SHAREDOCS_CONFIG.cartella (deve essere il link di condivisione della cartella).";
+    if(st === 404) return m + "\nNon trovato: controlla SHAREDOCS_CONFIG.sito e .cartella, e che il tuo utente possa entrare nel sito (proprietario o membro).";
     if(st === 0) return m + "\nRete: verifica la connessione o un proxy che blocca graph.microsoft.com.";
     return m;
   }
@@ -201,7 +204,26 @@ var SHAREDOCS_CONFIG = {
   }
 
   /* ---------- Test ---------- */
+  async function getOrNull(url){ try { return await api("GET", url); } catch(e){ if(e.status === 404) return null; throw e; } }
   async function openFolder(){
+    if(!/^https:\/\//.test(cfg.cartella)){
+      var m = String(cfg.sito).match(/^https:\/\/([^/]+)(\/sites\/[^/?#]+)/i);
+      if(!m) throw err("Indirizzo del sito non valido in SHAREDOCS_CONFIG.sito (es. https://srlsiciet.sharepoint.com/sites/SICIETDocs).", 400);
+      var site = await getOrNull("/sites/" + m[1] + ":" + m[2] + "?$select=id,displayName,webUrl");
+      if(!site) throw err("Sito " + m[2] + " non trovato o non accessibile con il tuo utente.", 404);
+      var d = await api("GET", "/sites/" + site.id + "/drive?$select=id,name,webUrl");
+      drive = d.id;
+      var parts = String(cfg.cartella).split("/").map(function(x){ return x.trim(); }).filter(Boolean), parent = await api("GET", "/drives/" + drive + "/root?$select=id"), acc = [], created = [];
+      for(var i = 0; i < parts.length; i++){
+        acc.push(parts[i]);
+        var it = await getOrNull("/drives/" + drive + "/root:/" + acc.map(encodeURIComponent).join("/") + ":?$select=id,name,folder,webUrl");
+        if(!it){ it = await api("POST", "/drives/" + drive + "/items/" + parent.id + "/children", { name: parts[i], folder: {}, "@microsoft.graph.conflictBehavior": "fail" }); created.push(parts[i]); }
+        else if(!it.folder) throw err('"' + acc.join("/") + '" esiste ma non è una cartella.', 409);
+        parent = it;
+      }
+      root = parent.id;
+      return { name: site.displayName + " › " + d.name + " › " + parts.join(" › ") + (created.length ? "  (cartelle create ora: " + created.join(", ") + ")" : ""), webUrl: parent.webUrl, folder: {} };
+    }
     var b64 = btoa(unescape(encodeURIComponent(cfg.cartella))).replace(/=+$/, "").replace(/\//g, "_").replace(/\+/g, "-");
     var it = await api("GET", "/shares/u!" + b64 + "/driveItem");
     if(!it.folder) throw err("Il link non punta a una cartella.", 404);
@@ -227,8 +249,8 @@ var SHAREDOCS_CONFIG = {
       if(!r.length) throw err("Nessun ruolo ShareDocs assegnato a questo utente. In Entra ID → Applicazioni aziendali → SICIET ShareDocs → Utenti e gruppi, assegna un ruolo (Document Controller, Tecnico SICIET o Cliente) all'utente o al suo gruppo, poi esci e rientra.", 403);
       return r.map(function(x){ return ROLES[x] || x; }).join(", ");
     });
-    if(ok && !cfg.cartella){ step("steps", "Cartella SharePoint").ko("Il link della cartella dei transmittal non è ancora impostato (SHAREDOCS_CONFIG.cartella): accesso e ruoli funzionano, il test dei file si fa quando la cartella c'è."); $("btnRun").disabled = false; return; }
-    ok = ok && await run("steps", "Apertura della cartella dei transmittal dal link di condivisione", async function(){
+    if(ok && !cfg.cartella){ step("steps", "Cartella SharePoint").ko("La cartella dei transmittal non è ancora impostata (SHAREDOCS_CONFIG.cartella): accesso e ruoli funzionano, il test dei file si fa quando la cartella c'è."); $("btnRun").disabled = false; return; }
+    ok = ok && await run("steps", "Apertura del sito e della cartella dei transmittal", async function(){
       var it = await openFolder();
       return it.name + "\n" + it.webUrl;
     });

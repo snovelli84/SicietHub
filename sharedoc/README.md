@@ -78,7 +78,8 @@ Dopo la creazione:
    var SHAREDOCS_CONFIG = {
      clientId: "…",   // ID applicazione (client) di "SICIET ShareDocs"
      tenantId: "5c055224-300a-4b03-8742-552b7dd79f62",   // tenant SICIET, già impostato
-     cartella: "https://srlsiciet.sharepoint.com/:f:/s/…",  // link del punto 1 (anche dopo)
+     sito: "https://srlsiciet.sharepoint.com/sites/SICIETDocs",
+     cartella: "2040 PEG ITALY HVAC NGFGT IRAQ/Transmittals",   // percorso dentro "Documenti"
      testSizeMB: 25
    };
    ```
@@ -150,6 +151,7 @@ In fondo a ogni pagina di ShareDocs c'è la riga **"versione N · data"**, come 
 
 | Versione | Data | Modifica |
 |---|---|---|
+| 5 | 06/11/2026 | Sito SICIET Docs e percorso della cartella al posto del link di condivisione; le cartelle mancanti si creano da sole |
 | 4 | 06/11/2026 | Numero di versione in fondo alla pagina |
 | 3 | 06/11/2026 | Link della cartella SharePoint dei transmittal |
 | 2 | 06/11/2026 | ID applicazione della registrazione Entra ID |
