@@ -286,6 +286,7 @@ function datiDoc(x, vecchio){
   if(x.planned !== undefined) d.planned = data(x.planned);
   if(x.forecast !== undefined) d.forecast = data(x.forecast);
   if(x.closed !== undefined) d.closed = !!x.closed;
+  if(x.tba !== undefined) d.tba = !!x.tba;   // numero del cliente non ancora assegnato
   if(x.vid !== undefined) d.vid = Number(x.vid) || null;
   if(!d.titleEn && !d.title) throw new Errore(400, "Manca il titolo del documento.");
   return d;

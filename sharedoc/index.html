@@ -1,347 +1,234 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
-<title>SICIET ShareDocs – Test connessione</title>
 <meta name="theme-color" content="#005baa">
 <link rel="icon" href="icons/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>SICIET ShareDocs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Oxanium:wght@800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
+/* Layout: barra di commessa in alto, schede operative, registro a tabella; i transmittal si aprono in un pannello laterale come un foglio tecnico. */
 :root{
-  --brand:#005baa; --bg:#f4f6f9; --card:#fff; --text:#1d2430; --muted:#5d6878; --border:#e3e7ee;
-  --ok:#1e7d3c; --ok-bg:#e3f4e8; --ko:#b3261e; --ko-bg:#fbe4e2; --run:#7a5600; --run-bg:#fff4d6; --field:#f8fafc;
+  --bg:#f3f5f8; --surface:#ffffff; --sunk:#eaeef3; --ink:#16202c; --muted:#5b6775; --line:#d6dce4; --line-strong:#aeb8c5;
+  --accent:#1b4f8f; --accent-ink:#ffffff; --accent-soft:#e2eaf5;
+  --ok:#1d7347; --ok-soft:#e1f1e8; --warn:#9a5a00; --warn-soft:#fbefdb; --bad:#b0261d; --bad-soft:#f9e3e1;
+  --pend:#2b5ea6; --pend-soft:#e3ecf9; --info:#4e5d70; --info-soft:#e8ecf1;
+  --shadow:0 12px 40px rgba(16,32,52,.18);
+  --logo-plate:transparent; --brand-grad:linear-gradient(90deg,#1472B8 0%,#3C8F8C 50%,#82BA3A 100%); --brand-rule:linear-gradient(180deg,#1472B8 0%,#82BA3A 100%);
+  --f-brand:"Oxanium","Archivo",Arial,sans-serif;
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
 }
-@media (prefers-color-scheme: dark){:root{
-  --bg:#11161d; --card:#1a212b; --text:#e8edf3; --muted:#9aa6b5; --border:#2a3340;
-  --ok:#7fd59a; --ok-bg:#16301f; --ko:#f2b8b5; --ko-bg:#3a1d1b; --run:#f1d38a; --run-bg:#3a3018; --field:#141a22; color-scheme:dark}}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e131a; --surface:#151c25; --sunk:#1b242f; --ink:#e4e9f0; --muted:#97a3b2; --line:#29333f; --line-strong:#3c4856;
+  --accent:#7eaaf0; --accent-ink:#0b1420; --accent-soft:#1b2a3e;
+  --ok:#62c48f; --ok-soft:#15291f; --warn:#e6a548; --warn-soft:#2e2412; --bad:#f2837a; --bad-soft:#331a18;
+  --pend:#8db3f2; --pend-soft:#17253a; --info:#a5b3c5; --info-soft:#1e2731; --shadow:0 12px 40px rgba(0,0,0,.5); --logo-plate:#ffffff; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e131a; --surface:#151c25; --sunk:#1b242f; --ink:#e4e9f0; --muted:#97a3b2; --line:#29333f; --line-strong:#3c4856;
+  --accent:#7eaaf0; --accent-ink:#0b1420; --accent-soft:#1b2a3e;
+  --ok:#62c48f; --ok-soft:#15291f; --warn:#e6a548; --warn-soft:#2e2412; --bad:#f2837a; --bad-soft:#331a18;
+  --pend:#8db3f2; --pend-soft:#17253a; --info:#a5b3c5; --info-soft:#1e2731; --shadow:0 12px 40px rgba(0,0,0,.5); --logo-plate:#ffffff; color-scheme:dark}
+
 *{box-sizing:border-box}
-body{margin:0;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
-header{background:var(--brand);color:#fff;padding:20px 16px 44px}
-header .in,main{max-width:820px;margin:0 auto}
-header h1{margin:0;font-size:0;line-height:0}
-.logo{display:inline-block;background:#fff;border-radius:16px;padding:8px 12px;line-height:0}
-.logo img{display:block;height:64px;width:auto}
-header .title{margin:12px 0 0;font-size:20px;font-weight:700}
-header p{margin:4px 0 0;opacity:.9}
-main{margin-top:-28px;padding:0 16px 32px;display:grid;gap:16px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 16px;display:grid;gap:12px}
-h2{margin:0;font-size:17px}
-.btns{display:flex;flex-wrap:wrap;gap:8px}
-button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:10px 14px;cursor:pointer;background:var(--field);color:var(--text);border:1px solid var(--border)}
-button.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
-button:disabled{opacity:.55;cursor:not-allowed}
-button:focus-visible{outline:2px solid var(--text);outline-offset:2px}
-ol.steps{list-style:none;margin:0;padding:0;display:grid;gap:8px}
-.steps li{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--field)}
-.steps .ico{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;background:var(--border);color:var(--muted)}
-.steps li.ok .ico{background:var(--ok-bg);color:var(--ok)}
-.steps li.ko .ico{background:var(--ko-bg);color:var(--ko)}
-.steps li.run .ico{background:var(--run-bg);color:var(--run)}
-.steps b{display:block}
-.steps .det{font-size:13px;color:var(--muted);overflow-wrap:anywhere;white-space:pre-line}
-.steps li.ko .det{color:var(--ko)}
-.bar{height:6px;border-radius:3px;background:var(--border);overflow:hidden;margin-top:6px}
-.bar i{display:block;height:100%;width:0;background:var(--brand)}
-.notice{border-radius:12px;padding:12px;font-size:14px;background:var(--run-bg);color:var(--run)}
-.who{font-size:14px;color:var(--muted)}
-code{font-size:13px;background:var(--field);border:1px solid var(--border);border-radius:6px;padding:1px 5px}
-a{color:var(--brand)}
-@media (prefers-color-scheme: dark){a{color:#6fb0ee}}
-footer{text-align:center;padding:8px 16px 28px;color:var(--muted);font-size:12px}
-label.file{display:grid;gap:6px;font-size:14px;color:var(--muted)}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0}
+
+/* Top bar */
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:10px}
+.top .toggles{display:flex;gap:6px;flex:none;align-items:center}
+.who{font-size:12.5px;color:var(--muted);display:inline-flex;gap:6px;align-items:center;max-width:220px;overflow:hidden;white-space:nowrap}
+.job select{font:inherit;font-family:var(--f-mono);font-size:12px;font-weight:600;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);color:var(--ink);padding:2px 4px;max-width:240px}
+.top .lockup{text-decoration:none}
+.lockup{display:inline-flex;align-items:center;gap:10px;background:var(--logo-plate);border-radius:8px;padding:4px 10px 4px 6px}
+.lockup img{height:30px;width:auto;display:block}
+.lockup .rule{width:2px;height:26px;border-radius:1px;background:var(--brand-rule)}
+.lockup .wm{font-family:var(--f-brand);font-weight:800;font-size:19px;line-height:1;letter-spacing:2px;text-transform:uppercase;background:var(--brand-grad);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+.job{display:flex;flex-direction:column;line-height:1.25;padding-left:14px;border-left:1px solid var(--line);min-width:0;max-width:240px}
+.job b,.job span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.job b{font-family:var(--f-mono);font-size:12px;font-weight:600}
+.job span{font-size:12px;color:var(--muted)}
+nav.tabs{display:flex;gap:2px;margin-left:auto;flex-wrap:wrap}
+nav.tabs a{padding:7px 10px;border-radius:6px;text-decoration:none;color:var(--muted);font-weight:500}
+nav.tabs a:hover{background:var(--sunk);color:var(--ink)}
+nav.tabs a[aria-current="page"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.lang{display:inline-flex;border:1px solid var(--line-strong);border-radius:6px;overflow:hidden;flex:none}
+.lang button{border:0;background:var(--surface);padding:5px 9px;font-family:var(--f-mono);font-size:12px;font-weight:600;color:var(--muted);cursor:pointer}
+.lang button+button{border-left:1px solid var(--line-strong)}
+.lang button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+nav.tabs .n{font-family:var(--f-mono);font-size:11px;margin-left:5px;padding:0 5px;border-radius:9px;background:var(--bad);color:var(--surface)}
+
+main{padding-block:24px 40px}
+.appver{text-align:center;color:var(--muted);font-size:12px;padding-block:0 28px}
+.pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.pagehead h1{font-size:24px;font-weight:700}
+.pagehead p{margin:4px 0 0;color:var(--muted);max-width:68ch}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line-strong);background:var(--surface);padding:7px 13px;border-radius:6px;cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover{background:var(--sunk)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.small{padding:4px 9px;font-size:13px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.link{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font-weight:500;text-align:left}
+.link:hover{text-decoration:underline}
+
+/* Status chip */
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:2px 9px 2px 7px;border-radius:999px;white-space:nowrap;background:var(--info-soft);color:var(--info)}
+.chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.t-ok{background:var(--ok-soft);color:var(--ok)} .t-warn{background:var(--warn-soft);color:var(--warn)} .t-bad{background:var(--bad-soft);color:var(--bad)}
+.t-pend{background:var(--pend-soft);color:var(--pend)} .t-info{background:var(--info-soft);color:var(--info)} .t-muted{background:var(--sunk);color:var(--muted)}
+.demo{font-family:var(--f-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px dashed var(--line-strong);border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:1px}
+.code{display:inline-grid;place-items:center;min-width:22px;height:22px;border-radius:4px;font-family:var(--f-mono);font-weight:600;font-size:12px;border:1.5px solid currentColor}
+
+/* Dashboard */
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:24px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:2px;text-align:left;cursor:pointer}
+.kpi:hover{border-color:var(--line-strong)}
+.kpi .v{font-family:var(--f-display);font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi .l{font-size:12.5px;color:var(--muted);font-weight:500}
+.kpi.alert .v{color:var(--bad)} .kpi.warnv .v{color:var(--warn)}
+.grid2{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:20px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px}
+.panel>h2{font-size:15px;font-weight:700;padding:14px 16px 0}
+.panel .sub{padding:2px 16px 10px;color:var(--muted);font-size:13px;margin:0}
+.todo{list-style:none;margin:0;padding:0}
+.todo li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 16px;border-top:1px solid var(--line)}
+.todo .what{min-width:0}
+.todo .what b{font-weight:600;display:block;overflow-wrap:anywhere}
+.todo .what span{font-size:12.5px;color:var(--muted)}
+.stripe{width:4px;align-self:stretch;border-radius:2px;background:currentColor}
+.stack{display:flex;height:14px;border-radius:4px;overflow:hidden;margin:6px 16px 12px;background:var(--sunk)}
+.stack i{display:block;height:100%}
+.legend{list-style:none;margin:0;padding:0 16px 14px;display:grid;gap:6px}
+.legend li{display:flex;align-items:center;gap:8px;font-size:13px}
+.legend li .sw{width:10px;height:10px;border-radius:2px;flex:none}
+.legend li .c{margin-left:auto;font-family:var(--f-mono)}
+.empty{padding:28px 16px;text-align:center;color:var(--muted)}
+
+/* Tables */
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.toolbar input,.toolbar select{border:1px solid var(--line-strong);background:var(--surface);border-radius:6px;padding:6px 10px}
+.toolbar input[type=search]{min-width:220px;flex:1 1 220px;max-width:360px}
+.toolbar .count{margin-left:auto;color:var(--muted);font-size:13px}
+.tablebox{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:9px 12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+th{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600;background:var(--sunk);white-space:nowrap;position:sticky;top:0}
+tbody tr:last-child td{border-bottom:0}
+tbody tr.clickable{cursor:pointer}
+tbody tr.clickable:hover td{background:var(--sunk)}
+td.num{white-space:nowrap}
+.hist{display:flex;gap:4px;flex-wrap:wrap}
+.hist span{font-family:var(--f-mono);font-size:11.5px;padding:1px 6px;border-radius:4px;background:var(--sunk);white-space:nowrap}
+
+/* Drawer */
+.scrim{position:fixed;inset:0;background:rgba(10,18,28,.45);z-index:20}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(880px,100%);background:var(--bg);z-index:21;box-shadow:var(--shadow);display:flex;flex-direction:column;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-right:env(safe-area-inset-right,0px)}
+.drawer .dh{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--surface);flex-wrap:wrap}
+.drawer .dh h2{font-size:17px;font-weight:700;margin-right:auto}
+.drawer .db{overflow:auto;padding:20px;flex:1}
+.form{display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
+.form>*{min-width:0}
+.drawer .db>*{max-width:100%}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+label.f{display:grid;gap:4px;font-size:12.5px;font-weight:600;color:var(--muted)}
+label.f input,label.f select,label.f textarea,td select,td input,td textarea{border:1px solid var(--line-strong);background:var(--surface);border-radius:6px;padding:7px 9px;font-weight:400;color:var(--ink);width:100%}
+textarea{resize:vertical;min-height:64px}
+td select,td input{padding:4px 6px;min-width:62px}
+.hint{font-size:12.5px;color:var(--muted);margin:0}
+.notice{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:12px 14px;font-size:13.5px}
+.notice.warn{border-color:var(--warn);background:var(--warn-soft)}
+
+/* Transmittal sheet */
+.sheet{background:var(--surface);border:1.5px solid var(--line-strong);border-radius:2px;padding:22px 24px;font-size:13px}
+.sh-head{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start;border-bottom:2px solid var(--ink);padding-bottom:12px}
+.sh-brand{display:grid;gap:4px;justify-items:start}
+.sh-brand .lockup{padding:4px 10px 4px 4px;gap:12px}
+.sh-brand .lockup img{height:46px}
+.sh-brand .lockup .rule{height:38px;width:3px}
+.sh-brand .lockup .wm{font-size:24px;letter-spacing:3px}
+.sh-brand small{font-size:11px;color:var(--muted);letter-spacing:.04em}
+.sh-title{text-align:right}
+.file{display:grid;gap:2px;font-size:13px;min-width:0}
+.file .fname{font-size:12px;overflow-wrap:anywhere}
+.file .sp{font-family:var(--f-mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.fileinput{font-size:12px;max-width:100%}
+.sh-files{margin-top:14px;font-size:12px;display:grid;gap:2px}
+.sh-files b{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.notice.preview{border-color:var(--pend);background:var(--pend-soft);margin-bottom:16px}
+.sh-co{font-size:10.5px;line-height:1.45;color:var(--muted);margin-bottom:10px}
+.sh-co b{color:var(--ink)}
+.sh-title .k{font-family:var(--f-display);font-weight:700;letter-spacing:.14em;font-size:13px}
+.sh-title .no{font-family:var(--f-mono);font-size:20px;font-weight:600}
+.sh-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid var(--line-strong);border-top:0}
+.sh-meta div{padding:7px 10px;border-top:1px solid var(--line-strong);min-width:0}
+.sh-meta div:nth-child(odd){border-right:1px solid var(--line-strong)}
+.sh-meta i{display:block;font-style:normal;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.sh-meta b{font-weight:600;overflow-wrap:anywhere}
+.sheet table{margin-top:14px;border:1px solid var(--line-strong)}
+.sheet th{background:var(--sunk);font-size:10px;position:static}
+.sheet th,.sheet td{border:1px solid var(--line-strong);padding:6px 8px}
+.sh-legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px;font-size:11.5px}
+.sh-legend b{display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+.sh-legend div div{display:flex;gap:6px}
+.sh-sign{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;margin-top:22px}
+.sh-sign div{border-top:1px solid var(--ink);padding-top:4px;font-size:11px;color:var(--muted)}
+.stamp{display:inline-block;transform:rotate(-4deg);border:2px solid currentColor;border-radius:4px;padding:2px 8px;font-family:var(--f-display);font-weight:700;letter-spacing:.08em;font-size:12px;text-transform:uppercase}
+
+/* Comments */
+.cmt-reply{display:grid;gap:6px;min-width:240px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:6px;z-index:40;font-weight:500;max-width:calc(100% - 32px)}
+.confirm{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}
+
+@media (max-width:980px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.grid2{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){
+  .top .toggles{margin-left:auto}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .job{border-left:0;padding-left:0}
+  nav.tabs{margin-left:0;width:100%}
+  .sh-meta,.sh-legend,.sh-sign{grid-template-columns:minmax(0,1fr)}
+  .sh-meta div:nth-child(odd){border-right:0}
+  .sheet{padding:16px}
+  .drawer .db{padding:14px}
+}
+@media (prefers-reduced-motion:no-preference){.drawer{animation:slide .18s ease-out}@keyframes slide{from{transform:translateX(24px);opacity:.6}}}
 </style>
+
 </head>
 <body>
-<header><div class="in">
-  <h1><span class="logo"><img src="icons/logo.png" alt="SICIET ShareDocs" width="799" height="474"></span></h1>
-  <p class="title">Test di connessione a Microsoft 365</p>
-  <p>Verifica che l'accesso Microsoft 365 e la cartella SharePoint dei transmittal funzionino davvero.</p>
-</div></header>
+<header class="top">
+  <div class="wrap">
+    <a class="lockup" href="#cruscotto" aria-label="SICIET ShareDocs, vai al cruscotto"><img src="icons/siciet-mark.png" alt="SICIET" width="55" height="30"><span class="rule"></span><span class="wm">ShareDocs</span></a>
+    <div class="job"><b id="jobCode"></b><span id="jobClient"></span></div>
+    <nav class="tabs" id="tabs" aria-label="Sezioni"></nav>
+    <div class="toggles"><span class="who" id="who"></span><div class="lang" id="modeBox" role="group" aria-label="Vista / View" hidden><button type="button" data-view-mode="siciet" aria-pressed="true">SICIET</button><button type="button" data-view-mode="client" aria-pressed="false">Client</button></div>
+    <div class="lang" id="langBox" role="group" aria-label="Lingua / Language"><button type="button" data-lang="it" aria-pressed="false">IT</button><button type="button" data-lang="en" aria-pressed="false">EN</button></div></div>
+  </div>
+</header>
+<main class="wrap" id="main"><div class="empty">Caricamento… / Loading…</div></main>
+<!-- Aumentare versione e data a ogni modifica pubblicata, insieme a VERSIONE in sharedoc.js e a ?v= qui sotto. -->
+<footer class="wrap appver">SICIET ShareDocs · versione 1 · 06/11/2026</footer>
+<div id="drawerRoot"></div>
+<div id="toastRoot"></div>
 
-<main>
-  <p class="notice" id="cfgMissing" hidden>Configurazione incompleta: manca l'ID applicazione (<code>clientId</code>) di "SICIET ShareDocs" in <code>SHAREDOCS_CONFIG</code>, all'inizio dello script di questa pagina. Vedi <code>sharedoc/README.md</code> nella repository.</p>
-
-  <section class="card">
-    <h2>1. Accesso</h2>
-    <p class="who" id="who">Non hai ancora effettuato l'accesso.</p>
-    <div class="btns">
-      <button class="primary" id="btnLogin" type="button">Accedi con Microsoft</button>
-      <button id="btnLogout" type="button" hidden>Esci</button>
-    </div>
-  </section>
-
-  <section class="card">
-    <h2>2. Test automatico</h2>
-    <p class="who">Crea una cartella di prova nella cartella dei transmittal, carica un file piccolo e uno grande (oltre il limite di 20 MB del prototipo), li rilegge e li elenca. Alla fine puoi eliminare tutto.</p>
-    <div class="btns">
-      <button class="primary" id="btnRun" type="button" disabled>Avvia il test</button>
-      <button id="btnClean" type="button" disabled>Elimina i file di prova</button>
-    </div>
-    <ol class="steps" id="steps"></ol>
-  </section>
-
-  <section class="card">
-    <h2>3. Prova con un tuo documento (facoltativa)</h2>
-    <label class="file">Scegli un PDF o un disegno vero: viene caricato nella cartella di prova con il nome standard di ShareDocs.
-      <input type="file" id="ownFile" disabled>
-    </label>
-    <ol class="steps" id="ownSteps"></ol>
-  </section>
-</main>
-
-<!-- Aumentare la versione (e la data) a ogni modifica pubblicata: serve a capire se il browser mostra l'ultima. -->
-<footer>SICIET ShareDocs · Test connessione · versione 6 · 06/11/2026</footer>
-
-<script>
-/* =====================================================================
-   CONFIGURAZIONE – da compilare (vedi README.md)
-   ===================================================================== */
-var SHAREDOCS_CONFIG = {
-  // Registrazione dell'app in Microsoft Entra ID → Panoramica
-  clientId: "9e9b873b-2e7c-4011-aebd-7470627d55ec",   // ID applicazione (client) di "SICIET ShareDocs"
-  tenantId: "5c055224-300a-4b03-8742-552b7dd79f62",   // ID directory (tenant) SICIET
-  // Sito SharePoint di ShareDocs e cartella dei transmittal dentro "Documenti".
-  // Le cartelle mancanti vengono create dal test. (In alternativa a "cartella" si può
-  // mettere il link di condivisione di una cartella, che inizia con https://.)
-  sito: "https://srlsiciet.sharepoint.com/sites/SICIETDocs",
-  cartella: "2040 PEG ITALY HVAC NGFGT IRAQ/Transmittals",
-  // Dimensione del file grande di prova, in MB (deve superare 20 per provare il limite)
-  testSizeMB: 25
-};
-
-(function(){
-  "use strict";
-  var cfg = SHAREDOCS_CONFIG;
-  var MSAL_URL = "https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js";
-  var GRAPH = "https://graph.microsoft.com/v1.0";
-  var SCOPES = ["User.Read", "Files.ReadWrite.All"];
-  var SIMPLE_MAX = 4 * 1024 * 1024;       // oltre 4 MB Graph richiede la sessione di caricamento
-  var CHUNK = 10 * 327680;                // multiplo di 320 KiB, come richiesto da Graph
-  var $ = function(id){ return document.getElementById(id); };
-  var configured = !!(cfg.clientId && cfg.tenantId);
-  // Indirizzo di ritorno dopo l'accesso: sempre la cartella, anche se la pagina è aperta come .../index.html
-  var REDIRECT = location.origin + location.pathname.replace(/index\.html$/, "");
-  var ROLES = { DocControl: "Document Controller", Engineer: "Tecnico SICIET", Client: "Cliente" };
-  var pca = null, account = null, drive = null, root = null, testFolder = null;
-
-  /* ---------- Interfaccia dei passi ---------- */
-  function step(list, title){
-    var li = document.createElement("li");
-    li.innerHTML = '<span class="ico">…</span><div><b></b><div class="det"></div></div>';
-    li.querySelector("b").textContent = title;
-    $(list).appendChild(li);
-    var api = {
-      run: function(d){ li.className = "run"; li.querySelector(".ico").textContent = "…"; api.det(d || "In corso…"); return api; },
-      ok: function(d){ li.className = "ok"; li.querySelector(".ico").textContent = "✓"; api.det(d || ""); return api; },
-      ko: function(d){ li.className = "ko"; li.querySelector(".ico").textContent = "✗"; api.det(d || ""); return api; },
-      det: function(d){ li.querySelector(".det").textContent = d; return api; },
-      bar: function(p){ var b = li.querySelector(".bar"); if(!b){ b = document.createElement("div"); b.className = "bar"; b.innerHTML = "<i></i>"; li.lastElementChild.appendChild(b); } b.firstChild.style.width = Math.round(p*100) + "%"; return api; }
-    };
-    return api.run("In attesa");
-  }
-  async function run(list, title, fn){
-    var s = step(list, title).run();
-    try { var d = await fn(s); s.ok(d); return true; }
-    catch(e){ s.ko(spiega(e)); return false; }
-  }
-  function spiega(e){
-    var m = (e && e.message) || String(e), st = e && e.status;
-    if(st === 401) return m + "\nToken non valido: esci e rientra.";
-    if(st === 403) return m + "\nPermesso negato: controlla il consenso amministratore (Files.ReadWrite.All) e che il tuo utente abbia accesso in modifica alla cartella.";
-    if(st === 404) return m + "\nNon trovato: controlla SHAREDOCS_CONFIG.sito e .cartella, e che il tuo utente possa entrare nel sito (proprietario o membro).";
-    if(st === 0) return m + "\nRete: verifica la connessione o un proxy che blocca graph.microsoft.com.";
-    return m;
-  }
-  function err(msg, status){ var e = new Error(msg); e.status = status; return e; }
-  function mb(n){ return (n/1048576).toFixed(1) + " MB"; }
-
-  /* ---------- MSAL ---------- */
-  function loadScript(src){ return new Promise(function(res, rej){ var s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = function(){ rej(err("Impossibile caricare la libreria di accesso Microsoft (MSAL).", 0)); }; document.head.appendChild(s); }); }
-  async function initAuth(){
-    await loadScript(MSAL_URL);
-    pca = new msal.PublicClientApplication({
-      auth: { clientId: cfg.clientId, authority: "https://login.microsoftonline.com/" + cfg.tenantId, redirectUri: REDIRECT },
-      cache: { cacheLocation: "sessionStorage" }
-    });
-    await pca.initialize();
-    var r = await pca.handleRedirectPromise();
-    account = (r && r.account) || pca.getAllAccounts()[0] || null;
-  }
-  async function token(){
-    try { return (await pca.acquireTokenSilent({ scopes: SCOPES, account: account })).accessToken; }
-    catch(e){ if(e instanceof msal.InteractionRequiredAuthError){ await pca.acquireTokenRedirect({ scopes: SCOPES, account: account }); } throw e; }
-  }
-  async function api(method, url, body, headers){
-    var h = Object.assign({ Authorization: "Bearer " + await token() }, headers || {});
-    if(body && !(body instanceof Blob)){ body = JSON.stringify(body); h["Content-Type"] = "application/json"; }
-    var res;
-    try { res = await fetch(url.indexOf("https://") === 0 ? url : GRAPH + url, { method: method, headers: h, body: body }); }
-    catch(e){ throw err("Connessione a Microsoft Graph non riuscita.", 0); }
-    if(!res.ok){ var j = await res.json().catch(function(){ return {}; }); throw err(((j.error && (j.error.code + ": " + j.error.message)) || res.statusText) + " (HTTP " + res.status + ")", res.status); }
-    return res.status === 204 ? null : res.json();
-  }
-  function itemUrl(path, suffix){
-    var p = path ? ":/" + path.split("/").map(encodeURIComponent).join("/") + ":" : "";
-    return "/drives/" + drive + "/items/" + root + p + (suffix || "");
-  }
-  async function put(path, blob, onProgress){
-    if(blob.size <= SIMPLE_MAX){
-      return api("PUT", itemUrl(path, "/content?@microsoft.graph.conflictBehavior=replace"), blob, { "Content-Type": blob.type || "application/octet-stream" });
-    }
-    var s = await api("POST", itemUrl(path, "/createUploadSession"), { item: { "@microsoft.graph.conflictBehavior": "replace" } });
-    var last = null;
-    for(var start = 0; start < blob.size; start += CHUNK){
-      var end = Math.min(start + CHUNK, blob.size);
-      var res = await fetch(s.uploadUrl, { method: "PUT", headers: { "Content-Range": "bytes " + start + "-" + (end - 1) + "/" + blob.size }, body: blob.slice(start, end) })
-        .catch(function(){ throw err("Connessione interrotta durante il caricamento.", 0); });
-      if(!res.ok && res.status !== 202) throw err("Caricamento a blocchi non riuscito (HTTP " + res.status + ").", res.status);
-      if(onProgress) onProgress(end / blob.size);
-      if(res.status === 200 || res.status === 201) last = await res.json();
-    }
-    return last;
-  }
-
-  /* ---------- Test ---------- */
-  async function getOrNull(url){ try { return await api("GET", url); } catch(e){ if(e.status === 404) return null; throw e; } }
-  async function openFolder(){
-    if(!/^https:\/\//.test(cfg.cartella)){
-      var m = String(cfg.sito).match(/^https:\/\/([^/]+)(\/sites\/[^/?#]+)/i);
-      if(!m) throw err("Indirizzo del sito non valido in SHAREDOCS_CONFIG.sito (es. https://srlsiciet.sharepoint.com/sites/SICIETDocs).", 400);
-      // 1) Con Sites.Read.All il sito si legge dal suo indirizzo.
-      // 2) Con il solo Files.ReadWrite.All /sites/... viene rifiutato: si apre allora la raccolta
-      //    Documenti dal suo indirizzo web (API /shares), che basta per i file.
-      var site = null, d = null, via = "";
-      try {
-        site = await getOrNull("/sites/" + m[1] + ":" + m[2] + "?$select=id,displayName,webUrl");
-        if(site){ d = await api("GET", "/sites/" + site.id + "/drive?$select=id,name,webUrl"); via = "indirizzo del sito"; }
-      } catch(e){ if(e.status !== 401 && e.status !== 403) throw e; }
-      if(!d){
-        var base = "https://" + m[1] + m[2], libs = ["Documenti condivisi", "Shared Documents"], lastErr = null;
-        for(var k = 0; k < libs.length && !d; k++){
-          try {
-            var u = base + "/" + libs[k];
-            var b64 = btoa(unescape(encodeURIComponent(u))).replace(/=+$/, "").replace(/\//g, "_").replace(/\+/g, "-");
-            var li = await api("GET", "/shares/u!" + b64 + "/driveItem?$select=id,name,webUrl,parentReference");
-            d = { id: li.parentReference.driveId, name: li.name };
-            site = { displayName: m[2].replace(/^\/sites\//, "") };
-            via = "raccolta " + libs[k];
-          } catch(e){ lastErr = e; }
-        }
-        if(!d) throw err("Raccolta Documenti del sito " + m[2] + " non raggiungibile (" + ((lastErr && lastErr.message) || "") + "). Verifica di poter entrare nel sito con questo account.", (lastErr && lastErr.status) || 404);
-      }
-      drive = d.id;
-      var parts = String(cfg.cartella).split("/").map(function(x){ return x.trim(); }).filter(Boolean), parent = await api("GET", "/drives/" + drive + "/root?$select=id"), acc = [], created = [];
-      for(var i = 0; i < parts.length; i++){
-        acc.push(parts[i]);
-        var it = await getOrNull("/drives/" + drive + "/root:/" + acc.map(encodeURIComponent).join("/") + ":?$select=id,name,folder,webUrl");
-        if(!it){ it = await api("POST", "/drives/" + drive + "/items/" + parent.id + "/children", { name: parts[i], folder: {}, "@microsoft.graph.conflictBehavior": "fail" }); created.push(parts[i]); }
-        else if(!it.folder) throw err('"' + acc.join("/") + '" esiste ma non è una cartella.', 409);
-        parent = it;
-      }
-      root = parent.id;
-      return { name: site.displayName + " › " + d.name + " › " + parts.join(" › ") + (created.length ? "  (cartelle create ora: " + created.join(", ") + ")" : "") + "  · aperto tramite " + via, webUrl: parent.webUrl, folder: {} };
-    }
-    var b64 = btoa(unescape(encodeURIComponent(cfg.cartella))).replace(/=+$/, "").replace(/\//g, "_").replace(/\+/g, "-");
-    var it = await api("GET", "/shares/u!" + b64 + "/driveItem");
-    if(!it.folder) throw err("Il link non punta a una cartella.", 404);
-    drive = it.parentReference.driveId; root = it.id;
-    return it;
-  }
-  function stamp(){ var d = new Date(), p = function(n){ return String(n).padStart(2, "0"); }; return d.getFullYear() + "-" + p(d.getMonth()+1) + "-" + p(d.getDate()) + " " + p(d.getHours()) + "." + p(d.getMinutes()) + "." + p(d.getSeconds()); }
-  function bigBlob(sizeMB){
-    var size = Math.round(sizeMB * 1048576), part = new Uint8Array(1048576);
-    for(var i = 0; i < part.length; i++) part[i] = i % 251;
-    var parts = []; for(var n = 0; n < size; n += part.length) parts.push(n + part.length <= size ? part : part.slice(0, size - n));
-    return new Blob(parts, { type: "application/octet-stream" });
-  }
-
-  async function runAll(){
-    $("steps").innerHTML = ""; $("btnRun").disabled = true;
-    var ok = await run("steps", "Profilo utente (User.Read)", async function(){
-      var me = await api("GET", "/me?$select=displayName,userPrincipalName,userType");
-      return me.displayName + " · " + me.userPrincipalName + (me.userType === "Guest" ? " · utente OSPITE" : "");
-    });
-    ok = ok && await run("steps", "Ruolo nell'app ShareDocs (ruoli app di Entra ID)", async function(){
-      var r = (account.idTokenClaims && account.idTokenClaims.roles) || [];
-      if(!r.length) throw err("Nessun ruolo ShareDocs assegnato a questo utente. In Entra ID → Applicazioni aziendali → SICIET ShareDocs → Utenti e gruppi, assegna un ruolo (Document Controller, Tecnico SICIET o Cliente) all'utente o al suo gruppo, poi esci e rientra.", 403);
-      return r.map(function(x){ return ROLES[x] || x; }).join(", ");
-    });
-    if(ok && !cfg.cartella){ step("steps", "Cartella SharePoint").ko("La cartella dei transmittal non è ancora impostata (SHAREDOCS_CONFIG.cartella): accesso e ruoli funzionano, il test dei file si fa quando la cartella c'è."); $("btnRun").disabled = false; return; }
-    ok = ok && await run("steps", "Apertura del sito e della cartella dei transmittal", async function(){
-      var it = await openFolder();
-      return it.name + "\n" + it.webUrl;
-    });
-    ok = ok && await run("steps", "Creazione della cartella di prova", async function(){
-      testFolder = "_ShareDocs-test/" + stamp();
-      var f = await put(testFolder + "/LEGGIMI.txt", new Blob(["Cartella creata dal test di connessione di SICIET ShareDocs il " + new Date().toISOString() + ". Si può eliminare."], { type: "text/plain" }));
-      $("btnClean").disabled = false; $("ownFile").disabled = false;
-      return testFolder + "\n" + (f && f.webUrl ? f.webUrl.replace(/\/[^/]*$/, "") : "");
-    });
-    var small = "Test ShareDocs " + new Date().toISOString();
-    ok = ok && await run("steps", "Caricamento di un file piccolo", async function(){
-      var f = await put(testFolder + "/SOK000000000_RevA.txt", new Blob([small], { type: "text/plain" }));
-      return f.name + " · " + f.size + " byte";
-    });
-    ok = ok && await run("steps", "Caricamento di un file grande (" + cfg.testSizeMB + " MB) con sessione di caricamento", async function(s){
-      var t0 = Date.now();
-      var f = await put(testFolder + "/SOK000000001_Rev0.bin", bigBlob(cfg.testSizeMB), function(p){ s.bar(p).det("Caricati " + Math.round(p*100) + "%"); });
-      var sec = (Date.now() - t0) / 1000;
-      return f.name + " · " + mb(f.size) + " in " + sec.toFixed(0) + " s (" + (f.size/1048576/sec).toFixed(1) + " MB/s). Il limite di 20 MB del prototipo non vale su SharePoint.";
-    });
-    ok = ok && await run("steps", "Rilettura del file piccolo (download)", async function(){
-      var it = await api("GET", itemUrl(testFolder + "/SOK000000000_RevA.txt"));
-      var txt = await (await fetch(it["@microsoft.graph.downloadUrl"], { cache: "no-store" })).text();
-      if(txt !== small) throw err("Il contenuto riletto non coincide con quello caricato.", 500);
-      return "Contenuto identico. Link di download temporaneo ottenuto da Graph.";
-    });
-    ok = ok && await run("steps", "Elenco della cartella di prova", async function(){
-      var r = await api("GET", itemUrl(testFolder, "/children?$select=name,size,lastModifiedDateTime"));
-      return r.value.map(function(x){ return "• " + x.name + " (" + (x.size > 1048576 ? mb(x.size) : x.size + " byte") + ")"; }).join("\n");
-    });
-    $("btnRun").disabled = false;
-    if(ok) step("steps", "Esito").ok("Tutto funziona: ShareDocs può usare questa cartella SharePoint con il tuo account.");
-  }
-
-  async function uploadOwn(file){
-    $("ownSteps").innerHTML = "";
-    await run("ownSteps", "Caricamento di " + file.name + " (" + mb(file.size) + ")", async function(s){
-      var ext = (file.name.match(/\.[A-Za-z0-9]{1,6}$/) || [""])[0].toLowerCase();
-      var name = "SOK999999999_RevA" + ext;
-      var f = await put(testFolder + "/" + name, file, function(p){ s.bar(p).det("Caricati " + Math.round(p*100) + "%"); });
-      return "Salvato come " + name + "\nApri su SharePoint: " + f.webUrl;
-    });
-  }
-
-  async function clean(){
-    if(!testFolder) return;
-    $("btnClean").disabled = true;
-    await run("steps", "Eliminazione della cartella di prova", async function(){
-      await api("DELETE", itemUrl(testFolder));
-      var done = testFolder; testFolder = null; $("ownFile").disabled = true;
-      return done + " eliminata (resta nel cestino del sito per 93 giorni).";
-    });
-  }
-
-  /* ---------- Avvio ---------- */
-  async function start(){
-    if(!configured){ $("cfgMissing").hidden = false; $("btnLogin").disabled = true; return; }
-    try { await initAuth(); }
-    catch(e){ $("who").textContent = "Accesso non inizializzato: " + spiega(e); return; }
-    if(account){
-      var rr = ((account.idTokenClaims && account.idTokenClaims.roles) || []).map(function(x){ return ROLES[x] || x; });
-      $("who").textContent = "Accesso effettuato come " + (account.name || "") + " (" + account.username + ")" + (rr.length ? " · ruolo: " + rr.join(", ") : " · nessun ruolo ShareDocs assegnato") + ".";
-      $("btnLogin").hidden = true; $("btnLogout").hidden = false; $("btnRun").disabled = false;
-    }
-  }
-  $("btnLogin").addEventListener("click", function(){ pca.loginRedirect({ scopes: SCOPES, prompt: "select_account" }); });
-  $("btnLogout").addEventListener("click", function(){ pca.logoutRedirect({ account: account, postLogoutRedirectUri: REDIRECT }); });
-  $("btnRun").addEventListener("click", runAll);
-  $("btnClean").addEventListener("click", clean);
-  $("ownFile").addEventListener("change", function(e){ var f = e.target.files[0]; if(f && testFolder) uploadOwn(f); e.target.value = ""; });
-  start();
-})();
-</script>
+<script src="sharedoc.js?v=1"></script>
 </body>
 </html>
