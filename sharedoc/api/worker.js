@@ -35,6 +35,7 @@
  *
  * Richieste (tutte con "Authorization: Bearer <token>", tranne /ping):
  *   GET  /api/ping                        verifica il servizio
+ *   GET  /api/ping?sharepoint=1           verifica anche l'accesso al sito SharePoint
  *   GET  /api/me                          utente, ruoli e commesse visibili
  *   GET  /api/registro?c=ID               registro della commessa (filtrato per il cliente)
  *   POST /api/op?c=ID   { op, … }         modifica il registro (vedi OPERAZIONI)
@@ -615,7 +616,15 @@ export async function handle(request, env, ctx){
     const url = new URL(request.url), via = url.pathname.replace(/^\/api/, "") || "/";
     const q = k => url.searchParams.get(k);
 
-    if(via === "/ping") return json(env, 200, { ok: true, servizio: "SICIET ShareDocs" });
+    if(via === "/ping"){
+      // /api/ping?sharepoint=1 verifica anche che il servizio raggiunga il sito con le credenziali dell'app.
+      if(!q("sharepoint")) return json(env, 200, { ok: true, servizio: "SICIET ShareDocs" });
+      try {
+        const d = await drive(env);
+        const r = await graphJson(env, "GET", "/drives/" + d.drive + "/root?$select=webUrl");
+        return json(env, 200, { ok: true, servizio: "SICIET ShareDocs", sharepoint: "ok", documenti: r && r.webUrl });
+      } catch(e){ return json(env, 200, { ok: false, servizio: "SICIET ShareDocs", sharepoint: e.message }); }
+    }
 
     const u = await utente(request, env);
 

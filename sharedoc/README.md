@@ -153,7 +153,7 @@ Il codice è in [`api/worker.js`](api/worker.js): verifica l'utente (token Entra
    Poi, sempre in *Aggiungi un'autorizzazione* → **Microsoft Graph** → **Autorizzazioni applicazione** → `Sites.Selected` → **Aggiungi**.
    Infine **Concedi consenso amministratore per S.I.C.I.E.T.**: tutte le righe con la spunta verde.
 3. **Certificati e segreti** → **Nuovo segreto client** (descrizione "Servizio ShareDocs", scadenza 24 mesi) → copia subito il **Valore**, si vede una volta sola. Annota la scadenza: prima di allora si crea un segreto nuovo e si aggiorna `CLIENT_SECRET` su Cloudflare.
-4. **Accesso al solo sito SICIET Docs**, da [Graph Explorer](https://developer.microsoft.com/graph/graph-explorer) con l'account amministratore (consenso `Sites.FullControl.All` se richiesto), come per SICIET Quality:
+4. **Accesso al solo sito SICIET Docs** (se non si riesce a concedere `Sites.FullControl.All` a Graph Explorer, in alternativa si usa l'autorizzazione applicazione `Sites.ReadWrite.All` al posto di `Sites.Selected`, senza questo passo: funziona subito ma l'app potrebbe scrivere in tutti i siti), da [Graph Explorer](https://developer.microsoft.com/graph/graph-explorer) con l'account amministratore (consenso `Sites.FullControl.All` se richiesto), come per SICIET Quality:
    - `GET https://graph.microsoft.com/v1.0/sites/srlsiciet.sharepoint.com:/sites/SICIETDocs` → copia `id`;
    - `POST https://graph.microsoft.com/v1.0/sites/<id>/permissions` con corpo
      `{"roles":["write"],"grantedToIdentities":[{"application":{"id":"9e9b873b-2e7c-4011-aebd-7470627d55ec","displayName":"SICIET ShareDocs"}}]}` → risposta **201**.
@@ -170,6 +170,7 @@ Il codice è in [`api/worker.js`](api/worker.js): verifica l'utente (token Entra
    | `SITE` | `srlsiciet.sharepoint.com:/sites/SICIETDocs` |
    | `ORIGIN` | `https://hub.siciet.it` |
 3. Verifica: `https://<indirizzo del worker>/api/ping` nel browser risponde `{"ok":true,…}`. Se risponde "Servizio non configurato" manca una variabile.
+   Poi `https://<indirizzo del worker>/api/ping?sharepoint=1`: deve rispondere `"sharepoint":"ok"` con l'indirizzo della raccolta Documenti di SICIET Docs. Altrimenti il messaggio dice cosa manca (segreto errato, permesso dell'app, sito).
 4. Mandami l'indirizzo del worker (es. `https://siciet-sharedocs.<account>.workers.dev`): va nella configurazione della pagina.
 
 Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo.
