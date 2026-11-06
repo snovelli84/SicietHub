@@ -48,7 +48,7 @@
  */
 
 // Aumentare a ogni modifica: la pagina la mostra in fondo, così si vede se su Cloudflare c'è l'ultima.
-const VERSIONE_SERVIZIO = 7;
+const VERSIONE_SERVIZIO = 8;
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const MB = 1024 * 1024;
 const MAX_FILE = 2048 * MB;
@@ -264,7 +264,7 @@ function prossimoSeq(reg){
 function vistaCliente(reg){
   const trs = reg.trs.filter(t => t.status !== "bozza").map(t => ({
     id: t.id, seq: t.seq, prefix: t.prefix, status: t.status, date: t.date, dueDays: t.dueDays, note: t.note, attn: t.attn, to: t.to, endClient: t.endClient, projectName: t.projectName,
-    items: (t.items || []).map(i => ({ docId: i.docId, rev: i.rev, poi: i.poi, ret: i.ret ? { code: i.ret.code, date: i.ret.date } : null, file: i.file ? { id: i.file.id, name: i.file.name, size: i.file.size } : null, clientFiles: (i.clientFiles || []).map(f => ({ id: f.id, name: f.name, size: f.size })) }))
+    items: (t.items || []).map(i => ({ docId: i.docId, rev: i.rev, poi: i.poi, ret: i.ret ? { code: i.ret.code, date: i.ret.date } : null, files: fileDi(i).map(f => ({ id: f.id, name: f.name, size: f.size })), clientFiles: (i.clientFiles || []).map(f => ({ id: f.id, name: f.name, size: f.size })) }))
   }));
   const ids = new Set(trs.flatMap(t => t.items.map(i => i.docId)));
   return {
@@ -308,6 +308,20 @@ function nuoviCommenti(reg, u, lista, trId, origine){
   }
 }
 const CARTELLA_RISPOSTA = "Client reply";
+const MAX_FILE_RIGA = 10;
+// File trasmessi per un documento: PDF e nativo (DWG, DOCX…). I transmittal salvati prima
+// della versione 8 hanno un solo campo "file".
+function fileDi(it){ return Array.isArray(it.files) ? it.files : (it.file ? [it.file] : []); }
+// Nome del file come lo usa SICIET (es. SOK976701376_005_A.pdf): si tiene l'originale, purché
+// inizi con il numero del documento e non contenga caratteri vietati da SharePoint.
+function nomeFileDoc(nome, doc){
+  nome = testo(nome, 180, true, "il nome del file").replace(/\s+/g, " ");
+  if(/[\\/:*?"<>|#%\u0000-\u001F]/.test(nome) || /^[ .]|[ .]$/.test(nome)) throw new Errore(415, "Nome di file non ammesso: " + nome);
+  if(!/\.[A-Za-z0-9]{1,6}$/.test(nome) || VIETATE.test(nome)) throw new Errore(415, "Tipo di file non ammesso: " + nome);
+  const n = String(doc.num || "").toUpperCase();
+  if(!doc.tba && !nome.toUpperCase().replace(/\s+/g, "").startsWith(n)) throw new Errore(400, "Il nome del file deve iniziare con il numero del documento " + doc.num + ": " + nome);
+  return nome;
+}
 const MAX_ALLEGATI = 20;
 async function controllaFile(env, reg, tr, f, sotto){
   // Il file deve essere stato caricato nella cartella di questo transmittal (o nella sua sottocartella).
@@ -376,7 +390,7 @@ const OPERAZIONI = {
     reg.trs = src.trs.map(t => ({
       id: testo(t.id, 40, true, "l'ID"), seq: Number(t.seq) || 0, prefix: testo(t.prefix, 20, true, "il prefisso"), status: ["bozza", "emesso", "risposto"].includes(t.status) ? t.status : "emesso",
       date: data(t.date), to: testo(t.to, 120), endClient: testo(t.endClient, 120), attn: testo(t.attn, 120), dueDays: Number(t.dueDays) || 14, note: testo(t.note, 2000), projectName: testo(t.projectName, 200),
-      items: (t.items || []).map(i => ({ docId: testo(i.docId, 40, true), rev: rev(i.rev), poi: POI[i.poi] ? i.poi : "IFA", ret: i.ret && RET[i.ret.code] ? { code: String(i.ret.code), date: data(i.ret.date), origin: "import" } : null, replied: !!i.replied, file: null })),
+      items: (t.items || []).map(i => ({ docId: testo(i.docId, 40, true), rev: rev(i.rev), poi: POI[i.poi] ? i.poi : "IFA", ret: i.ret && RET[i.ret.code] ? { code: String(i.ret.code), date: data(i.ret.date), origin: "import" } : null, replied: !!i.replied, files: [] })),
       source: testo(t.source, 120)
     }));
     reg.cmts = (src.cmts || []).map(c => ({ id: nuovoId(), docId: c.docId, rev: rev(c.rev), trId: c.trId || "", n: Number(c.n) || 1, ref: testo(c.ref, 200), text: testo(c.text, 4000, true), reply: testo(c.reply, 4000), status: c.status === "chiuso" ? "chiuso" : "aperto", origin: "import" }));
@@ -397,9 +411,13 @@ const OPERAZIONI = {
       const doc = trovaDoc(reg, i.docId);
       if(doc.closed) throw new Errore(400, doc.num + " è chiuso.");
       const it = { docId: doc.id, rev: rev(i.rev), poi: POI[i.poi] ? i.poi : "IFA", ret: null };
-      const old = vecchi.get(doc.id);
-      if(i.file && i.file.id && (!old || !old.file || old.file.id !== i.file.id)) it.file = await controllaFile(env, reg, tr, i.file);
-      else if(i.file && old && old.file) it.file = old.file;
+      const old = vecchi.get(doc.id), esistenti = new Map((old ? fileDi(old) : []).map(f => [f.id, f]));
+      const richiesti = Array.isArray(i.files) ? i.files : (i.file ? [i.file] : []);
+      it.files = [];
+      for(const f of richiesti.slice(0, MAX_FILE_RIGA)){
+        if(!f || !f.id || it.files.some(g => g.id === f.id)) continue;
+        it.files.push(esistenti.get(f.id) || await controllaFile(env, reg, tr, f));
+      }
       items.push(it);
     }
     if(!items.length) throw new Errore(400, "Seleziona almeno un documento.");
@@ -411,7 +429,7 @@ const OPERAZIONI = {
     serve(u, "dc");
     const tr = trovaTr(reg, x.id);
     if(tr.status !== "bozza") throw new Errore(409, "Il transmittal è già emesso.");
-    const manca = tr.items.filter(i => !i.file).map(i => trovaDoc(reg, i.docId).num);
+    const manca = tr.items.filter(i => !fileDi(i).length).map(i => trovaDoc(reg, i.docId).num);
     if(manca.length) throw new Errore(400, "Allega il file prima di emettere: " + manca.join(", "));
     tr.status = "emesso"; tr.date = oggi(); tr.issuedBy = chi(u); tr.issuedAt = new Date().toISOString();
     return trNum(reg, tr) + " emesso";
@@ -506,8 +524,11 @@ async function caricamento(env, u, c, x){
   const { data: reg } = await leggiRegistro(env, c);
   const tr = trovaTr(reg, x.tr);
   if(tr.status !== "bozza") throw new Errore(409, "Il transmittal è già emesso: i file non si cambiano.");
-  const nome = testo(x.nome, 150, true, "il nome del file");
-  if(!/^[A-Za-z0-9][A-Za-z0-9._-]{0,140}\.[A-Za-z0-9]{1,6}$/.test(nome) || VIETATE.test(nome)) throw new Errore(415, "Nome o tipo di file non ammesso: " + nome);
+  const it = (tr.items || []).find(i => i.docId === x.docId);
+  const doc = x.docId ? trovaDoc(reg, x.docId) : null;
+  const nome = doc ? nomeFileDoc(x.nome, doc) : testo(x.nome, 180, true, "il nome del file");
+  if(!doc && (!/^[A-Za-z0-9][A-Za-z0-9 ._()-]{0,170}\.[A-Za-z0-9]{1,6}$/.test(nome) || VIETATE.test(nome))) throw new Errore(415, "Nome o tipo di file non ammesso: " + nome);
+  if(it && fileDi(it).length >= MAX_FILE_RIGA) throw new Errore(409, "Troppi file per questo documento (massimo " + MAX_FILE_RIGA + ").");
   const dim = Number(x.dimensione) || 0;
   if(dim <= 0 || dim > MAX_FILE) throw new Errore(413, "Dimensione del file non ammessa.");
   const parti = [reg.cfg.cartella, "Transmittals", trNum(reg, tr), nome];
@@ -543,7 +564,7 @@ async function linkFile(env, u, c, itemId){
   const trs = u.cliente ? reg.trs.filter(t => t.status !== "bozza") : reg.trs;
   let f = null;
   for(const t of trs) for(const i of t.items || []){
-    if(i.file && i.file.id === itemId) f = i.file;
+    for(const a of fileDi(i)) if(a.id === itemId) f = a;
     for(const a of i.clientFiles || []) if(a.id === itemId) f = a;
   }
   if(!f) throw new Errore(404, "File non trovato.");

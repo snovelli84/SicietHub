@@ -17,8 +17,8 @@ var SHAREDOCS_CONFIG = {
   api: "https://siciet-sharedocs.amministrazione-c44.workers.dev/api",   // servizio su Cloudflare
   scope: "api://9e9b873b-2e7c-4011-aebd-7470627d55ec/access_as_user"
 };
-const VERSIONE = 7;
-const SERVIZIO_ATTESO = 7;   // versione minima del servizio su Cloudflare (VERSIONE_SERVIZIO in api/worker.js)
+const VERSIONE = 8;
+const SERVIZIO_ATTESO = 8;   // versione minima del servizio su Cloudflare (VERSIONE_SERVIZIO in api/worker.js)
 const LOGO_URL = new URL("icons/siciet-mark.png", location.href).href;
 
 /* ---------- Lingua dell'interfaccia (per utente) ----------
@@ -144,7 +144,11 @@ async function op(body, opts){
 const CHUNK = 10 * 327680;   // multiplo di 320 KiB, come richiesto da Microsoft Graph
 const fsize = n => !n ? "" : n>1048576 ? (n/1048576).toFixed(1)+" MB" : Math.max(1,Math.round(n/1024))+" KB";
 const extOf = name => { const m=String(name||"").match(/\.[A-Za-z0-9]{1,6}$/); return m?m[0].toLowerCase():""; };
-const stdName = (docNum, rev, orig) => `${String(docNum).replace(/[^A-Za-z0-9._-]/g,"-")}_Rev${rev}${extOf(orig)}`;
+// File trasmessi per un documento (PDF e nativo). I transmittal più vecchi hanno un solo "file".
+const fileDi = it => !it ? [] : Array.isArray(it.files) ? it.files : (it.file ? [it.file] : []);
+const filesCell = (it, opts) => { const l=fileDi(it); return l.length ? `<div style="display:grid;gap:8px">${l.map(f=>fileCell(f,opts)).join("")}</div>` : fileCell(null); };
+// Il nome originale si tiene (es. SOK976701376_005_A.pdf), purché inizi con il numero del documento.
+const nomeValido = (nome, doc) => !!doc && (doc.tba || nome.toUpperCase().replace(/\s+/g,"").startsWith(String(doc.num||"").toUpperCase()));
 function fileCell(f, opts){
   opts=opts||{};
   if(!f) return `<span class="muted">${tx("nessun file","no file")}</span>`;
@@ -153,11 +157,11 @@ function fileCell(f, opts){
     ${opts.sp&&f.path?`<span class="sp" title="${tx("Percorso su SharePoint","SharePoint path")}">${esc(f.path)}</span>`:""}</div>`;
 }
 // Caricamento a blocchi direttamente su SharePoint, con la sessione aperta dal servizio.
-async function caricaFile(trId, file, nome, avanzamento, risposta){
+async function caricaFile(trId, file, nome, avanzamento, risposta, docId){
   if(!file.size) throw new Error(tx(`${file.name} è vuoto.`,`${file.name} is empty.`));
   const s = risposta
     ? await api("POST", "/upload-risposta" + qc(), { tr: trId, k: risposta.k, nome: file.name, dimensione: file.size })
-    : await api("POST", "/upload" + qc(), { tr: trId, nome, dimensione: file.size });
+    : await api("POST", "/upload" + qc(), { tr: trId, docId, nome, dimensione: file.size });
   if(risposta) nome = s.nome;
   let ultimo = null;
   for(let start = 0; start < file.size; start += CHUNK){
@@ -503,7 +507,7 @@ function viewClient(){
     <div class="actions"><span class="chip t-${open?"pend":"ok"}">${open?`${open} awaiting your review`:"Nothing awaiting review"}</span></div></div>
   <div class="tablebox"><table>
     <thead><tr><th>Transmittal</th><th>Date</th><th>Documents</th><th>Files</th><th>Reply due</th><th>Status</th></tr></thead>
-    <tbody>${list.length?list.map(tr=>{const st=clientState(tr), n=(tr.items||[]).length, nf=(tr.items||[]).filter(i=>i.file).length;
+    <tbody>${list.length?list.map(tr=>{const st=clientState(tr), n=(tr.items||[]).length, nf=(tr.items||[]).filter(i=>fileDi(i).length).length;
       return `<tr class="clickable" data-ctr="${esc(tr.id)}"><td class="mono num"><b>${esc(trNum(tr))}</b></td><td class="mono num">${fmtEn(tr.date)}</td><td class="mono">${n}</td>
       <td class="mono">${nf}/${n}</td><td class="mono num">${fmtEn(trDue(tr))}</td><td><span class="chip t-${st.tone}">${esc(st.label)}</span></td></tr>`}).join("")
     :`<tr><td colspan="6" class="empty">No transmittals received yet.</td></tr>`}</tbody></table></div>`;
@@ -512,7 +516,7 @@ function clientTr(tr, replying){
   const items=tr.items||[], canReply=items.some(i=>!i.ret);
   const rows=items.map((it,k)=>{const d=docById(it.docId)||{};
     return `<tr><td class="mono">${k+1}</td><td class="mono num">${esc(d.num||"?")}</td><td>${esc(titleOff(d))}</td><td class="mono">${esc(it.rev)}</td><td class="mono">${esc(it.poi)}</td>
-      <td style="min-width:200px">${fileCell(it.file)}</td>
+      <td style="min-width:200px">${filesCell(it)}</td>
       <td style="min-width:${replying&&!it.ret?260:120}px">${it.ret?`${retCode(it.ret.code)} <span class="muted">${esc(RET[it.ret.code]?.en||"")}</span><br><span class="muted mono">${fmtEn(it.ret.date)}</span>${allegatiCell(it.clientFiles)}`
         : replying ? `<select id="cc-${k}" aria-label="Return code"><option value="">Select a return code</option>${Object.entries(RET).map(([c,v])=>`<option value="${c}">${c} – ${v.en}</option>`).join("")}</select>
           <textarea id="cm-${k}" lang="en" aria-label="Comments" placeholder="Comments, one per line (optional)" style="margin-top:6px"></textarea>
@@ -578,7 +582,7 @@ function sheetHtml(tr){
       <div><b>Purpose of issue</b>${Object.entries(POI).map(([k,v])=>`<div><span class="mono" style="min-width:34px">${k}</span>${v.en}</div>`).join("")}</div>
       <div><b>Return codes</b>${Object.entries(RET).map(([k,v])=>`<div><span class="mono" style="min-width:14px">${k}</span>${v.en}</div>`).join("")}</div>
     </div>
-    ${items.some(i=>i.file)?`<div class="sh-files"><b>Attached files</b>${items.map((it,k)=>it.file?`<div><span class="mono">${k+1}.</span> <span class="mono">${esc(it.file.name)}</span> <span class="muted">(${fsize(it.file.size)})</span></div>`:"").join("")}<div class="muted">Files are available for download on the SICIET ShareDocs client portal.</div></div>`:""}
+    ${items.some(i=>fileDi(i).length)?`<div class="sh-files"><b>Attached files</b>${items.map((it,k)=>fileDi(it).map(f=>`<div><span class="mono">${k+1}.</span> <span class="mono">${esc(f.name)}</span> <span class="muted">(${fsize(f.size)})</span></div>`).join("")).join("")}<div class="muted">Files are available for download on the SICIET ShareDocs client portal.</div></div>`:""}
     <div class="sh-sign"><div>Issued by (SICIET) – name, date and signature</div><div>Received by (${esc(to)} / ${esc(endClient)}) – name, date and signature</div></div>
   </div>`;
 }
@@ -605,7 +609,7 @@ function renderDrawer(){
       + sheetHtml(tr)
       + (tr.status==="bozza"&&S.canWrite?`<p style="margin-top:16px">${S.pendingDel===tr.id?`<span class="confirm">${tx(`Eliminare la bozza ${esc(trNum(tr))}?`,`Delete draft ${esc(trNum(tr))}?`)} <button class="btn small danger" data-act="delTrYes" data-id="${esc(tr.id)}">${tx("Elimina","Delete")}</button><button class="btn small" data-act="delNo">${tx("Annulla","Cancel")}</button></span>`:`<button class="link" style="color:var(--bad)" data-act="delTr" data-id="${esc(tr.id)}">${tx("Elimina bozza","Delete draft")}</button>`}</p>`:"")
       + (tr.status!=="bozza"?`<p class="hint" style="margin-top:12px">${tx(`Emesso il ${fmt(tr.date)}`,`Issued on ${fmt(tr.date)}`)}${(tr.issuedBy||tr.by)?` ${tx("da","by")} ${esc((tr.issuedBy||tr.by).nome||"")}`:""}. ${tx("Il file scaricato si può stampare in PDF e allegare alla mail per il cliente.","The downloaded file can be printed to PDF and attached to the email to the client.")}</p>`:"")
-      + ((tr.items||[]).length?`<h3 style="font-size:14px;margin:18px 0 8px">${tx("File allegati","Attached files")}</h3><div class="tablebox"><table><thead><tr><th>${tx("Documento","Document")}</th><th>Rev</th><th>${tx("File e percorso SharePoint","File and SharePoint path")}</th><th>${tx("Risposta del cliente","Client reply")}</th></tr></thead><tbody>${(tr.items||[]).map(it=>{const x=docById(it.docId)||{};return `<tr><td class="mono num">${esc(x.num||"?")}</td><td class="mono">${esc(it.rev)}</td><td>${fileCell(it.file,{sp:true})}</td><td style="min-width:200px">${it.ret?retCode(it.ret.code)+" "+esc(fmt(it.ret.date)):`<span class="muted">${tx("in attesa","pending")}</span>`}${allegatiCell(it.clientFiles)}</td></tr>`}).join("")}</tbody></table></div>`:"");
+      + ((tr.items||[]).length?`<h3 style="font-size:14px;margin:18px 0 8px">${tx("File allegati","Attached files")}</h3><div class="tablebox"><table><thead><tr><th>${tx("Documento","Document")}</th><th>Rev</th><th>${tx("File e percorso SharePoint","File and SharePoint path")}</th><th>${tx("Risposta del cliente","Client reply")}</th></tr></thead><tbody>${(tr.items||[]).map(it=>{const x=docById(it.docId)||{};return `<tr><td class="mono num">${esc(x.num||"?")}</td><td class="mono">${esc(it.rev)}</td><td>${filesCell(it,{sp:true})}</td><td style="min-width:200px">${it.ret?retCode(it.ret.code)+" "+esc(fmt(it.ret.date)):`<span class="muted">${tx("in attesa","pending")}</span>`}${allegatiCell(it.clientFiles)}</td></tr>`}).join("")}</tbody></table></div>`:"");
   } else if(d.type==="ctr") {
     const tr=S.trs.find(t=>t.id===d.id); if(!tr){ closeDrawer(); return; }
     const st=clientState(tr);
@@ -643,9 +647,9 @@ function trForm(d){
       <td><span class="mono">${esc(doc.num)}</span><br><span class="muted">${esc(titleUi(doc))}</span></td><td>${chip(i.key)}${i.rev?` <span class="mono muted">rev ${esc(i.rev)}</span>`:""}</td>
       <td><input id="rv-${esc(doc.id)}" class="mono" value="${esc(suggest)}" aria-label="${tx("Revisione","Revision")}" style="width:62px"></td>
       <td><select id="po-${esc(doc.id)}" aria-label="${tx("Scopo di emissione","Purpose of issue")}">${Object.entries(POI).map(([k,v])=>`<option value="${k}" ${k===defPoi?"selected":""}>${k} – ${tx(v.it,v.en)}</option>`).join("")}</select></td>
-      <td style="min-width:220px">${p&&p.file?`<div class="muted" style="font-size:12px">${tx("Allegato","Attached")}: <span class="mono">${esc(p.file.name)}</span></div>`:""}<input type="file" id="fl-${esc(doc.id)}" class="fileinput" ${S.canWrite?"":"disabled"} aria-label="${tx("File del documento","Document file")} ${esc(doc.num)}"></td></tr>`}).join("")}
+      <td style="min-width:240px">${fileDi(p).map(f=>`<label class="hint" style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="keepfile" data-doc="${esc(doc.id)}" data-file="${esc(f.id)}" checked aria-label="${tx("Mantieni","Keep")} ${esc(f.name)}"><span class="mono" style="font-size:12px;overflow-wrap:anywhere">${esc(f.name)}</span></label>`).join("")}<input type="file" id="fl-${esc(doc.id)}" class="fileinput" multiple ${S.canWrite?"":"disabled"} aria-label="${tx("File del documento","Document files")} ${esc(doc.num)}"></td></tr>`}).join("")}
     </tbody></table></div>
-    <p class="hint">${tx(`Il file viene rinominato in modo standard (numero documento_Rev, es. SOK976701376_Rev5.pdf) e caricato su SharePoint in ${esc(S.cfg.cartella)}/Transmittals/<n. transmittal>/, senza limite di dimensione. Per emettere servono i file di tutti i documenti selezionati; la bozza si può salvare anche senza.`,`Files are renamed to a standard name (document no._Rev, e.g. SOK976701376_Rev5.pdf) and uploaded to SharePoint in ${esc(S.cfg.cartella)}/Transmittals/<transmittal no.>/, with no size limit. Every selected document needs a file to issue; drafts can be saved without.`)}</p>
+    <p class="hint">${tx(`Per ogni documento si possono allegare più file, di solito il PDF e il nativo (DWG, DOCX…). Il nome resta quello originale (es. SOK976701376_005_A.pdf) e deve iniziare con il numero del documento. I file vanno su SharePoint in ${esc(S.cfg.cartella)}/Transmittals/<n. transmittal>/, senza limite di dimensione. Per togliere un file già caricato, togli la spunta. Per emettere ogni documento deve avere almeno un file.`,`Each document can have several files, usually the PDF and the native file (DWG, DOCX…). The original name is kept (e.g. SOK976701376_005_A.pdf) and must start with the document number. Files go to SharePoint in ${esc(S.cfg.cartella)}/Transmittals/<transmittal no.>/, with no size limit. Untick a file already uploaded to remove it. Every document needs at least one file to issue.`)}</p>
     <div class="actions"><button class="btn" type="submit" data-mode="draft">${tx("Salva bozza","Save draft")}</button><button class="btn primary" type="submit" data-mode="issue">${tx("Emetti oggi","Issue today")}</button></div>
   </form>`;
 }
@@ -710,7 +714,7 @@ function docCard(doc){
       <div>${chip(i.key)} ${i.rev?`<span class="mono">rev ${esc(i.rev)}</span>`:""} <span class="muted">· ${tx("prossima revisione","next revision")}: <span class="mono">${esc(i.next)}</span></span></div></div>
     <h3 style="font-size:14px">${tx("Storico emissioni","Issue history")}</h3>
     <div class="tablebox"><table><thead><tr><th>Rev</th><th>Transmittal</th><th>${tx("Data","Date")}</th><th>${tx("Scopo","Purpose")}</th><th>${tx("Ritorno","Return")}</th><th>${tx("Data ritorno","Return date")}</th><th>File</th></tr></thead><tbody>
-    ${i.issues.length?i.issues.map(x=>`<tr class="clickable" data-tr="${esc(x.tr.id)}"><td class="mono">${esc(x.it.rev)}</td><td class="mono">${esc(trNum(x.tr))}</td><td class="mono">${fmt(x.tr.date)}</td><td class="mono">${esc(x.it.poi)}</td><td>${x.it.ret?retCode(x.it.ret.code)+" "+esc(tx(RET[x.it.ret.code].it,RET[x.it.ret.code].en)):`<span class="muted">${tx("in attesa","pending")}</span>`}</td><td class="mono">${x.it.ret?fmt(x.it.ret.date):""}</td><td>${x.it.file?fileCell(x.it.file)+allegatiCell(x.it.clientFiles):`<span class="muted">—</span>`}</td></tr>`).join("")
+    ${i.issues.length?i.issues.map(x=>`<tr class="clickable" data-tr="${esc(x.tr.id)}"><td class="mono">${esc(x.it.rev)}</td><td class="mono">${esc(trNum(x.tr))}</td><td class="mono">${fmt(x.tr.date)}</td><td class="mono">${esc(x.it.poi)}</td><td>${x.it.ret?retCode(x.it.ret.code)+" "+esc(tx(RET[x.it.ret.code].it,RET[x.it.ret.code].en)):`<span class="muted">${tx("in attesa","pending")}</span>`}</td><td class="mono">${x.it.ret?fmt(x.it.ret.date):""}</td><td>${fileDi(x.it).length?filesCell(x.it)+allegatiCell(x.it.clientFiles):`<span class="muted">—</span>`}</td></tr>`).join("")
       :`<tr><td colspan="7" class="empty">${tx("Non ancora emesso.","Not issued yet.")}</td></tr>`}</tbody></table></div>
     <h3 style="font-size:14px">${tx("Commenti del cliente","Client comments")} (${cm.length})</h3>
     ${cm.length?`<div class="tablebox"><table><thead><tr><th>Rev</th><th>${tx("N.","No.")}</th><th>${tx("Commento","Comment")}</th><th>${tx("Risposta","Reply")}</th><th>${tx("Stato","Status")}</th></tr></thead><tbody>${cm.sort((a,b)=>String(a.rev).localeCompare(String(b.rev))||a.n-b.n).map(c=>`<tr><td class="mono">${esc(c.rev)}</td><td class="mono">${esc(c.n)}</td><td>${esc(c.text)}</td><td>${esc(c.reply||"—")}</td><td>${c.status==="chiuso"?`<span class="chip t-ok">${tx("Chiuso","Closed")}</span>`:`<span class="chip t-warn">${tx("Aperto","Open")}</span>`}</td></tr>`).join("")}</tbody></table></div>`:`<p class="hint">${tx("Nessun commento registrato.","No comments logged.")}</p>`}
@@ -801,13 +805,15 @@ async function saveTr(mode){
   const prev=new Map((prevTr?.items||[]).map(i=>[i.docId,i]));
   const items=[], uploads=[];
   document.querySelectorAll('#trf input[type=checkbox][data-doc]').forEach(ck=>{ if(!ck.checked) return; const id=ck.dataset.doc;
-    const rev=cleanCode(val("rv-"+id))||"A", f=document.getElementById("fl-"+id)?.files?.[0]||null, old=prev.get(id);
-    const item={docId:id,rev,poi:val("po-"+id)||"IFA"};
-    if(old&&old.file) item.file={id:old.file.id};
-    if(f) uploads.push({item,f});
+    const rev=cleanCode(val("rv-"+id))||"A", nuovi=[...(document.getElementById("fl-"+id)?.files||[])];
+    const item={docId:id,rev,poi:val("po-"+id)||"IFA",files:[]};
+    document.querySelectorAll(`#trf .keepfile[data-doc="${CSS.escape(id)}"]`).forEach(k=>{ if(k.checked) item.files.push({id:k.dataset.file}); });
+    nuovi.forEach(f=>uploads.push({item,f}));
     items.push(item); });
   if(!items.length){ toast(tx("Seleziona almeno un documento.","Select at least one document.")); return; }
-  if(mode==="issue"){ const miss=items.filter(i=>!i.file&&!uploads.find(u=>u.item===i)).map(i=>docById(i.docId)?.num);
+  const errati=uploads.filter(u=>!nomeValido(u.f.name, docById(u.item.docId)));
+  if(errati.length){ toast(tx(`Il nome del file deve iniziare con il numero del documento: ${errati.map(u=>u.f.name).join(", ")}`,`The file name must start with the document number: ${errati.map(u=>u.f.name).join(", ")}`)); return; }
+  if(mode==="issue"){ const miss=items.filter(i=>!i.files.length&&!uploads.find(u=>u.item===i)).map(i=>docById(i.docId)?.num);
     if(miss.length){ toast(tx(`Allega il file prima di emettere: ${miss.join(", ")}`,`Attach the file before issuing: ${miss.join(", ")}`)); return; } }
   const base={to:val("t_to"),endClient:val("t_ec"),attn:val("t_attn"),note:val("t_note"),dueDays:Number(val("t_due"))||S.cfg.dueDays};
   form.querySelectorAll("button").forEach(b=>b.disabled=true);
@@ -816,9 +822,9 @@ async function saveTr(mode){
     // Un transmittal nuovo si salva prima come bozza: serve il numero per la cartella dei file.
     if(!id){ const r=await op(Object.assign({op:"trSave",items:items.map(i=>({docId:i.docId,rev:i.rev,poi:i.poi}))},base),{quiet:uploads.length>0||mode==="issue"}); id=r.esito.id; S.drawer.editId=id; }
     for(let k=0;k<uploads.length;k++){
-      const {item,f}=uploads[k], nome=stdName(docById(item.docId)?.num||"DOC", item.rev, f.name);
-      const it=await caricaFile(id, f, nome, p=>toast(tx(`File ${k+1} di ${uploads.length}: ${nome} – ${Math.round(p*100)}%`,`File ${k+1} of ${uploads.length}: ${nome} – ${Math.round(p*100)}%`)));
-      item.file={id:it.id,orig:f.name};
+      const {item,f}=uploads[k], nome=f.name;
+      const it=await caricaFile(id, f, nome, p=>toast(tx(`File ${k+1} di ${uploads.length}: ${nome} – ${Math.round(p*100)}%`,`File ${k+1} of ${uploads.length}: ${nome} – ${Math.round(p*100)}%`)), null, item.docId);
+      item.files.push({id:it.id,orig:f.name});
     }
     await op(Object.assign({op:"trSave",id,items,emetti:mode==="issue"},base));
     openDrawer({type:"tr",id});
@@ -892,7 +898,7 @@ document.addEventListener("click", async e=>{
   else if(a==="editDocCancel"){ S.drawer.edit=false; renderDrawer(); }
   else if(a==="respond"){ S.drawer.respond=true; renderDrawer(); }
   else if(a==="respondCancel"){ S.drawer.respond=false; renderDrawer(); }
-  else if(a==="issueTr"){ const trx=S.trs.find(x=>x.id===id); const miss=(trx?.items||[]).filter(i=>!i.file).map(i=>docById(i.docId)?.num);
+  else if(a==="issueTr"){ const trx=S.trs.find(x=>x.id===id); const miss=(trx?.items||[]).filter(i=>!fileDi(i).length).map(i=>docById(i.docId)?.num);
     if(miss.length){ toast(tx(`Allega il file prima di emettere: ${miss.join(", ")}. Usa "Modifica".`,`Attach the file before issuing: ${miss.join(", ")}. Use "Edit".`)); return; }
     try{ await op({op:"trIssue",id}); }catch(err){ fail(err); } }
   else if(a==="delTr"){ S.pendingDel=id; renderDrawer(); }
