@@ -16,7 +16,7 @@
   - **Cliente**: vede solo i transmittal emessi delle commesse in cui il suo indirizzo o dominio è tra i *clienti ammessi*, scarica i file e risponde con codici, commenti e **allegati** (disegni commentati, documenti di riferimento). Il portale è sempre in inglese.
 - **Allegati della risposta**: vanno in `<commessa>/Transmittals/<n. transmittal>/Client reply/` con nome `<n. documento>_Rev<rev>_Client_<nome originale>`; non sovrascrivono mai file esistenti. Anche il Document Controller può allegarli quando registra una risposta arrivata per email.
 - **Interfaccia** in italiano o inglese (selettore IT/EN); le comunicazioni ufficiali (foglio transmittal, VDRL, CRS) sono sempre in inglese.
-- **Transmittal**: si scelgono documenti, revisione, scopo e il file di ciascuno. I file vengono rinominati in modo standard (`<n. documento>_Rev<rev>.pdf`) e caricati a blocchi direttamente in `SICIET Docs / Documenti / <commessa> / Transmittals / <n. transmittal>/`, senza limite di dimensione. Senza file non si emette.
+- **Transmittal**: si scelgono documenti, revisione, scopo e i file di ciascuno, di solito PDF e nativo (DWG, DOCX…), fino a 10. Il nome resta quello originale (es. `SOK976701376_005_A.pdf`) e deve iniziare con il numero del documento. I file vengono caricati a blocchi direttamente in `SICIET Docs / Documenti / <commessa> / Transmittals / <n. transmittal>/`, senza limite di dimensione. Senza file non si emette.
 - **Excel**: `VDRL <commessa>.xlsx` e `CRS <commessa>.xlsx` nella cartella della commessa si aggiornano da soli a ogni modifica.
 - **Vista Client** (selettore SICIET | Client, solo per i colleghi SICIET): mostra il portale come lo vede il cliente.
 - **Prima commessa e dati esistenti**: alla prima apertura il Document Controller crea la commessa (codice, nome, cartella, clienti ammessi). Poi da *Transmittal → Impostazioni commessa → Importazione iniziale* carica il file JSON con il registro esistente. I dati dei clienti **non vanno mai in questa repository**, che è pubblica: il file di importazione si conserva altrove.
@@ -225,7 +225,7 @@ Il test di questa pagina usa invece le autorizzazioni **delegate** (`Files.ReadW
 
 ## Versione delle pagine
 
-**App** (`index.html` + `sharedoc.js`): versione 7 del 06/11/2026 (pagina Commenti con una scheda per ogni risposta del cliente; v6: in fondo alla pagina la versione del servizio, con avviso se su Cloudflare è vecchio; v5: allegati del cliente nella risposta; v4: controllo dei file scaricati; v3: anteprima dei PDF dentro ShareDocs; v2: pulsante *Aggiorna Excel*; v1: prima versione collegata al servizio). A ogni modifica di `sharedoc.js` aumentare `VERSIONE`, il numero in `sharedoc.js?v=` e il footer di `index.html`.
+**App** (`index.html` + `sharedoc.js`): versione 8 del 06/11/2026 (più file per documento con il nome originale; servizio v8; v7: pagina Commenti con una scheda per ogni risposta del cliente; v6: in fondo alla pagina la versione del servizio, con avviso se su Cloudflare è vecchio; v5: allegati del cliente nella risposta; v4: controllo dei file scaricati; v3: anteprima dei PDF dentro ShareDocs; v2: pulsante *Aggiorna Excel*; v1: prima versione collegata al servizio). A ogni modifica di `sharedoc.js` aumentare `VERSIONE`, il numero in `sharedoc.js?v=` e il footer di `index.html`.
 
 **Pagina di test** (`test/index.html`):
 
