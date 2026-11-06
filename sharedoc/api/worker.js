@@ -455,8 +455,11 @@ const OPERAZIONI = {
     return "Commento riaperto";
   },
   // --- Cliente ---
+  // Risposta dal portale. La invia il cliente; dalla vista "Client" può inviarla anche il
+  // Document Controller (prova o risposta dettata al telefono): resta registrata come sua.
   async clientReply(env, u, reg, x){
-    serve(u, "cliente");
+    if(!u.cliente && !u.dc) throw new Errore(403, "Operazione non consentita al tuo ruolo.");
+    const origine = u.cliente ? "client" : "siciet";
     const tr = trovaTr(reg, x.trId);
     if(tr.status === "bozza") throw new Errore(404, "Transmittal non trovato.");
     let n = 0, allegati = 0;
@@ -464,15 +467,15 @@ const OPERAZIONI = {
       const it = tr.items[Number(r.k)];
       if(!it || it.ret || !r.code) continue;
       if(!RET[r.code]) throw new Errore(400, "Return code not valid.");
-      it.ret = { code: String(r.code), date: oggi(), origin: "client", by: chi(u) }; n++;
+      it.ret = { code: String(r.code), date: oggi(), origin: origine, by: chi(u) }; n++;
       allegati += await aggiungiAllegati(env, u, reg, tr, it, r.files);
     }
     const risposti = new Set(tr.items.filter(i => i.ret).map(i => i.docId));
     const commenti = (x.comments || []).filter(c => risposti.has(c.docId));
     if(!n && !commenti.length) throw new Errore(400, "Select at least one return code.");
     tr.status = tr.items.every(i => i.ret) ? "risposto" : "emesso";
-    nuoviCommenti(reg, u, commenti, tr.id, "client");
-    return { msg: "Review sent to SICIET", n, comments: commenti.length, attachments: allegati };
+    nuoviCommenti(reg, u, commenti, tr.id, origine);
+    return { msg: u.cliente ? "Review sent to SICIET" : "Risposta registrata a nome di SICIET (" + u.nome + ")", n, comments: commenti.length, attachments: allegati };
   }
 };
 
