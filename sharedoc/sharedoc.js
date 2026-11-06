@@ -17,7 +17,7 @@ var SHAREDOCS_CONFIG = {
   api: "https://siciet-sharedocs.amministrazione-c44.workers.dev/api",   // servizio su Cloudflare
   scope: "api://9e9b873b-2e7c-4011-aebd-7470627d55ec/access_as_user"
 };
-const VERSIONE = 4;
+const VERSIONE = 5;
 const LOGO_URL = new URL("icons/siciet-mark.png", location.href).href;
 
 /* ---------- Lingua dell'interfaccia (per utente) ----------
@@ -152,9 +152,12 @@ function fileCell(f, opts){
     ${opts.sp&&f.path?`<span class="sp" title="${tx("Percorso su SharePoint","SharePoint path")}">${esc(f.path)}</span>`:""}</div>`;
 }
 // Caricamento a blocchi direttamente su SharePoint, con la sessione aperta dal servizio.
-async function caricaFile(trId, file, nome, avanzamento){
+async function caricaFile(trId, file, nome, avanzamento, risposta){
   if(!file.size) throw new Error(tx(`${file.name} è vuoto.`,`${file.name} is empty.`));
-  const s = await api("POST", "/upload" + qc(), { tr: trId, nome, dimensione: file.size });
+  const s = risposta
+    ? await api("POST", "/upload-risposta" + qc(), { tr: trId, k: risposta.k, nome: file.name, dimensione: file.size })
+    : await api("POST", "/upload" + qc(), { tr: trId, nome, dimensione: file.size });
+  if(risposta) nome = s.nome;
   let ultimo = null;
   for(let start = 0; start < file.size; start += CHUNK){
     const end = Math.min(start + CHUNK, file.size);
@@ -168,6 +171,21 @@ async function caricaFile(trId, file, nome, avanzamento){
   if(!ultimo || !ultimo.id) throw new Error(tx("SharePoint non ha confermato il file ","SharePoint did not confirm the file ") + nome);
   return ultimo;
 }
+// Allegati della risposta del cliente: elenco con anteprima e download.
+function allegatiCell(lista, vuoto){
+  if(!lista || !lista.length) return vuoto || "";
+  return `<div class="allegati"><span class="lbl">${tx("Allegati del cliente","Client attachments")} (${lista.length})</span>${lista.map(f=>fileCell(f)).join("")}</div>`;
+}
+// Carica gli allegati scelti per ogni riga di risposta; restituisce { k: [{id, orig}] }.
+async function caricaAllegati(tr, righe, prefisso){
+  const out={}, lista=[];
+  righe.forEach(k=>{ const inp=document.getElementById(prefisso+k); for(const f of (inp&&inp.files)||[]) lista.push({k,f}); });
+  for(let n=0;n<lista.length;n++){ const {k,f}=lista[n];
+    const it=await caricaFile(tr.id, f, f.name, p=>toast(tx(`Allegato ${n+1} di ${lista.length}: ${f.name} – ${Math.round(p*100)}%`,`Attachment ${n+1} of ${lista.length}: ${f.name} – ${Math.round(p*100)}%`)), {k});
+    (out[k]=out[k]||[]).push({id:it.id,orig:f.name}); }
+  return out;
+}
+
 // Anteprima dentro ShareDocs: il PDF viene scaricato dal link temporaneo e mostrato in un
 // pannello con il visualizzatore del browser. Niente schede aperte "in ritardo" (che i browser
 // bloccano) e niente accesso a SharePoint: funziona uguale per i colleghi e per il cliente.
@@ -440,9 +458,10 @@ function clientTr(tr, replying){
   const rows=items.map((it,k)=>{const d=docById(it.docId)||{};
     return `<tr><td class="mono">${k+1}</td><td class="mono num">${esc(d.num||"?")}</td><td>${esc(titleOff(d))}</td><td class="mono">${esc(it.rev)}</td><td class="mono">${esc(it.poi)}</td>
       <td style="min-width:200px">${fileCell(it.file)}</td>
-      <td style="min-width:${replying&&!it.ret?260:120}px">${it.ret?`${retCode(it.ret.code)} <span class="muted">${esc(RET[it.ret.code]?.en||"")}</span><br><span class="muted mono">${fmtEn(it.ret.date)}</span>`
+      <td style="min-width:${replying&&!it.ret?260:120}px">${it.ret?`${retCode(it.ret.code)} <span class="muted">${esc(RET[it.ret.code]?.en||"")}</span><br><span class="muted mono">${fmtEn(it.ret.date)}</span>${allegatiCell(it.clientFiles)}`
         : replying ? `<select id="cc-${k}" aria-label="Return code"><option value="">Select a return code</option>${Object.entries(RET).map(([c,v])=>`<option value="${c}">${c} – ${v.en}</option>`).join("")}</select>
-          <textarea id="cm-${k}" lang="en" aria-label="Comments" placeholder="Comments, one per line (optional)" style="margin-top:6px"></textarea>`
+          <textarea id="cm-${k}" lang="en" aria-label="Comments" placeholder="Comments, one per line (optional)" style="margin-top:6px"></textarea>
+          <label class="hint" style="display:grid;gap:4px;margin-top:6px">Attachments (optional): marked-up drawings, reference documents<input type="file" id="ca-${k}" class="fileinput" multiple></label>`
         : `<span class="muted">Pending</span>`}</td></tr>`}).join("");
   return `<div class="form">
     <div class="sh-meta" style="border-top:1px solid var(--line-strong)">
@@ -468,7 +487,14 @@ async function saveClientReply(form){
     if(!c&&lines.length) items.push({k,missing:true}); });
   if(items.some(i=>i.missing)){ toast("Select a return code for every document you comment on."); return; }
   if(!items.length){ toast("Select at least one return code."); return; }
-  try{ const r=await op({op:"clientReply",trId:tr.id,items,comments}); openDrawer({type:"ctr",id:tr.id}); return r; }catch(e){ fail(e); }
+  const senza=(tr.items||[]).map((it,k)=>k).filter(k=>!items.some(i=>i.k===k)&&(document.getElementById("ca-"+k)?.files||[]).length);
+  if(senza.length){ toast("Select a return code for every document you attach files to."); return; }
+  form.querySelectorAll("button").forEach(b=>b.disabled=true);
+  try{
+    const allegati=await caricaAllegati(tr, items.map(i=>i.k), "ca-");
+    items.forEach(i=>{ if(allegati[i.k]) i.files=allegati[i.k]; });
+    const r=await op({op:"clientReply",trId:tr.id,items,comments}); openDrawer({type:"ctr",id:tr.id}); return r;
+  }catch(e){ form.querySelectorAll("button").forEach(b=>b.disabled=false); fail(e); }
 }
 
 /* ---------- Foglio transmittal: comunicazione ufficiale, sempre in inglese ---------- */
@@ -524,7 +550,7 @@ function renderDrawer(){
       + sheetHtml(tr)
       + (tr.status==="bozza"&&S.canWrite?`<p style="margin-top:16px">${S.pendingDel===tr.id?`<span class="confirm">${tx(`Eliminare la bozza ${esc(trNum(tr))}?`,`Delete draft ${esc(trNum(tr))}?`)} <button class="btn small danger" data-act="delTrYes" data-id="${esc(tr.id)}">${tx("Elimina","Delete")}</button><button class="btn small" data-act="delNo">${tx("Annulla","Cancel")}</button></span>`:`<button class="link" style="color:var(--bad)" data-act="delTr" data-id="${esc(tr.id)}">${tx("Elimina bozza","Delete draft")}</button>`}</p>`:"")
       + (tr.status!=="bozza"?`<p class="hint" style="margin-top:12px">${tx(`Emesso il ${fmt(tr.date)}`,`Issued on ${fmt(tr.date)}`)}${(tr.issuedBy||tr.by)?` ${tx("da","by")} ${esc((tr.issuedBy||tr.by).nome||"")}`:""}. ${tx("Il file scaricato si può stampare in PDF e allegare alla mail per il cliente.","The downloaded file can be printed to PDF and attached to the email to the client.")}</p>`:"")
-      + ((tr.items||[]).length?`<h3 style="font-size:14px;margin:18px 0 8px">${tx("File allegati","Attached files")}</h3><div class="tablebox"><table><thead><tr><th>${tx("Documento","Document")}</th><th>Rev</th><th>${tx("File e percorso SharePoint","File and SharePoint path")}</th></tr></thead><tbody>${(tr.items||[]).map(it=>{const x=docById(it.docId)||{};return `<tr><td class="mono num">${esc(x.num||"?")}</td><td class="mono">${esc(it.rev)}</td><td>${fileCell(it.file,{sp:true})}</td></tr>`}).join("")}</tbody></table></div>`:"");
+      + ((tr.items||[]).length?`<h3 style="font-size:14px;margin:18px 0 8px">${tx("File allegati","Attached files")}</h3><div class="tablebox"><table><thead><tr><th>${tx("Documento","Document")}</th><th>Rev</th><th>${tx("File e percorso SharePoint","File and SharePoint path")}</th><th>${tx("Risposta del cliente","Client reply")}</th></tr></thead><tbody>${(tr.items||[]).map(it=>{const x=docById(it.docId)||{};return `<tr><td class="mono num">${esc(x.num||"?")}</td><td class="mono">${esc(it.rev)}</td><td>${fileCell(it.file,{sp:true})}</td><td style="min-width:200px">${it.ret?retCode(it.ret.code)+" "+esc(fmt(it.ret.date)):`<span class="muted">${tx("in attesa","pending")}</span>`}${allegatiCell(it.clientFiles)}</td></tr>`}).join("")}</tbody></table></div>`:"");
   } else if(d.type==="ctr") {
     const tr=S.trs.find(t=>t.id===d.id); if(!tr){ closeDrawer(); return; }
     const st=clientState(tr);
@@ -575,7 +601,8 @@ function respondForm(tr){
     ${(tr.items||[]).map((it,k)=>{const d=docById(it.docId)||{};return `<tr><td><span class="mono">${esc(d.num||"?")}</span><br><span class="muted">${esc(titleUi(d))}</span></td><td class="mono">${esc(it.rev)}</td>
       <td><select id="rc-${k}" aria-label="${tx("Codice di ritorno","Return code")}"><option value="">—</option>${Object.entries(RET).map(([c,v])=>`<option value="${c}" ${it.ret&&String(it.ret.code)===c?"selected":""}>${c} – ${tx(v.it,v.en)}</option>`).join("")}</select></td>
       <td><input id="rd-${k}" type="date" value="${esc(it.ret?.date||todayISO())}" aria-label="${tx("Data di ritorno","Return date")}"></td>
-      <td><textarea id="rt-${k}" aria-label="${tx("Commenti","Comments")}" placeholder="${tx("Nessun commento","No comments")}" style="min-width:220px"></textarea></td></tr>`}).join("")}
+      <td><textarea id="rt-${k}" aria-label="${tx("Commenti","Comments")}" placeholder="${tx("Nessun commento","No comments")}" style="min-width:220px"></textarea>
+        <label class="hint" style="display:grid;gap:4px;margin-top:6px">${tx("Allegati del cliente (facoltativi)","Client attachments (optional)")}<input type="file" id="ra-${k}" class="fileinput" multiple></label>${allegatiCell(it.clientFiles)}</td></tr>`}).join("")}
     </tbody></table></div>
     <div class="actions"><button class="btn" type="button" data-act="respondCancel">${tx("Annulla","Cancel")}</button><button class="btn primary" type="submit">${tx("Salva risposta","Save reply")}</button></div></form>`;
 }
@@ -628,7 +655,7 @@ function docCard(doc){
       <div>${chip(i.key)} ${i.rev?`<span class="mono">rev ${esc(i.rev)}</span>`:""} <span class="muted">· ${tx("prossima revisione","next revision")}: <span class="mono">${esc(i.next)}</span></span></div></div>
     <h3 style="font-size:14px">${tx("Storico emissioni","Issue history")}</h3>
     <div class="tablebox"><table><thead><tr><th>Rev</th><th>Transmittal</th><th>${tx("Data","Date")}</th><th>${tx("Scopo","Purpose")}</th><th>${tx("Ritorno","Return")}</th><th>${tx("Data ritorno","Return date")}</th><th>File</th></tr></thead><tbody>
-    ${i.issues.length?i.issues.map(x=>`<tr class="clickable" data-tr="${esc(x.tr.id)}"><td class="mono">${esc(x.it.rev)}</td><td class="mono">${esc(trNum(x.tr))}</td><td class="mono">${fmt(x.tr.date)}</td><td class="mono">${esc(x.it.poi)}</td><td>${x.it.ret?retCode(x.it.ret.code)+" "+esc(tx(RET[x.it.ret.code].it,RET[x.it.ret.code].en)):`<span class="muted">${tx("in attesa","pending")}</span>`}</td><td class="mono">${x.it.ret?fmt(x.it.ret.date):""}</td><td>${x.it.file?fileCell(x.it.file):`<span class="muted">—</span>`}</td></tr>`).join("")
+    ${i.issues.length?i.issues.map(x=>`<tr class="clickable" data-tr="${esc(x.tr.id)}"><td class="mono">${esc(x.it.rev)}</td><td class="mono">${esc(trNum(x.tr))}</td><td class="mono">${fmt(x.tr.date)}</td><td class="mono">${esc(x.it.poi)}</td><td>${x.it.ret?retCode(x.it.ret.code)+" "+esc(tx(RET[x.it.ret.code].it,RET[x.it.ret.code].en)):`<span class="muted">${tx("in attesa","pending")}</span>`}</td><td class="mono">${x.it.ret?fmt(x.it.ret.date):""}</td><td>${x.it.file?fileCell(x.it.file)+allegatiCell(x.it.clientFiles):`<span class="muted">—</span>`}</td></tr>`).join("")
       :`<tr><td colspan="7" class="empty">${tx("Non ancora emesso.","Not issued yet.")}</td></tr>`}</tbody></table></div>
     <h3 style="font-size:14px">${tx("Commenti del cliente","Client comments")} (${cm.length})</h3>
     ${cm.length?`<div class="tablebox"><table><thead><tr><th>Rev</th><th>${tx("N.","No.")}</th><th>${tx("Commento","Comment")}</th><th>${tx("Risposta","Reply")}</th><th>${tx("Stato","Status")}</th></tr></thead><tbody>${cm.sort((a,b)=>String(a.rev).localeCompare(String(b.rev))||a.n-b.n).map(c=>`<tr><td class="mono">${esc(c.rev)}</td><td class="mono">${esc(c.n)}</td><td>${esc(c.text)}</td><td>${esc(c.reply||"—")}</td><td>${c.status==="chiuso"?`<span class="chip t-ok">${tx("Chiuso","Closed")}</span>`:`<span class="chip t-warn">${tx("Aperto","Open")}</span>`}</td></tr>`).join("")}</tbody></table></div>`:`<p class="hint">${tx("Nessun commento registrato.","No comments logged.")}</p>`}
@@ -738,7 +765,12 @@ async function saveResponse(form){
   const tr=S.trs.find(t=>t.id===form.dataset.id); if(!tr) return;
   const items=(tr.items||[]).map((it,k)=>({k,code:val("rc-"+k),date:val("rd-"+k)}));
   const comments=[]; (tr.items||[]).forEach((it,k)=>linee("rt-"+k).forEach(text=>comments.push({docId:it.docId,rev:it.rev,text})));
-  try{ await op({op:"respond",trId:tr.id,items,comments}); openDrawer({type:"tr",id:tr.id}); }catch(e){ fail(e); }
+  form.querySelectorAll("button").forEach(b=>b.disabled=true);
+  try{
+    const allegati=await caricaAllegati(tr, items.map(i=>i.k), "ra-");
+    items.forEach(i=>{ if(allegati[i.k]) i.files=allegati[i.k]; });
+    await op({op:"respond",trId:tr.id,items,comments}); openDrawer({type:"tr",id:tr.id});
+  }catch(e){ form.querySelectorAll("button").forEach(b=>b.disabled=false); fail(e); }
 }
 async function importDocs(){
   const docs=val("imp").split(/\r?\n/).filter(l=>l.trim()).map(l=>{ const c=l.split("\t"); return {num:cleanCode(c[0]),supNum:cleanCode(c[1]),title:String(c[2]||"").trim(),titleEn:String(c[3]||"").trim(),disc:String(c[4]||"").trim(),planned:parseDate(c[5])}; }).filter(d=>d.num);
