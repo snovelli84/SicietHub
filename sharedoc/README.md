@@ -144,6 +144,17 @@ SICIET Quality salva su SharePoint tramite un **servizio** (Cloudflare Worker) c
 
 Il test di questa pagina usa invece le autorizzazioni **delegate** (`Files.ReadWrite.All`) per verificare in fretta accesso, ruoli, cartella e file grandi. Con l'architettura sopra, `Files.ReadWrite.All` si toglie.
 
+## Versione delle pagine
+
+In fondo a ogni pagina di ShareDocs c'è la riga **"versione N · data"**, come in SICIET Quality. A ogni modifica pubblicata si aumenta di uno il numero e si aggiorna la data nel `<footer>` della pagina. Se nel browser compare un numero più vecchio di quello su GitHub, la pagina è in cache: aggiornare con Ctrl+F5 (sul telefono chiudere e riaprire la scheda).
+
+| Versione | Data | Modifica |
+|---|---|---|
+| 4 | 06/11/2026 | Numero di versione in fondo alla pagina |
+| 3 | 06/11/2026 | Link della cartella SharePoint dei transmittal |
+| 2 | 06/11/2026 | ID applicazione della registrazione Entra ID |
+| 1 | 06/11/2026 | Prima pubblicazione della pagina di test |
+
 ## Note di sicurezza
 
 - Nessun segreto nel codice: l'app usa il flusso SPA con PKCE e il token resta nella sessione del browser.
