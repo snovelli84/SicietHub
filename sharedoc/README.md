@@ -1,13 +1,30 @@
 # SICIET ShareDocs
 
-**SICIET ShareDocs** è il sistema di gestione dei transmittal e del ciclo di revisione documentale con i clienti (registro documenti/VDRL, transmittal, file allegati, codici di ritorno e commenti del cliente). È un progetto separato da SICIET HUB, pubblicato all'indirizzo `https://hub.siciet.it/sharedoc/` (cartella [`sharedoc/`](.) di questa repository) e non compare nel portale.
+**SICIET ShareDocs** è il sistema di gestione dei transmittal e del ciclo di revisione documentale con i clienti: registro documenti (VDRL), transmittal con file allegati, codici di ritorno e commenti del cliente, portale per il cliente. È un progetto separato da SICIET HUB, pubblicato all'indirizzo **`https://hub.siciet.it/sharedoc/`** (cartella [`sharedoc/`](.) di questa repository), e non compare nel portale.
 
-Il prototipo funzionale è su claude.ai; questa cartella contiene per ora la **pagina di test di connessione** a Microsoft 365, primo passo verso la versione reale.
+| File | Cosa contiene |
+|---|---|
+| [`index.html`](index.html), [`sharedoc.js`](sharedoc.js) | l'app: accesso Microsoft, registro, transmittal, commenti, portale cliente |
+| [`api/worker.js`](api/worker.js) | il servizio su Cloudflare che legge e scrive su SharePoint (sezione 7) |
+| [`test/index.html`](test/index.html) | la pagina di test della connessione a Microsoft 365 (`https://hub.siciet.it/sharedoc/test/`) |
+
+## Uso dell'app
+
+- **Accesso**: con l'account Microsoft. I colleghi SICIET usano l'account aziendale; i clienti l'account ospite invitato da SICIET. Cosa si può fare dipende dal **ruolo app** assegnato in Entra ID (applicazioni aziendali → SICIET ShareDocs → Utenti e gruppi):
+  - **Document Controller**: crea commesse, gestisce il registro, prepara ed emette i transmittal con i file, registra le risposte arrivate per altre vie;
+  - **Tecnico SICIET**: consulta tutto e risponde ai commenti del cliente;
+  - **Cliente**: vede solo i transmittal emessi delle commesse in cui il suo indirizzo o dominio è tra i *clienti ammessi*, scarica i file e risponde con codici e commenti. Il portale è sempre in inglese.
+- **Interfaccia** in italiano o inglese (selettore IT/EN); le comunicazioni ufficiali (foglio transmittal, VDRL, CRS) sono sempre in inglese.
+- **Transmittal**: si scelgono documenti, revisione, scopo e il file di ciascuno. I file vengono rinominati in modo standard (`<n. documento>_Rev<rev>.pdf`) e caricati a blocchi direttamente in `SICIET Docs / Documenti / <commessa> / Transmittals / <n. transmittal>/`, senza limite di dimensione. Senza file non si emette.
+- **Excel**: `VDRL <commessa>.xlsx` e `CRS <commessa>.xlsx` nella cartella della commessa si aggiornano da soli a ogni modifica.
+- **Vista Client** (selettore SICIET | Client, solo per i colleghi SICIET): mostra il portale come lo vede il cliente.
+- **Prima commessa e dati esistenti**: alla prima apertura il Document Controller crea la commessa (codice, nome, cartella, clienti ammessi). Poi da *Transmittal → Impostazioni commessa → Importazione iniziale* carica il file JSON con il registro esistente. I dati dei clienti **non vanno mai in questa repository**, che è pubblica: il file di importazione si conserva altrove.
+- **Clienti ammessi**: in *Impostazioni commessa*, uno per riga, indirizzi completi o domini (`@pegitaly.it`). Il cliente deve anche essere invitato come ospite in Entra ID e avere il ruolo **Cliente**.
 
 ## Configurazione di Entra ID e Microsoft Graph
 
 Questa guida prepara il collegamento di ShareDocs a Microsoft 365, sullo stesso schema di SICIET Quality.
-Alla fine la pagina `https://hub.siciet.it/sharedoc/` (**test di connessione**, file [`index.html`](index.html)) verifica sul tenant SICIET che:
+Alla fine la pagina `https://hub.siciet.it/sharedoc/test/` (**test di connessione**, file [`test/index.html`](test/index.html)) verifica sul tenant SICIET che:
 
 - l'accesso con l'account aziendale funzioni e l'utente abbia un **ruolo** ShareDocs;
 - l'app raggiunga la cartella SharePoint dei transmittal;
@@ -46,7 +63,7 @@ Consiglio una registrazione **separata da SICIET Quality**: permessi, utenti ass
 Dopo la creazione:
 
 1. **Panoramica** → copia *ID applicazione (client)* e *ID directory (tenant)*.
-2. **Autenticazione** → l'URI SPA deve essere esattamente `https://hub.siciet.it/sharedoc/`, barra finale compresa (la pagina torna sempre a quell'indirizzo, anche se aperta come `.../index.html`). Per provare in locale si può aggiungere `http://localhost:8080/`.
+2. **Autenticazione** → gli URI SPA devono essere esattamente `https://hub.siciet.it/sharedoc/` (l'app) e `https://hub.siciet.it/sharedoc/test/` (la pagina di test), barra finale compresa (la pagina torna sempre a quell'indirizzo, anche se aperta come `.../index.html`). Per provare in locale si può aggiungere `http://localhost:8080/`.
    Non serve nessun *segreto client*: l'app è una SPA con accesso PKCE, come Quality. Non crearne.
 3. **Autorizzazioni API → Aggiungi autorizzazione → Microsoft Graph → Autorizzazioni delegate**:
    - `User.Read` (di solito già presente)
@@ -206,6 +223,10 @@ SICIET Quality salva su SharePoint tramite un **servizio** (Cloudflare Worker) c
 Il test di questa pagina usa invece le autorizzazioni **delegate** (`Files.ReadWrite.All`) per verificare in fretta accesso, ruoli, cartella e file grandi. Con l'architettura sopra, `Files.ReadWrite.All` si toglie.
 
 ## Versione delle pagine
+
+**App** (`index.html` + `sharedoc.js`): versione 1 del 06/11/2026, prima versione collegata al servizio. A ogni modifica di `sharedoc.js` aumentare `VERSIONE`, il numero in `sharedoc.js?v=` e il footer di `index.html`.
+
+**Pagina di test** (`test/index.html`):
 
 In fondo a ogni pagina di ShareDocs c'è la riga **"versione N · data"**, come in SICIET Quality. A ogni modifica pubblicata si aumenta di uno il numero e si aggiorna la data nel `<footer>` della pagina. Se nel browser compare un numero più vecchio di quello su GitHub, la pagina è in cache: aggiornare con Ctrl+F5 (sul telefono chiudere e riaprire la scheda).
 
