@@ -41,6 +41,7 @@
  *   POST /api/op?c=ID   { op, … }         modifica il registro (vedi OPERAZIONI)
  *   POST /api/upload?c=ID { tr, nome, dimensione }   sessione di caricamento di un file
  *   GET  /api/file?c=ID&item=ID           link temporaneo per scaricare un file
+ *   POST /api/excel?c=ID                  rigenera subito VDRL e CRS in Excel (colleghi SICIET)
  *   POST /api/commessa  { id, nome, … }   crea una commessa (Document Controller)
  */
 
@@ -245,6 +246,8 @@ function registroVuoto(c){
 }
 async function leggiRegistro(env, c){
   const r = await leggiJson(env, cartellaDati(env).concat(c.id, "registro.json"));
+  // Documenti senza numero del cliente: il numero provvisorio TBA-nnn li identifica sempre.
+  if(r) for(const d of r.data.docs || []) if(/^TBA-\d+$/.test(d.num || "")) d.tba = true;
   return r || { data: registroVuoto(c), etag: null };
 }
 function trNum(reg, tr){ return (tr.prefix || reg.cfg.prefix) + String(tr.seq).padStart(2, "0"); }
@@ -644,6 +647,16 @@ export async function handle(request, env, ctx){
     if(via === "/upload" && request.method === "POST"){
       const c = await commessaPer(env, u, q("c"));
       return json(env, 200, await caricamento(env, u, c, await corpo(request)));
+    }
+    if(via === "/excel" && request.method === "POST"){
+      serve(u, "siciet");
+      const c = await commessaPer(env, u, q("c"));
+      const { data: reg } = await leggiRegistro(env, c);
+      await aggiornaExcel(env, reg);
+      const d = await drive(env);
+      const vdrl = await graphJson(env, "GET", await urlPercorso(env, [reg.cfg.cartella, "VDRL " + reg.cfg.id + ".xlsx"], "?$select=webUrl"));
+      const dati = await graphJson(env, "GET", await urlPercorso(env, cartellaDati(env).concat(c.id, "registro.json"), "?$select=webUrl"));
+      return json(env, 200, { esito: "VDRL e CRS aggiornati", vdrl: vdrl && vdrl.webUrl, registro: dati && dati.webUrl, drive: d.drive ? "ok" : "" });
     }
     if(via === "/file" && request.method === "GET"){
       const c = await commessaPer(env, u, q("c"));
