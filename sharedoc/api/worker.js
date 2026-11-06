@@ -44,11 +44,14 @@
  *                                         risposta del cliente (cartella "Client reply" del transmittal)
  *   GET  /api/file?c=ID&item=ID           link temporaneo per scaricare un file
  *   POST /api/excel?c=ID                  rigenera subito VDRL e CRS in Excel (colleghi SICIET)
+ *   GET  /api/archivio?c=ID&cartella=…    anteprima dell'importazione di un archivio di file già
+ *                                         trasmessi (Document Controller); l'operazione
+ *                                         "archivioCollega" esegue i collegamenti
  *   POST /api/commessa  { id, nome, … }   crea una commessa (Document Controller)
  */
 
 // Aumentare a ogni modifica: la pagina la mostra in fondo, così si vede se su Cloudflare c'è l'ultima.
-const VERSIONE_SERVIZIO = 8;
+const VERSIONE_SERVIZIO = 9;
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const MB = 1024 * 1024;
 const MAX_FILE = 2048 * MB;
@@ -264,6 +267,7 @@ function prossimoSeq(reg){
 function vistaCliente(reg){
   const trs = reg.trs.filter(t => t.status !== "bozza").map(t => ({
     id: t.id, seq: t.seq, prefix: t.prefix, status: t.status, date: t.date, dueDays: t.dueDays, note: t.note, attn: t.attn, to: t.to, endClient: t.endClient, projectName: t.projectName,
+    sheet: t.sheet ? { id: t.sheet.id, name: t.sheet.name, size: t.sheet.size } : null,
     items: (t.items || []).map(i => ({ docId: i.docId, rev: i.rev, poi: i.poi, ret: i.ret ? { code: i.ret.code, date: i.ret.date } : null, files: fileDi(i).map(f => ({ id: f.id, name: f.name, size: f.size })), clientFiles: (i.clientFiles || []).map(f => ({ id: f.id, name: f.name, size: f.size })) }))
   }));
   const ids = new Set(trs.flatMap(t => t.items.map(i => i.docId)));
@@ -343,6 +347,92 @@ async function aggiungiAllegati(env, u, reg, tr, it, files){
   it.clientFiles = (it.clientFiles || []).concat(nuovi).slice(-MAX_ALLEGATI);
   return nuovi.length;
 }
+
+/* ---------- Importazione di un archivio di file già trasmessi ----------
+ * Legge una cartella della commessa su SICIET Docs (con le sottocartelle), riconosce dal nome di
+ * ogni file il documento e la revisione (es. SOK976701376_005_A.pdf, SOK976701379 GA_REV5.dwg)
+ * e i PDF dei transmittal (S2040-T03.pdf), e li abbina ai transmittal emessi. I file non vengono
+ * spostati né copiati: restano dove sono e vengono collegati (l'ID di SharePoint resta valido
+ * anche se in seguito si spostano dentro il sito).
+ */
+const IGNORA = /\.(log|tmp|bak|dwl2?|lck|ini|db)$|^~\$|^\./i;
+async function elencoRicorsivo(env, parti){
+  const d = await drive(env), out = [], coda = [parti];
+  let cartelle = 0;
+  while(coda.length){
+    const p = coda.shift();
+    if(++cartelle > 40) throw new Errore(413, "Troppe sottocartelle (oltre 40): indica una cartella più piccola.");
+    let next = "/drives/" + d.drive + "/root:/" + enc(p) + ":/children?$top=999&$select=id,name,size,file,folder,lastModifiedDateTime,webUrl";
+    while(next){
+      const r = await graphJson(env, "GET", next);
+      if(!r) throw new Errore(404, "Cartella non trovata: " + p.join("/"));
+      for(const it of r.value){
+        if(it.folder){ if(it.name !== CARTELLA_RISPOSTA) coda.push(p.concat(it.name)); }
+        else out.push({ id: it.id, name: it.name, size: it.size, webUrl: it.webUrl, data: (it.lastModifiedDateTime || "").slice(0, 10), path: "/" + p.concat(it.name).join("/") });
+      }
+      next = r["@odata.nextLink"];
+      if(out.length > 3000) throw new Errore(413, "Troppi file (oltre 3000): indica una cartella più piccola.");
+    }
+  }
+  return out;
+}
+function revisioneDaNome(resto){
+  let m = resto.match(/^[ _-]*(\d{3})(?=[ _.-]|$)/);          // SOK…_005_A
+  if(m) return String(parseInt(m[1], 10));
+  m = resto.match(/REV[ ._-]*([0-9]{1,3}|[A-Z])(?![A-Z0-9])/i);  // …GA_REV5, … Rev B
+  if(m) return /^\d+$/.test(m[1]) ? String(parseInt(m[1], 10)) : m[1].toUpperCase();
+  return null;
+}
+function analizzaArchivio(reg, files){
+  const docs = reg.docs.filter(d => d.num && !d.tba).sort((a, b) => b.num.length - a.num.length);
+  const emessi = reg.trs.filter(t => t.status !== "bozza");
+  const perNum = new Map(emessi.map(t => [trNum(reg, t).toUpperCase(), t]));
+  const abbinati = [], fogli = [], ignorati = [];
+  for(const f of files){
+    if(IGNORA.test(f.name)){ ignorati.push({ f, motivo: "file di servizio" }); continue; }
+    const base = f.name.replace(/\.[A-Za-z0-9]{1,6}$/, ""), chiave = base.toUpperCase().replace(/\s+/g, "");
+    const tr = perNum.get(chiave);
+    if(tr && /\.pdf$/i.test(f.name)){ fogli.push({ tr, f }); continue; }
+    const doc = docs.find(d => chiave.startsWith(d.num.toUpperCase()));
+    if(!doc){ ignorati.push({ f, motivo: "numero di documento non riconosciuto" }); continue; }
+    const resto = base.replace(/\s+/g, " ").slice(base.toUpperCase().indexOf(doc.num.toUpperCase()) + doc.num.length);
+    const r = revisioneDaNome(resto);
+    if(r === null){ ignorati.push({ f, doc, motivo: "revisione non riconosciuta nel nome" }); continue; }
+    const cand = emessi.filter(t => (t.items || []).some(i => i.docId === doc.id && String(i.rev).toUpperCase() === r));
+    if(!cand.length){ ignorati.push({ f, doc, rev: r, motivo: "nessun transmittal emesso con " + doc.num + " rev " + r }); continue; }
+    // Più transmittal con la stessa revisione: quello con la data più vicina al file.
+    const giorni = t => Math.abs((Date.parse(t.date || "1970-01-01") - Date.parse(f.data || t.date || "1970-01-01")) / 864e5);
+    const tr2 = cand.sort((a, b) => giorni(a) - giorni(b))[0];
+    abbinati.push({ tr: tr2, k: tr2.items.findIndex(i => i.docId === doc.id && String(i.rev).toUpperCase() === r), doc, rev: r, f });
+  }
+  return { abbinati, fogli, ignorati, emessi };
+}
+function rapportoArchivio(reg, a, cartella, nFile){
+  const giaCollegato = (tr, id) => (tr.sheet && tr.sheet.id === id) || (tr.items || []).some(i => fileDi(i).some(x => x.id === id));
+  const perTr = a.emessi.map(t => {
+    const righe = (t.items || []).map((it, k) => {
+      const doc = reg.docs.find(d => d.id === it.docId) || {};
+      const trovati = a.abbinati.filter(x => x.tr === t && x.k === k);
+      return { doc: doc.num, rev: it.rev, gia: fileDi(it).map(f => f.name), nuovi: trovati.filter(x => !giaCollegato(t, x.f.id)).map(x => ({ name: x.f.name, path: x.f.path, size: x.f.size })) };
+    });
+    const foglio = a.fogli.find(x => x.tr === t);
+    return { tr: trNum(reg, t), data: t.date, foglio: foglio ? { name: foglio.f.name, nuovo: !giaCollegato(t, foglio.f.id) } : (t.sheet ? { name: t.sheet.name, nuovo: false } : null), righe };
+  }).sort((x, y) => String(x.data).localeCompare(String(y.data)));
+  const nuovi = perTr.reduce((n, t) => n + t.righe.reduce((m, r) => m + r.nuovi.length, 0) + (t.foglio && t.foglio.nuovo ? 1 : 0), 0);
+  return {
+    cartella, file: nFile, daCollegare: nuovi, transmittal: perTr,
+    nonAbbinati: a.ignorati.filter(x => x.motivo !== "file di servizio").map(x => ({ name: x.f.name, path: x.f.path, motivo: x.motivo })),
+    ignorati: a.ignorati.filter(x => x.motivo === "file di servizio").length
+  };
+}
+function cartellaArchivio(reg, x){
+  const p = String(x || reg.cfg.cartella).replace(/^\/+|\/+$/g, "");
+  const parti = p.split("/").map(v => v.trim()).filter(Boolean);
+  if(!parti.length || parti[0] !== reg.cfg.cartella) throw new Errore(400, "La cartella deve essere dentro quella della commessa: " + reg.cfg.cartella);
+  for(const v of parti) nomeCartella(v);
+  return parti;
+}
+function metaFile(f, origine){ return { id: f.id, name: f.name, size: f.size, webUrl: f.webUrl, path: f.path, origin: origine, linkedAt: new Date().toISOString() }; }
 
 const OPERAZIONI = {
   // --- Document Controller ---
@@ -455,6 +545,19 @@ const OPERAZIONI = {
     nuoviCommenti(reg, u, x.comments, tr.id, "siciet");
     return "Risposta di " + trNum(reg, tr) + " registrata";
   },
+  async archivioCollega(env, u, reg, x){
+    serve(u, "dc");
+    const parti = cartellaArchivio(reg, x.cartella);
+    const a = analizzaArchivio(reg, await elencoRicorsivo(env, parti));
+    let n = 0;
+    for(const m of a.abbinati){
+      const it = m.tr.items[m.k], lista = fileDi(it);
+      if(lista.some(f => f.id === m.f.id) || lista.length >= MAX_FILE_RIGA) continue;
+      it.files = lista.concat(metaFile(m.f, "archivio")); delete it.file; n++;
+    }
+    for(const s2 of a.fogli){ if(!s2.tr.sheet){ s2.tr.sheet = metaFile(s2.f, "archivio"); n++; } }
+    return { msg: "Archivio: collegati " + n + " file", n };
+  },
   // --- Tecnici e Document Controller ---
   async cmtAdd(env, u, reg, x){
     serve(u, "siciet");
@@ -563,6 +666,7 @@ async function linkFile(env, u, c, itemId){
   const { data: reg } = await leggiRegistro(env, c);
   const trs = u.cliente ? reg.trs.filter(t => t.status !== "bozza") : reg.trs;
   let f = null;
+  for(const t of trs) if(t.sheet && t.sheet.id === itemId) f = t.sheet;
   for(const t of trs) for(const i of t.items || []){
     for(const a of fileDi(i)) if(a.id === itemId) f = a;
     for(const a of i.clientFiles || []) if(a.id === itemId) f = a;
@@ -722,6 +826,14 @@ export async function handle(request, env, ctx){
     if(via === "/upload" && request.method === "POST"){
       const c = await commessaPer(env, u, q("c"));
       return json(env, 200, await caricamento(env, u, c, await corpo(request)));
+    }
+    if(via === "/archivio" && request.method === "GET"){
+      serve(u, "dc");
+      const c = await commessaPer(env, u, q("c"));
+      const { data: reg } = await leggiRegistro(env, c);
+      const parti = cartellaArchivio(reg, q("cartella"));
+      const files = await elencoRicorsivo(env, parti);
+      return json(env, 200, rapportoArchivio(reg, analizzaArchivio(reg, files), parti.join("/"), files.length));
     }
     if(via === "/excel" && request.method === "POST"){
       serve(u, "siciet");
