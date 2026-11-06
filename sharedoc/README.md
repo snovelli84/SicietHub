@@ -224,7 +224,7 @@ Il test di questa pagina usa invece le autorizzazioni **delegate** (`Files.ReadW
 
 ## Versione delle pagine
 
-**App** (`index.html` + `sharedoc.js`): versione 1 del 06/11/2026, prima versione collegata al servizio. A ogni modifica di `sharedoc.js` aumentare `VERSIONE`, il numero in `sharedoc.js?v=` e il footer di `index.html`.
+**App** (`index.html` + `sharedoc.js`): versione 2 del 06/11/2026 (pulsante *Aggiorna Excel* nella pagina Transmittal; v1: prima versione collegata al servizio). A ogni modifica di `sharedoc.js` aumentare `VERSIONE`, il numero in `sharedoc.js?v=` e il footer di `index.html`.
 
 **Pagina di test** (`test/index.html`):
 

@@ -17,7 +17,7 @@ var SHAREDOCS_CONFIG = {
   api: "https://siciet-sharedocs.amministrazione-c44.workers.dev/api",   // servizio su Cloudflare
   scope: "api://9e9b873b-2e7c-4011-aebd-7470627d55ec/access_as_user"
 };
-const VERSIONE = 1;
+const VERSIONE = 2;
 const LOGO_URL = new URL("icons/siciet-mark.png", location.href).href;
 
 /* ---------- Lingua dell'interfaccia (per utente) ----------
@@ -346,8 +346,8 @@ function viewDocs(infos){
 function viewTrs(){
   const list=[...S.trs].sort((a,b)=>((b.status==="bozza")-(a.status==="bozza"))||String(b.date||"").localeCompare(String(a.date||""))||b.seq-a.seq);   // bozze in cima, poi dal più recente
   return `
-  <div class="pagehead"><div><h1>${tx("Transmittal","Transmittals")}</h1><p>${tx(`Registro di tutti i transmittal della commessa, numerati in automatico ${esc(S.cfg.prefix)}nn. Il foglio inviato al cliente è sempre in inglese.`,`Log of all project transmittals, numbered automatically ${esc(S.cfg.prefix)}nn. The sheet sent to the client is always in English.`)}</p></div>
-    <div class="actions"><button class="btn" data-act="settings">${tx("Impostazioni commessa","Project settings")}</button><button class="btn primary" data-act="newTr" ${S.canWrite&&S.docs.length?"":"disabled"}>${tx("Nuovo transmittal","New transmittal")}</button></div></div>
+  <div class="pagehead"><div><h1>${tx("Transmittal","Transmittals")}</h1><p>${S.excelUrl?`<a href="${esc(S.excelUrl)}" target="_blank" rel="noopener">${tx("Apri VDRL su SharePoint","Open VDRL on SharePoint")}</a> · `:""}${tx(`Registro di tutti i transmittal della commessa, numerati in automatico ${esc(S.cfg.prefix)}nn. Il foglio inviato al cliente è sempre in inglese.`,`Log of all project transmittals, numbered automatically ${esc(S.cfg.prefix)}nn. The sheet sent to the client is always in English.`)}</p></div>
+    <div class="actions">${S.canComment?`<button class="btn" data-act="excel" title="${tx("Rigenera subito VDRL e CRS nella cartella SharePoint della commessa","Regenerate VDRL and CRS now in the project's SharePoint folder")}">${tx("Aggiorna Excel","Update Excel")}</button>`:""}<button class="btn" data-act="settings">${tx("Impostazioni commessa","Project settings")}</button><button class="btn primary" data-act="newTr" ${S.canWrite&&S.docs.length?"":"disabled"}>${tx("Nuovo transmittal","New transmittal")}</button></div></div>
   <div class="tablebox"><table>
     <thead><tr><th>${tx("Numero","Number")}</th><th>${tx("Data","Date")}</th><th>${tx("Destinatario","To")}</th><th>${tx("Documenti","Documents")}</th><th>${tx("Scopo","Purpose")}</th><th>${tx("Risposta entro","Reply due")}</th><th>${tx("Stato","Status")}</th></tr></thead>
     <tbody>${list.length?list.map(tr=>{const st=trState(tr), pois=[...new Set((tr.items||[]).map(i=>i.poi))];
@@ -772,6 +772,8 @@ document.addEventListener("click", async e=>{
   else if(a==="dlTr") dlTr(id);
   else if(a==="csv") csvVdrl();
   else if(a==="crs") csvCrs();
+  else if(a==="excel"){ t.disabled=true; toast(tx("Aggiornamento di VDRL e CRS in corso…","Updating VDRL and CRS…"));
+    try{ const r=await api("POST","/excel"+qc()); toast(r.esito); if(r.vdrl) S.excelUrl=r.vdrl; render(); }catch(err){ fail(err); } finally{ t.disabled=false; } }
   else if(a==="dlFile") dlFile(id);
   else if(a==="viewFile") viewFile(id);
   else if(a==="crStart"){ S.drawer.replying=true; renderDrawer(); }
