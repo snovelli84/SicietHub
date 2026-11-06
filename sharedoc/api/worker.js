@@ -500,8 +500,10 @@ async function linkFile(env, u, c, itemId){
   for(const t of trs) for(const i of t.items || []) if(i.file && i.file.id === itemId) f = i.file;
   if(!f) throw new Errore(404, "File non trovato.");
   const d = await drive(env);
-  const it = await graphJson(env, "GET", "/drives/" + d.drive + "/items/" + encodeURIComponent(itemId) + "?$select=id,name,size,webUrl");
+  // Niente $select: con $select SharePoint non restituisce il link temporaneo di download.
+  const it = await graphJson(env, "GET", "/drives/" + d.drive + "/items/" + encodeURIComponent(itemId));
   if(!it) throw new Errore(404, "Il file non c'è più su SharePoint.");
+  if(!it["@microsoft.graph.downloadUrl"]) throw new Errore(502, "SharePoint non ha fornito il link di download.");
   return { url: it["@microsoft.graph.downloadUrl"], name: f.name, size: it.size, webUrl: u.siciet ? it.webUrl : undefined };
 }
 

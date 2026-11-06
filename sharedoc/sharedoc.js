@@ -17,7 +17,7 @@ var SHAREDOCS_CONFIG = {
   api: "https://siciet-sharedocs.amministrazione-c44.workers.dev/api",   // servizio su Cloudflare
   scope: "api://9e9b873b-2e7c-4011-aebd-7470627d55ec/access_as_user"
 };
-const VERSIONE = 3;
+const VERSIONE = 4;
 const LOGO_URL = new URL("icons/siciet-mark.png", location.href).href;
 
 /* ---------- Lingua dell'interfaccia (per utente) ----------
@@ -171,6 +171,19 @@ async function caricaFile(trId, file, nome, avanzamento){
 // Anteprima dentro ShareDocs: il PDF viene scaricato dal link temporaneo e mostrato in un
 // pannello con il visualizzatore del browser. Niente schede aperte "in ritardo" (che i browser
 // bloccano) e niente accesso a SharePoint: funziona uguale per i colleghi e per il cliente.
+// Scarica il contenuto dal link temporaneo e controlla che sia davvero il file (non una pagina d'errore).
+async function scaricaContenuto(r){
+  if(!r || !r.url) throw new Error(tx("Il servizio non ha fornito il link del file: aggiorna il servizio su Cloudflare.","The service did not provide the file link: update the service on Cloudflare."));
+  let res;
+  try { res = await fetch(r.url); } catch(e){ throw new Error(tx("Scaricamento del file non riuscito: controlla la connessione.","File download failed: check your connection.")); }
+  if(!res.ok) throw new Error(tx("SharePoint ha rifiutato lo scaricamento (","SharePoint refused the download (") + res.status + ").");
+  const b = await res.blob();
+  if(/\.pdf$/i.test(r.name)){
+    const testa = new Uint8Array(await b.slice(0, 5).arrayBuffer());
+    if(String.fromCharCode(...testa) !== "%PDF-") throw new Error(tx("Il file ricevuto non è un PDF valido.","The received file is not a valid PDF."));
+  }
+  return b;
+}
 async function viewFile(id){
   const back = S.drawer ? (S.drawer.type === "pdf" ? S.drawer.back : Object.assign({}, S.drawer)) : null;
   openDrawer({ type: "pdf", id, name: "", back });
@@ -180,7 +193,7 @@ async function viewFile(id){
     Object.assign(S.drawer, { name: r.name, size: r.size, webUrl: !isClient() && r.webUrl, pdf: /\.pdf$/i.test(r.name) });
     if(!S.drawer.pdf){ renderDrawer(); return; }
     renderDrawer();
-    const b = await (await fetch(r.url)).blob();
+    const b = await scaricaContenuto(r);
     if(!S.drawer || S.drawer.id !== id) return;
     if(S.pdfUrl) URL.revokeObjectURL(S.pdfUrl);
     S.pdfUrl = URL.createObjectURL(new Blob([b], { type: "application/pdf" }));
@@ -203,7 +216,7 @@ async function dlFile(id){
   try {
     const r = await api("GET", "/file" + qc() + "&item=" + encodeURIComponent(id));
     toast(tx("Scaricamento di ","Downloading ") + r.name + "…");
-    const b = await (await fetch(r.url)).blob();
+    const b = await scaricaContenuto(r);
     salvaBlob(r.name, b);
   } catch(e){ fail(e); }
 }
