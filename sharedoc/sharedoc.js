@@ -17,7 +17,7 @@ var SHAREDOCS_CONFIG = {
   api: "https://siciet-sharedocs.amministrazione-c44.workers.dev/api",   // servizio su Cloudflare
   scope: "api://9e9b873b-2e7c-4011-aebd-7470627d55ec/access_as_user"
 };
-const VERSIONE = 6;
+const VERSIONE = 7;
 const SERVIZIO_ATTESO = 7;   // versione minima del servizio su Cloudflare (VERSIONE_SERVIZIO in api/worker.js)
 const LOGO_URL = new URL("icons/siciet-mark.png", location.href).href;
 
@@ -410,27 +410,81 @@ function viewTrs(){
 }
 
 /* ---------- Commenti (CRS) ---------- */
+/* Commenti: una scheda per ogni risposta (documento + revisione + transmittal), con codice di
+   ritorno, chi ha risposto, allegati del cliente e tutti i commenti con la risposta SICIET. */
+function gruppiRisposte(){
+  const g=new Map(), key=(trId,docId,rev)=>trId+"|"+docId+"|"+rev;
+  for(const tr of S.trs){ if(tr.status==="bozza") continue;
+    (tr.items||[]).forEach(it=>{ if(!it.ret&&!(it.clientFiles||[]).length) return;
+      g.set(key(tr.id,it.docId,it.rev),{tr,it,docId:it.docId,rev:it.rev,cmts:[],data:it.ret?.date||tr.date||""}); }); }
+  for(const c of S.cmts){ const k=key(c.trId||"",c.docId,c.rev);
+    if(!g.has(k)){ const tr=S.trs.find(t=>t.id===c.trId)||null, it=tr?(tr.items||[]).find(i=>i.docId===c.docId&&i.rev===c.rev):null;
+      g.set(k,{tr,it,docId:c.docId,rev:c.rev,cmts:[],data:it?.ret?.date||(c.createdAt||"").slice(0,10)}); }
+    g.get(k).cmts.push(c); }
+  const out=[...g.values()];
+  out.forEach(x=>{ x.cmts.sort((a,b)=>(a.n||0)-(b.n||0)); x.aperti=x.cmts.filter(c=>c.status!=="chiuso").length; });
+  return out.sort((a,b)=>(b.aperti>0)-(a.aperti>0)||String(b.data).localeCompare(String(a.data))||docSort(docById(a.docId)||{},docById(b.docId)||{}));
+}
+function origineRisposta(ret){
+  if(!ret) return "";
+  if(ret.origin==="client") return `<span class="chip t-pend">${tx("dal portale cliente","from client portal")}</span>`;
+  if(ret.origin==="siciet") return `<span class="chip t-muted">${tx("registrata da SICIET","logged by SICIET")}</span>`;
+  if(ret.origin==="import") return `<span class="chip t-muted">${tx("importata","imported")}</span>`;
+  return "";
+}
+function rigaCommento(c){
+  const autore=c.by&&c.by.nome?`<span class="muted">${esc(c.by.nome)}${c.createdAt?" · "+fmt(c.createdAt.slice(0,10)):""}</span>`:"";
+  const risposta = c.status==="chiuso"||!S.canComment
+    ? (c.reply?`<div>${esc(c.reply)}</div>${c.replyBy&&c.replyBy.nome?`<span class="muted">${esc(c.replyBy.nome)}${c.closedAt?" · "+fmt(c.closedAt):""}</span>`:""}`:'<span class="muted">—</span>')
+    : `<div class="cmt-reply"><textarea id="rep-${esc(c.id)}" lang="en" aria-label="${tx("Risposta al commento, in inglese","Reply to the comment")}" placeholder="${tx("Risposta in inglese, es. Noted, updated in rev. 0.","e.g. Noted, updated in rev. 0.")}">${esc(c.reply||"")}</textarea>
+      <div class="actions"><button class="btn small" data-cmt-save="${esc(c.id)}">${tx("Salva risposta","Save reply")}</button><button class="btn small primary" data-cmt-close="${esc(c.id)}">${tx("Salva e chiudi","Save and close")}</button></div></div>`;
+  const stato = c.status==="chiuso"
+    ? `<span class="chip t-ok">${tx("Chiuso","Closed")}</span>${S.canComment?`<br><button class="link" data-cmt-reopen="${esc(c.id)}" style="margin-top:6px">${tx("Riapri","Reopen")}</button>`:""}`
+    : `<span class="chip t-warn">${tx("Aperto","Open")}</span>`;
+  return `<tr><td class="mono">${esc(c.n)}</td><td style="min-width:220px"><div style="white-space:pre-wrap">${esc(c.text)}</div>${c.ref?`<span class="muted">${tx("Rif.","Ref.")}: ${esc(c.ref)}</span><br>`:""}${autore}</td><td style="min-width:240px">${risposta}</td><td>${stato}</td></tr>`;
+}
+function schedaRisposta(x){
+  const d=docById(x.docId)||{}, ret=x.it&&x.it.ret, info=d.id?docInfo(d):null;
+  const codice = ret ? `${retCode(ret.code)} <b>${esc(tx(RET[ret.code]?.it||"",RET[ret.code]?.en||""))}</b>` : `<span class="muted">${tx("nessun codice","no code")}</span>`;
+  const chi = ret&&ret.by&&ret.by.nome ? esc(ret.by.nome) : "";
+  return `<section class="panel rv">
+    <div class="rv-head">
+      <div class="rv-title"><span class="mono"><b>${esc(d.num||"?")}</b> rev ${esc(x.rev)}</span>${tbaTag(d)}<span class="rv-doc">${esc(titleUi(d))}</span></div>
+      <div class="rv-meta">
+        ${x.tr?`<span>Transmittal <button class="link mono" data-tr="${esc(x.tr.id)}">${esc(trNum(x.tr))}</button></span>`:`<span class="muted">${tx("commento registrato a mano","comment logged manually")}</span>`}
+        <span>${codice}</span>
+        ${ret?`<span class="mono">${fmt(ret.date)}</span>`:""}
+        ${chi?`<span>${tx("da","by")} ${chi}</span>`:""}
+        ${origineRisposta(ret)}
+        ${x.aperti?`<span class="chip t-warn">${tx(`${x.aperti} aperti`,`${x.aperti} open`)}</span>`:(x.cmts.length?`<span class="chip t-ok">${tx("tutti chiusi","all closed")}</span>`:"")}
+      </div>
+    </div>
+    ${allegatiCell(x.it&&x.it.clientFiles)}
+    ${x.cmts.length?`<div class="tablebox" style="margin-top:10px"><table><thead><tr><th>${tx("N.","No.")}</th><th>${tx("Commento del cliente","Client comment")}</th><th>${tx("Risposta SICIET (EN)","SICIET reply")}</th><th>${tx("Stato","Status")}</th></tr></thead><tbody>${x.cmts.map(rigaCommento).join("")}</tbody></table></div>`
+      :`<p class="hint" style="margin:10px 0 0">${tx("Nessun commento scritto con questa risposta.","No written comments with this reply.")}</p>`}
+    <div class="actions rv-actions">
+      ${d.id?`<button class="btn small" data-doc-open="${esc(d.id)}">${tx("Scheda documento","Document record")}</button>`:""}
+      ${S.canWrite&&d.id&&info?`<button class="btn small" data-act="newTr" data-doc="${esc(d.id)}">${tx(`Riemetti in rev ${esc(info.next)}`,`Reissue as rev ${esc(info.next)}`)}</button>`:""}
+      ${S.canComment&&d.id?`<button class="btn small" data-act="newCmt" data-doc="${esc(d.id)}">${tx("Aggiungi commento","Add comment")}</button>`:""}
+    </div>
+  </section>`;
+}
 function viewCmts(){
-  const f=S.cfilter;
-  let list=S.cmts.filter(c=>f==="tutti"||(f==="aperti"?c.status!=="chiuso":c.status==="chiuso"));
-  list.sort((a,b)=>{const da=docById(a.docId),dbb=docById(b.docId);return docSort(da||{},dbb||{})||String(a.rev).localeCompare(String(b.rev))||(a.n||0)-(b.n||0)});
-  const open=S.cmts.filter(c=>c.status!=="chiuso").length;
+  const f=S.cfilter, tutti=gruppiRisposte();
+  const nAperti=tutti.filter(x=>x.aperti).length, nChiusi=tutti.filter(x=>x.cmts.length&&!x.aperti).length;
+  const list=tutti.filter(x=>f==="tutti"||(f==="aperti"?x.aperti>0:(x.cmts.length&&!x.aperti)));
+  const openC=S.cmts.filter(c=>c.status!=="chiuso").length;
   return `
-  <div class="pagehead"><div><h1>${tx("Registro commenti","Comment register")}</h1><p>${tx("Comment Resolution Sheet della commessa: ogni commento del cliente riceve una risposta SICIET, scritta in inglese, e si chiude prima della riemissione.","The project's Comment Resolution Sheet: every client comment gets a SICIET reply, written in English, and is closed before the document is reissued.")}</p></div>
+  <div class="pagehead"><div><h1>${tx("Risposte e commenti del cliente","Client replies and comments")}</h1><p>${tx("Una scheda per ogni risposta del cliente: codice di ritorno, chi ha risposto, allegati e commenti con la risposta SICIET, scritta in inglese. I commenti si chiudono prima della riemissione.","One card per client reply: return code, who replied, attachments and comments with the SICIET reply, written in English. Comments are closed before reissuing.")}</p></div>
     <div class="actions"><button class="btn" data-act="crs" ${S.cmts.length?"":"disabled"} title="${tx("File ufficiale in inglese","Official file, in English")}">${tx("Esporta CRS (CSV, EN)","Export CRS (CSV)")}</button><button class="btn primary" data-act="newCmt" ${S.canComment&&S.docs.length?"":"disabled"}>${tx("Registra commento","Log comment")}</button></div></div>
   <div class="toolbar">
-    <select id="cf" aria-label="${tx("Filtra commenti","Filter comments")}"><option value="aperti" ${f==="aperti"?"selected":""}>${tx("Aperti","Open")} (${open})</option><option value="chiusi" ${f==="chiusi"?"selected":""}>${tx("Chiusi","Closed")} (${S.cmts.length-open})</option><option value="tutti" ${f==="tutti"?"selected":""}>${tx("Tutti","All")} (${S.cmts.length})</option></select>
-    <span class="count">${tx(`${list.length} commenti`,`${list.length} comments`)}</span></div>
-  <div class="tablebox"><table>
-    <thead><tr><th>${tx("Documento","Document")}</th><th>Rev</th><th>${tx("N.","No.")}</th><th>${tx("Commento del cliente","Client comment")}</th><th>${tx("Risposta SICIET (EN)","SICIET reply")}</th><th>${tx("Stato","Status")}</th></tr></thead>
-    <tbody>${list.length?list.map(c=>{const d=docById(c.docId);
-      return `<tr><td class="mono num">${esc(d?d.num:tx("(documento rimosso)","(document removed)"))}${demoTag(c)}<br><span class="muted" style="font-family:var(--f-body)">${esc(titleUi(d))}</span></td>
-      <td class="mono">${esc(c.rev)}</td><td class="mono">${esc(c.n)}</td><td style="min-width:220px">${c.origin==="client"?`<span class="chip t-pend" style="margin-bottom:4px">${tx("dal portale","from portal")}</span><br>`:""}${esc(c.text)}${c.ref?`<br><span class="muted">${tx("Rif.","Ref.")}: ${esc(c.ref)}</span>`:""}</td>
-      <td>${c.status==="chiuso"||!S.canComment?(c.reply?esc(c.reply):'<span class="muted">—</span>'):
-        `<div class="cmt-reply"><textarea id="rep-${esc(c.id)}" lang="en" aria-label="${tx("Risposta al commento, in inglese","Reply to the comment")}" placeholder="${tx("Risposta in inglese, es. Noted, updated in rev. 0.","e.g. Noted, updated in rev. 0.")}">${esc(c.reply||"")}</textarea>
-        <div class="actions"><button class="btn small" data-cmt-save="${esc(c.id)}">${tx("Salva risposta","Save reply")}</button><button class="btn small primary" data-cmt-close="${esc(c.id)}">${tx("Salva e chiudi","Save and close")}</button></div></div>`}</td>
-      <td>${c.status==="chiuso"?`<span class="chip t-ok">${tx("Chiuso","Closed")}</span>${S.canComment?`<br><button class="link" data-cmt-reopen="${esc(c.id)}" style="margin-top:6px">${tx("Riapri","Reopen")}</button>`:""}`:`<span class="chip t-warn">${tx("Aperto","Open")}</span>`}</td></tr>`}).join("")
-    :`<tr><td colspan="6" class="empty">${f==="aperti"?tx("Nessun commento aperto.","No open comments."):tx("Nessun commento.","No comments.")}</td></tr>`}</tbody></table></div>`;
+    <select id="cf" aria-label="${tx("Filtra risposte","Filter replies")}">
+      <option value="aperti" ${f==="aperti"?"selected":""}>${tx("Con commenti aperti","With open comments")} (${nAperti})</option>
+      <option value="chiusi" ${f==="chiusi"?"selected":""}>${tx("Commenti tutti chiusi","All comments closed")} (${nChiusi})</option>
+      <option value="tutti" ${f==="tutti"?"selected":""}>${tx("Tutte le risposte","All replies")} (${tutti.length})</option></select>
+    <span class="count">${tx(`${openC} commenti aperti in totale`,`${openC} open comments in total`)}</span></div>
+  ${list.length?`<div class="rvlist">${list.map(schedaRisposta).join("")}</div>`
+    :`<div class="panel"><div class="empty">${f==="aperti"?tx("Nessun commento aperto. Scegli «Tutte le risposte» per vedere anche le risposte senza commenti.","No open comments. Choose “All replies” to also see replies without comments."):tx("Nessuna risposta.","No replies.")}</div></div>`}`;
 }
 
 /* ---------- Portale cliente (sempre in inglese) ---------- */
@@ -878,7 +932,7 @@ document.addEventListener("change", e=>{
   if(id==="impJson" && e.target.files[0]) importaRegistro(e.target.files[0]);
 });
 document.addEventListener("keydown", e=>{ if(e.key==="Escape"&&S.drawer) closeDrawer(); });
-function route(){ const h=location.hash.slice(1); S.view=TABS.some(([k])=>k===h)?h:"cruscotto"; render(); window.scrollTo(0,0); }
+function route(){ const h=location.hash.slice(1); S.view=TABS.some(([k])=>k===h)?h:"cruscotto"; if(S.drawer) closeDrawer(); render(); window.scrollTo(0,0); }
 window.addEventListener("hashchange", route);
 
 /* ---------- Avvio ---------- */
