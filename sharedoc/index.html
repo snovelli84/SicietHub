@@ -92,7 +92,7 @@ label.file{display:grid;gap:6px;font-size:14px;color:var(--muted)}
 </main>
 
 <!-- Aumentare la versione (e la data) a ogni modifica pubblicata: serve a capire se il browser mostra l'ultima. -->
-<footer>SICIET ShareDocs · Test connessione · versione 5 · 06/11/2026</footer>
+<footer>SICIET ShareDocs · Test connessione · versione 6 · 06/11/2026</footer>
 
 <script>
 /* =====================================================================
@@ -209,9 +209,28 @@ var SHAREDOCS_CONFIG = {
     if(!/^https:\/\//.test(cfg.cartella)){
       var m = String(cfg.sito).match(/^https:\/\/([^/]+)(\/sites\/[^/?#]+)/i);
       if(!m) throw err("Indirizzo del sito non valido in SHAREDOCS_CONFIG.sito (es. https://srlsiciet.sharepoint.com/sites/SICIETDocs).", 400);
-      var site = await getOrNull("/sites/" + m[1] + ":" + m[2] + "?$select=id,displayName,webUrl");
-      if(!site) throw err("Sito " + m[2] + " non trovato o non accessibile con il tuo utente.", 404);
-      var d = await api("GET", "/sites/" + site.id + "/drive?$select=id,name,webUrl");
+      // 1) Con Sites.Read.All il sito si legge dal suo indirizzo.
+      // 2) Con il solo Files.ReadWrite.All /sites/... viene rifiutato: si apre allora la raccolta
+      //    Documenti dal suo indirizzo web (API /shares), che basta per i file.
+      var site = null, d = null, via = "";
+      try {
+        site = await getOrNull("/sites/" + m[1] + ":" + m[2] + "?$select=id,displayName,webUrl");
+        if(site){ d = await api("GET", "/sites/" + site.id + "/drive?$select=id,name,webUrl"); via = "indirizzo del sito"; }
+      } catch(e){ if(e.status !== 401 && e.status !== 403) throw e; }
+      if(!d){
+        var base = "https://" + m[1] + m[2], libs = ["Documenti condivisi", "Shared Documents"], lastErr = null;
+        for(var k = 0; k < libs.length && !d; k++){
+          try {
+            var u = base + "/" + libs[k];
+            var b64 = btoa(unescape(encodeURIComponent(u))).replace(/=+$/, "").replace(/\//g, "_").replace(/\+/g, "-");
+            var li = await api("GET", "/shares/u!" + b64 + "/driveItem?$select=id,name,webUrl,parentReference");
+            d = { id: li.parentReference.driveId, name: li.name };
+            site = { displayName: m[2].replace(/^\/sites\//, "") };
+            via = "raccolta " + libs[k];
+          } catch(e){ lastErr = e; }
+        }
+        if(!d) throw err("Raccolta Documenti del sito " + m[2] + " non raggiungibile (" + ((lastErr && lastErr.message) || "") + "). Verifica di poter entrare nel sito con questo account.", (lastErr && lastErr.status) || 404);
+      }
       drive = d.id;
       var parts = String(cfg.cartella).split("/").map(function(x){ return x.trim(); }).filter(Boolean), parent = await api("GET", "/drives/" + drive + "/root?$select=id"), acc = [], created = [];
       for(var i = 0; i < parts.length; i++){
@@ -222,7 +241,7 @@ var SHAREDOCS_CONFIG = {
         parent = it;
       }
       root = parent.id;
-      return { name: site.displayName + " › " + d.name + " › " + parts.join(" › ") + (created.length ? "  (cartelle create ora: " + created.join(", ") + ")" : ""), webUrl: parent.webUrl, folder: {} };
+      return { name: site.displayName + " › " + d.name + " › " + parts.join(" › ") + (created.length ? "  (cartelle create ora: " + created.join(", ") + ")" : "") + "  · aperto tramite " + via, webUrl: parent.webUrl, folder: {} };
     }
     var b64 = btoa(unescape(encodeURIComponent(cfg.cartella))).replace(/=+$/, "").replace(/\//g, "_").replace(/\+/g, "-");
     var it = await api("GET", "/shares/u!" + b64 + "/driveItem");
