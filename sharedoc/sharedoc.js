@@ -17,8 +17,8 @@ var SHAREDOCS_CONFIG = {
   api: "https://siciet-sharedocs.amministrazione-c44.workers.dev/api",   // servizio su Cloudflare
   scope: "api://9e9b873b-2e7c-4011-aebd-7470627d55ec/access_as_user"
 };
-const VERSIONE = 9;
-const SERVIZIO_ATTESO = 9;   // versione minima del servizio su Cloudflare (VERSIONE_SERVIZIO in api/worker.js)
+const VERSIONE = 10;
+const SERVIZIO_ATTESO = 10;   // versione minima del servizio su Cloudflare (VERSIONE_SERVIZIO in api/worker.js)
 const LOGO_URL = new URL("icons/siciet-mark.png", location.href).href;
 
 /* ---------- Lingua dell'interfaccia (per utente) ----------
@@ -609,8 +609,13 @@ function renderDrawer(){
       + (tr.sheet?`<div class="notice" style="margin-bottom:12px;display:grid;gap:6px"><b>${tx("Transmittal originale (PDF inviato al cliente)","Original transmittal (PDF sent to the client)")}</b>${fileCell(tr.sheet,{sp:true})}</div>`:"")
       + sheetHtml(tr)
       + (tr.status==="bozza"&&S.canWrite?`<p style="margin-top:16px">${S.pendingDel===tr.id?`<span class="confirm">${tx(`Eliminare la bozza ${esc(trNum(tr))}?`,`Delete draft ${esc(trNum(tr))}?`)} <button class="btn small danger" data-act="delTrYes" data-id="${esc(tr.id)}">${tx("Elimina","Delete")}</button><button class="btn small" data-act="delNo">${tx("Annulla","Cancel")}</button></span>`:`<button class="link" style="color:var(--bad)" data-act="delTr" data-id="${esc(tr.id)}">${tx("Elimina bozza","Delete draft")}</button>`}</p>`:"")
+      + (tr.status!=="bozza"&&S.canWrite?`<div style="margin-top:18px">${S.pendingDel===tr.id?`<div class="notice warn" style="display:grid;gap:8px"><b>${tx(`Eliminare ${esc(trNum(tr))}?`,`Delete ${esc(trNum(tr))}?`)}</b><span>${tx("Solo per transmittal emessi per prova: sparisce dal registro insieme a risposte e commenti, e il numero torna libero. I file restano su SharePoint. L'operazione resta nello storico.","Only for transmittals issued as a test: it disappears from the register with replies and comments, and the number becomes free again. Files stay on SharePoint. The operation is kept in the log.")}</span>
+          <label class="f">${tx(`Per confermare scrivi ${esc(trNum(tr))}`,`To confirm type ${esc(trNum(tr))}`)}<input id="delConferma" class="mono" autocomplete="off"></label>
+          <label class="f">${tx("Motivo","Reason")}<input id="delMotivo" value="${tx("transmittal di prova","test transmittal")}"></label>
+          <span class="actions"><button class="btn small danger" data-act="delProvaYes" data-id="${esc(tr.id)}">${tx("Elimina definitivamente","Delete permanently")}</button><button class="btn small" data-act="delNo">${tx("Annulla","Cancel")}</button></span></div>`
+        :`<button class="link" style="color:var(--bad)" data-act="delTr" data-id="${esc(tr.id)}">${tx("Elimina transmittal di prova…","Delete test transmittal…")}</button>`}</div>`:"")
       + (tr.status!=="bozza"?`<p class="hint" style="margin-top:12px">${tx(`Emesso il ${fmt(tr.date)}`,`Issued on ${fmt(tr.date)}`)}${(tr.issuedBy||tr.by)?` ${tx("da","by")} ${esc((tr.issuedBy||tr.by).nome||"")}`:""}. ${tx("Il file scaricato si può stampare in PDF e allegare alla mail per il cliente.","The downloaded file can be printed to PDF and attached to the email to the client.")}</p>`:"")
-      + ((tr.items||[]).length?`<h3 style="font-size:14px;margin:18px 0 8px">${tx("File allegati","Attached files")}</h3><div class="tablebox"><table><thead><tr><th>${tx("Documento","Document")}</th><th>Rev</th><th>${tx("File e percorso SharePoint","File and SharePoint path")}</th><th>${tx("Risposta del cliente","Client reply")}</th></tr></thead><tbody>${(tr.items||[]).map(it=>{const x=docById(it.docId)||{};return `<tr><td class="mono num">${esc(x.num||"?")}</td><td class="mono">${esc(it.rev)}</td><td>${filesCell(it,{sp:true})}</td><td style="min-width:200px">${it.ret?retCode(it.ret.code)+" "+esc(fmt(it.ret.date)):`<span class="muted">${tx("in attesa","pending")}</span>`}${allegatiCell(it.clientFiles)}</td></tr>`}).join("")}</tbody></table></div>`:"");
+      + ((tr.items||[]).length?`<h3 style="font-size:14px;margin:18px 0 8px">${tx("File allegati","Attached files")}</h3><div class="tablebox"><table><thead><tr><th>${tx("Documento","Document")}</th><th>Rev</th><th>${tx("File e percorso SharePoint","File and SharePoint path")}</th><th>${tx("Risposta del cliente","Client reply")}</th></tr></thead><tbody>${(tr.items||[]).map(it=>{const x=docById(it.docId)||{};return `<tr><td class="mono num">${esc(x.num||"?")}</td><td class="mono">${esc(it.rev)}</td><td>${filesCell(it,{sp:true})}</td><td style="min-width:200px">${it.ret?retCode(it.ret.code)+" "+esc(fmt(it.ret.date)):it.replied?`<span class="chip t-pend">${tx("risposta ricevuta, codice da inserire","reply received, code to log")}</span>`:`<span class="muted">${tx("in attesa","pending")}</span>`}${allegatiCell(it.clientFiles)}</td></tr>`}).join("")}</tbody></table></div>`:"");
   } else if(d.type==="ctr") {
     const tr=S.trs.find(t=>t.id===d.id); if(!tr){ closeDrawer(); return; }
     const st=clientState(tr);
@@ -937,6 +942,7 @@ document.addEventListener("click", async e=>{
     try{ await op({op:"trIssue",id}); }catch(err){ fail(err); } }
   else if(a==="delTr"){ S.pendingDel=id; renderDrawer(); }
   else if(a==="delTrYes"){ try{ await op({op:"trDelete",id}); closeDrawer(); }catch(err){ fail(err); } }
+  else if(a==="delProvaYes"){ try{ await op({op:"trEliminaProva",id,conferma:val("delConferma"),motivo:val("delMotivo")}); S.pendingDel=null; closeDrawer(); }catch(err){ fail(err); } }
   else if(a==="delNo"){ S.pendingDel=null; renderDrawer(); }
   else if(a==="dlTr") dlTr(id);
   else if(a==="csv") csvVdrl();

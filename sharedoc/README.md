@@ -226,7 +226,7 @@ Il test di questa pagina usa invece le autorizzazioni **delegate** (`Files.ReadW
 
 ## Versione delle pagine
 
-**App** (`index.html` + `sharedoc.js`): versione 9 del 06/11/2026 (importazione dell'archivio; servizio v9; v8: più file per documento con il nome originale; v7: pagina Commenti con una scheda per ogni risposta del cliente; v6: in fondo alla pagina la versione del servizio, con avviso se su Cloudflare è vecchio; v5: allegati del cliente nella risposta; v4: controllo dei file scaricati; v3: anteprima dei PDF dentro ShareDocs; v2: pulsante *Aggiorna Excel*; v1: prima versione collegata al servizio). A ogni modifica di `sharedoc.js` aumentare `VERSIONE`, il numero in `sharedoc.js?v=` e il footer di `index.html`.
+**App** (`index.html` + `sharedoc.js`): versione 10 del 06/11/2026 (eliminazione dei transmittal emessi per prova; servizio v10; v9: importazione dell'archivio; v8: più file per documento con il nome originale; v7: pagina Commenti con una scheda per ogni risposta del cliente; v6: in fondo alla pagina la versione del servizio, con avviso se su Cloudflare è vecchio; v5: allegati del cliente nella risposta; v4: controllo dei file scaricati; v3: anteprima dei PDF dentro ShareDocs; v2: pulsante *Aggiorna Excel*; v1: prima versione collegata al servizio). A ogni modifica di `sharedoc.js` aumentare `VERSIONE`, il numero in `sharedoc.js?v=` e il footer di `index.html`.
 
 **Pagina di test** (`test/index.html`):
 
