@@ -51,7 +51,7 @@
  */
 
 // Aumentare a ogni modifica: la pagina la mostra in fondo, così si vede se su Cloudflare c'è l'ultima.
-const VERSIONE_SERVIZIO = 9;
+const VERSIONE_SERVIZIO = 10;
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const MB = 1024 * 1024;
 const MAX_FILE = 2048 * MB;
@@ -530,6 +530,18 @@ const OPERAZIONI = {
     if(tr.status !== "bozza") throw new Errore(409, "Si eliminano solo le bozze.");
     reg.trs = reg.trs.filter(t => t !== tr);
     return "Bozza " + trNum(reg, tr) + " eliminata (i file restano su SharePoint)";
+  },
+  // Transmittal emesso per prova: si elimina solo scrivendo il suo numero per conferma.
+  // Spariscono anche i commenti collegati; il numero torna libero. Resta traccia nello storico.
+  async trEliminaProva(env, u, reg, x){
+    serve(u, "dc");
+    const tr = trovaTr(reg, x.id), num = trNum(reg, tr);
+    if(String(x.conferma || "").trim().toUpperCase() !== num.toUpperCase()) throw new Errore(400, "Per confermare scrivi esattamente il numero del transmittal: " + num);
+    const motivo = testo(x.motivo, 300) || "transmittal di prova";
+    const nc = reg.cmts.filter(c => c.trId === tr.id).length;
+    reg.trs = reg.trs.filter(t => t !== tr);
+    reg.cmts = reg.cmts.filter(c => c.trId !== tr.id);
+    return num + " eliminato (" + motivo + ")" + (nc ? ", con " + nc + " commenti" : "") + ". I file restano su SharePoint.";
   },
   // Risposta del cliente arrivata per altre vie (email, PDF), registrata da SICIET.
   async respond(env, u, reg, x){
