@@ -1,7 +1,7 @@
 /*
  * SICIET SHAREDOCS – transmittal e ciclo di revisione documentale con i clienti
  * -----------------------------------------------------------------------------
- * Pagina pubblicata su https://hub.siciet.it/sharedoc/ (vedi README.md).
+ * Pagina pubblicata su https://hub.siciet.it/sharedocs/ (vedi README.md).
  * L'utente accede con l'account Microsoft (colleghi SICIET e ospiti del cliente);
  * la pagina chiede al servizio (api/worker.js, su Cloudflare) i dati della
  * commessa e gli manda le modifiche. Il servizio controlla ruolo e dati e scrive
@@ -9,7 +9,7 @@
  * SharePoint, nella cartella del transmittal.
  *
  * A ogni modifica di questo file aumentare VERSIONE e il numero in
- * "sharedoc.js?v=…" in index.html (altrimenti i browser usano la copia vecchia).
+ * "sharedocs.js?v=…" in index.html (altrimenti i browser usano la copia vecchia).
  */
 var SHAREDOCS_CONFIG = {
   clientId: "9e9b873b-2e7c-4011-aebd-7470627d55ec",          // app "SICIET ShareDocs" in Entra ID
@@ -17,7 +17,7 @@ var SHAREDOCS_CONFIG = {
   api: "https://siciet-sharedocs.amministrazione-c44.workers.dev/api",   // servizio su Cloudflare
   scope: "api://9e9b873b-2e7c-4011-aebd-7470627d55ec/access_as_user"
 };
-const VERSIONE = 10;
+const VERSIONE = 11;
 const SERVIZIO_ATTESO = 10;   // versione minima del servizio su Cloudflare (VERSIONE_SERVIZIO in api/worker.js)
 const LOGO_URL = new URL("icons/siciet-mark.png", location.href).href;
 

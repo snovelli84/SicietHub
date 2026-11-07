@@ -106,6 +106,6 @@ Nello stesso punto di `richieste.html` si possono cambiare i tipi di richiesta (
 
 La cartella [`quality/`](quality/) contiene **SICIET Quality** (controllo qualità dei componenti per JOB e TAG), un progetto separato che non compare nel portale: vedi [`quality/README.md`](quality/README.md).
 
-La cartella [`sharedoc/`](sharedoc/) contiene **SICIET ShareDocs** (transmittal e ciclo di revisione documentale con i clienti), all'indirizzo `https://hub.siciet.it/sharedoc/`: per ora la pagina di test di connessione a Microsoft 365 (Entra ID e SharePoint), vedi [`sharedoc/README.md`](sharedoc/README.md). Non compare nel portale.
+La cartella [`sharedocs/`](sharedocs/) contiene **SICIET ShareDocs** (transmittal e ciclo di revisione documentale con i clienti), all'indirizzo `https://hub.siciet.it/sharedocs/`: per ora la pagina di test di connessione a Microsoft 365 (Entra ID e SharePoint), vedi [`sharedocs/README.md`](sharedocs/README.md). Non compare nel portale.
 
 La cartella [`hr/`](hr/) contiene **SICIET HR** (comunicazione delle nuove assunzioni al consulente del lavoro e agli uffici interni), raggiungibile solo all'indirizzo `https://hub.siciet.it/hr` e protetta da password: vedi [`hr/README.md`](hr/README.md).
