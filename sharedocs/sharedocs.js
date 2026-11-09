@@ -17,8 +17,8 @@ var SHAREDOCS_CONFIG = {
   api: "https://siciet-sharedocs.amministrazione-c44.workers.dev/api",   // servizio su Cloudflare
   scope: "api://9e9b873b-2e7c-4011-aebd-7470627d55ec/access_as_user"
 };
-const VERSIONE = 11;
-const SERVIZIO_ATTESO = 10;   // versione minima del servizio su Cloudflare (VERSIONE_SERVIZIO in api/worker.js)
+const VERSIONE = 12;
+const SERVIZIO_ATTESO = 11;   // versione minima del servizio su Cloudflare (VERSIONE_SERVIZIO in api/worker.js)
 const LOGO_URL = new URL("icons/siciet-mark.png", location.href).href;
 
 /* ---------- Lingua dell'interfaccia (per utente) ----------
@@ -136,7 +136,10 @@ async function op(body, opts){
   const r = await api("POST", "/op" + qc(), body);
   setReg(r.registro);
   const m = typeof r.esito === "string" ? r.esito : (r.esito && r.esito.msg);
-  if(m && !(opts && opts.quiet)) toast(m);
+  const em = r.esito && r.esito.email;
+  const nota = !em || isClient() ? "" : em.errore ? tx(" · Email NON inviata: ", " · Email NOT sent: ") + em.errore : em.inviata ? tx(" · Email inviata a ", " · Email sent to ") + em.a.join(", ") : (em.motivo === "nessun contatto del cliente" ? tx(" · Nessuna email: la commessa non ha contatti del cliente (Impostazioni commessa → Clienti e notifiche)", " · No email: the project has no client contacts (Project settings → Clients and notifications)") : "");
+  if(m && !(opts && opts.quiet)) toast(m + nota);
+  else if(nota && em && em.errore) toast(nota.replace(/^ · /, ""));
   return r;
 }
 
@@ -703,13 +706,63 @@ function settingsForm(){
     <div class="row"><label class="f">${tx("Commessa SICIET","SICIET job")}<input id="s_proj" value="${esc(c.project)}"></label><label class="f">${tx("Nome progetto (sul transmittal)","Project name (on the transmittal)")}<input id="s_pname" value="${esc(c.projectName)}"></label></div>
     <div class="row"><label class="f">Customer<input id="s_cust" value="${esc(c.customer)}"></label><label class="f">Client<input id="s_ec" value="${esc(c.endClient)}"></label><label class="f">${tx("Alla c.a. predefinito","Default attention")}<input id="s_attn" value="${esc(c.attn)}"></label></div>
     <div class="row"><label class="f">${tx("Prefisso transmittal","Transmittal prefix")}<input id="s_pre" class="mono" value="${esc(c.prefix)}"></label><label class="f">${tx("Primo numero progressivo","First sequence number")}<input id="s_seq" type="number" min="1" value="${esc(c.startSeq)}"></label><label class="f">${tx("Giorni per la risposta","Days to reply")}<input id="s_due" type="number" min="1" max="90" value="${esc(c.dueDays)}"></label></div>
-    <label class="f">${tx("Clienti ammessi al portale (indirizzi email o domini come @cliente.com, uno per riga)","Clients allowed on the portal (email addresses or domains like @client.com, one per line)")}<textarea id="s_cli" class="mono" rows="4" placeholder="@pegitaly.it">${esc((c.clienti||[]).join("\n"))}</textarea></label>
-    <p class="hint">${tx(`Cartella SharePoint: SICIET Docs / Documenti / ${esc(c.cartella)}. Gli ospiti con ruolo Cliente vedono questa commessa solo se il loro indirizzo o dominio è nell'elenco.`,`SharePoint folder: SICIET Docs / Documents / ${esc(c.cartella)}. Guests with the Client role see this project only if their address or domain is listed.`)}</p>
+    <label class="f">${tx("Clienti ammessi al portale (indirizzi email o domini come @cliente.com, uno per riga)","Clients allowed on the portal (email addresses or domains like @client.com, one per line)")}<textarea id="s_cli" class="mono" rows="3" placeholder="@pegitaly.it">${esc((c.clienti||[]).join("\n"))}</textarea></label>
+    <p class="hint">${tx(`Cartella SharePoint: SICIET Docs / Documenti / ${esc(c.cartella)}. Un ospite vede questa commessa solo se il suo indirizzo o dominio è nell'elenco; chi inviti dalla sezione qui sotto viene aggiunto da solo.`,`SharePoint folder: SICIET Docs / Documents / ${esc(c.cartella)}. A guest sees this project only if their address or domain is listed; people invited below are added automatically.`)}</p>
+    <label class="f">${tx("Chi riceve l'email quando il cliente risponde (uno per riga; vuoto = chi ha emesso il transmittal)","Who gets an email when the client replies (one per line; empty = whoever issued the transmittal)")}<textarea id="s_notif" class="mono" rows="2" placeholder="document.control@siciet.it">${esc((c.notificheSiciet||[]).join("\n"))}</textarea></label>
     <div class="actions"><button class="btn primary" type="submit" ${S.canWrite?"":"disabled"}>${tx("Salva impostazioni","Save settings")}</button></div></form>
+    ${S.canWrite?clientiPanel():""}
     ${S.canWrite&&vuoto?`<div class="notice" style="margin-top:24px"><b>${tx("Importazione iniziale","Initial import")}</b><p class="hint" style="margin:4px 0 10px">${tx("Carica il file JSON con registro e transmittal esistenti (es. sharedoc-import-2040.json). Si può fare solo finché la commessa non ha transmittal né commenti.","Load the JSON file with the existing register and transmittals. Allowed only while the project has no transmittals or comments.")}</p>
       <input type="file" id="impJson" accept=".json,application/json"></div>`:""}
     ${S.canWrite?`<div class="notice" style="margin-top:16px"><b>${tx("Nuova commessa","New project")}</b><p class="hint" style="margin:4px 0 10px">${tx("Crea un'altra commessa con il suo registro e la sua cartella su SharePoint.","Create another project with its own register and SharePoint folder.")}</p><button class="btn small" type="button" data-act="newCommessa">${tx("Crea commessa","Create project")}</button></div>`:""}`;
 }
+/* Clienti della commessa: invito come ospiti, stato dell'invito, notifiche. */
+const MSG_INVITO = () => `You have been invited to SICIET ShareDocs to receive the document transmittals of the project ${S.cfg.projectName||S.cfg.project} and send your review. After accepting the invitation, open ${location.origin}${location.pathname.replace(/index\.html$/,"")} and sign in with this email address.`;
+function statoInvito(p){
+  const st=String(p.stato||"");
+  if(/accepted/i.test(st)) return `<span class="chip t-ok">${tx("attivo","active")}</span>`;
+  if(/pending/i.test(st)) return `<span class="chip t-warn">${tx("invito in attesa","invitation pending")}</span>`;
+  if(st==="membro") return `<span class="chip t-ok">${tx("utente interno","internal user")}</span>`;
+  if(st) return `<span class="chip t-muted">${esc(st)}</span>`;
+  return `<span class="chip t-muted">${tx("stato sconosciuto","unknown state")}</span>`;
+}
+function clientiPanel(){
+  const d=S.drawer||{}, lista=d.contatti;
+  return `<div class="notice" style="margin-top:24px;display:grid;gap:10px"><b>${tx("Clienti e notifiche","Clients and notifications")}</b>
+    <p class="hint" style="margin:0">${tx("Inviti un cliente scrivendo nome ed email: riceve l'invito Microsoft con il tuo messaggio, viene aggiunto ai clienti ammessi e riceverà un'email (in inglese) a ogni transmittal emesso.","Invite a client with name and email: they get the Microsoft invitation with your message, are added to the allowed clients and will receive an email (in English) for every issued transmittal.")}</p>
+    ${lista===undefined?`<div class="hint">${tx("Caricamento dei clienti…","Loading clients…")}</div>`:lista.length?`<div class="tablebox"><table><thead><tr><th>${tx("Cliente","Client")}</th><th>${tx("Stato","Status")}</th><th>${tx("Notifiche","Notifications")}</th><th></th></tr></thead><tbody>${lista.map(p=>`<tr>
+      <td><b>${esc(p.nome||"")}</b><br><span class="mono" style="font-size:12px">${esc(p.email)}</span><br><span class="muted" style="font-size:11px">${tx("invitato il","invited on")} ${fmt((p.invitatoIl||"").slice(0,10))}${p.invitatoDa&&p.invitatoDa.nome?" · "+esc(p.invitatoDa.nome):""}</span></td>
+      <td>${statoInvito(p)}${p.dal?`<br><span class="muted" style="font-size:11px">${fmt(String(p.dal).slice(0,10))}</span>`:""}</td>
+      <td><label class="hint" style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-act="cliNotif" data-email="${esc(p.email)}" ${p.notifiche!==false?"checked":""}> ${tx("email","email")}</label></td>
+      <td><div class="actions"><button type="button" class="btn small" data-act="cliReinvia" data-email="${esc(p.email)}" data-nome="${esc(p.nome||"")}">${tx("Reinvia invito","Resend")}</button>
+        ${d.cliRimuovi===p.email?`<span class="confirm"><button type="button" class="btn small danger" data-act="cliRimuoviSi" data-email="${esc(p.email)}">${tx("Togli accesso","Remove access")}</button><button type="button" class="btn small" data-act="cliRimuoviNo">${tx("Annulla","Cancel")}</button></span>`:`<button type="button" class="link" style="color:var(--bad)" data-act="cliRimuovi" data-email="${esc(p.email)}">${tx("Togli accesso","Remove access")}</button>`}</div></td></tr>`).join("")}</tbody></table></div>`
+      :`<div class="hint">${d.contattiErrore?esc(d.contattiErrore):tx("Nessun cliente invitato per questa commessa.","No client invited for this project yet.")}</div>`}
+    <div class="row"><label class="f">${tx("Nome e cognome","Full name")}<input id="i_nome" placeholder="Sridhar Mylvaganan"></label><label class="f">Email<input id="i_email" type="email" placeholder="nome@cliente.com"></label></div>
+    <label class="f">${tx("Messaggio dell'invito (in inglese)","Invitation message")}<textarea id="i_msg" rows="3" lang="en">${esc(MSG_INVITO())}</textarea></label>
+    <div class="actions"><button type="button" class="btn primary" data-act="cliInvita" ${d.invitando?"disabled":""}>${d.invitando?tx("Invio in corso…","Sending…"):tx("Invita cliente","Invite client")}</button></div>
+  </div>`;
+}
+async function caricaContatti(){
+  const d=S.drawer; if(!d||d.type!=="settings"||!S.canWrite) return;
+  try{ d.contatti=(await api("GET","/clienti"+qc())).contatti; d.contattiErrore=""; }
+  catch(e){ d.contatti=[]; d.contattiErrore=e.message; }
+  if(S.drawer===d) aggiornaPannelloClienti();
+}
+// Ridisegna solo la sezione clienti, senza toccare i campi del modulo delle impostazioni.
+function aggiornaPannelloClienti(){
+  const box=document.querySelector(".drawer .db"); if(!box) return;
+  const vecchio=[...box.querySelectorAll(".notice")].find(n=>n.querySelector('[data-act="cliInvita"]'));
+  if(!vecchio) return;
+  const tmp=document.createElement("div"); tmp.innerHTML=clientiPanel(); vecchio.replaceWith(tmp.firstElementChild);
+}
+async function invitaCliente(email, nome, messaggio){
+  const d=S.drawer; d.invitando=true; aggiornaPannelloClienti();
+  try{
+    const r=await api("POST","/invita"+qc(),{email,nome,messaggio});
+    setReg(r.registro); toast(tx(`Invito inviato a ${email}. Riceverà l'email di Microsoft: dopo averla accettata potrà entrare in ShareDocs.`,`Invitation sent to ${email}.`));
+    d.invitando=false; d.contatti=undefined; aggiornaPannelloClienti(); caricaContatti();
+  }catch(e){ d.invitando=false; aggiornaPannelloClienti(); fail(e); }
+}
+
 function docCard(doc){
   const i=docInfo(doc), cm=S.cmts.filter(c=>c.docId===doc.id);
   if(S.drawer.edit) return `<form class="form" id="def" data-id="${esc(doc.id)}">${docFields(doc)}<div class="actions"><button class="btn" type="button" data-act="editDocCancel">${tx("Annulla","Cancel")}</button><button class="btn primary" type="submit">${tx("Salva","Save")}</button></div></form>`;
@@ -901,10 +954,15 @@ async function creaCommessa(){
     await apriCommessa(r.commessa.id); closeDrawer();
   }catch(e){ fail(e); }
 }
+function apriTrDaLink(){
+  const id=S.apriTr; if(!id) return; S.apriTr=null;
+  if(S.trs.some(t=>t.id===id)) openDrawer({type:isClient()?"ctr":"tr",id});
+  else toast(tx("Transmittal non trovato in questa commessa.","Transmittal not found in this project."));
+}
 async function apriCommessa(id){
   S.c=id; try{ localStorage.setItem("sd-commessa",id); }catch(_){}
   S.screen="caricamento"; render();
-  try{ await caricaRegistro(); S.screen=""; render(); }
+  try{ await caricaRegistro(); S.screen=""; render(); apriTrDaLink(); }
   catch(e){ S.screen="errore"; S.errore=e.message; render(); }
 }
 
@@ -931,7 +989,15 @@ document.addEventListener("click", async e=>{
   else if(a==="newDoc") openDrawer({type:"newDoc"});
   else if(a==="importDocs") openDrawer({type:"import"});
   else if(a==="newCmt") openDrawer({type:"newCmt",doc:t.dataset.doc});
-  else if(a==="settings") openDrawer({type:"settings"});
+  else if(a==="settings"){ openDrawer({type:"settings"}); caricaContatti(); }
+  else if(a==="cliInvita"){ const email=val("i_email"), nome=val("i_nome");
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ toast(tx("Scrivi un indirizzo email valido.","Enter a valid email address.")); return; }
+    invitaCliente(email, nome, val("i_msg")); }
+  else if(a==="cliReinvia") invitaCliente(t.dataset.email, t.dataset.nome, MSG_INVITO());
+  else if(a==="cliRimuovi"){ S.drawer.cliRimuovi=t.dataset.email; aggiornaPannelloClienti(); }
+  else if(a==="cliRimuoviNo"){ S.drawer.cliRimuovi=null; aggiornaPannelloClienti(); }
+  else if(a==="cliRimuoviSi"){ try{ await op({op:"contattoRimuovi",email:t.dataset.email}); S.drawer.cliRimuovi=null; S.drawer.contatti=undefined; aggiornaPannelloClienti(); caricaContatti(); }catch(err){ fail(err); } }
+  else if(a==="cliNotif"){ try{ await op({op:"contattoNotifiche",email:t.dataset.email,notifiche:t.checked}); }catch(err){ fail(err); } }
   else if(a==="newCommessa") openDrawer({type:"newCommessa"});
   else if(a==="editDoc"){ S.drawer.edit=true; renderDrawer(); }
   else if(a==="editDocCancel"){ S.drawer.edit=false; renderDrawer(); }
@@ -969,7 +1035,7 @@ document.addEventListener("submit", async e=>{
   if(f.id==="def"){ try{ await op({op:"docUpdate",id:f.dataset.id,doc:docData()}); S.drawer.edit=false; renderDrawer(); }catch(err){ fail(err); } }
   if(f.id==="cmf"){ const docId=val("c_doc"), rev=cleanCode(val("c_rev"))||docInfo(docById(docId)).rev||"A";
     try{ await op({op:"cmtAdd",docId,rev,ref:val("c_ref"),text:val("c_text")}); closeDrawer(); }catch(err){ fail(err); } }
-  if(f.id==="sf"){ try{ await op({op:"cfgSave",project:val("s_proj"),projectName:val("s_pname"),customer:val("s_cust"),endClient:val("s_ec"),attn:val("s_attn"),prefix:val("s_pre"),startSeq:Number(val("s_seq"))||1,dueDays:Number(val("s_due"))||14,clienti:linee("s_cli")}); closeDrawer(); }catch(err){ fail(err); } }
+  if(f.id==="sf"){ try{ await op({op:"cfgSave",project:val("s_proj"),projectName:val("s_pname"),customer:val("s_cust"),endClient:val("s_ec"),attn:val("s_attn"),prefix:val("s_pre"),startSeq:Number(val("s_seq"))||1,dueDays:Number(val("s_due"))||14,clienti:linee("s_cli"),notificheSiciet:linee("s_notif")}); closeDrawer(); }catch(err){ fail(err); } }
 });
 document.addEventListener("input", e=>{ if(e.target.id==="fq"){ S.filter.q=e.target.value; render(); } });
 document.addEventListener("change", e=>{
@@ -981,7 +1047,9 @@ document.addEventListener("change", e=>{
   if(id==="impJson" && e.target.files[0]) importaRegistro(e.target.files[0]);
 });
 document.addEventListener("keydown", e=>{ if(e.key==="Escape"&&S.drawer) closeDrawer(); });
-function route(){ const h=location.hash.slice(1); S.view=TABS.some(([k])=>k===h)?h:"cruscotto"; if(S.drawer) closeDrawer(); render(); window.scrollTo(0,0); }
+function route(){ const h=location.hash.slice(1);
+  if(h.startsWith("tr-")){ S.apriTr=h.slice(3); S.view="transmittal"; try{ history.replaceState(null,"",location.pathname+"#transmittal"); }catch(_){} if(S.screen===""&&S.trs.length) apriTrDaLink(); else render(); return; }
+  S.view=TABS.some(([k])=>k===h)?h:"cruscotto"; if(S.drawer) closeDrawer(); render(); window.scrollTo(0,0); }
 window.addEventListener("hashchange", route);
 
 /* ---------- Avvio ---------- */

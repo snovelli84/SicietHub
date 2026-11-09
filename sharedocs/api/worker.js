@@ -25,6 +25,13 @@
  *   FOLDER_DATI    (facoltativo) cartella dei dati nella raccolta Documenti;
  *                  di base "ShareDocs - dati (non modificare)"
  *   APP_URL        (facoltativo) indirizzo della pagina, di base ORIGIN + "/sharedocs/"
+ *   MAIL_FROM      (facoltativo) casella da cui partono inviti personalizzati e notifiche,
+ *                  di base sharedocs@siciet.it (serve il permesso applicazione Mail.Send)
+ *
+ * Clienti: un ospite è "cliente" di una commessa se il suo indirizzo (o dominio) è tra i
+ * clienti ammessi della commessa; il ruolo app Client non è più necessario (in Entra ID
+ * l'app non deve richiedere l'assegnazione obbligatoria). Gli inviti partono dal servizio
+ * (permesso User.Invite.All), lo stato degli inviti si legge con User.Read.All.
  *
  * Struttura su SharePoint (raccolta Documenti del sito):
  *   <cartella commessa>/Transmittals/<n. transmittal>/<file con nome standard>
@@ -48,10 +55,13 @@
  *                                         trasmessi (Document Controller); l'operazione
  *                                         "archivioCollega" esegue i collegamenti
  *   POST /api/commessa  { id, nome, … }   crea una commessa (Document Controller)
+ *   POST /api/invita?c=ID { email, nome, messaggio }   invita un cliente come ospite e lo
+ *                                         aggiunge ai clienti della commessa (anche per reinviare)
+ *   GET  /api/clienti?c=ID                contatti del cliente con lo stato dell'invito
  */
 
 // Aumentare a ogni modifica: la pagina la mostra in fondo, così si vede se su Cloudflare c'è l'ultima.
-const VERSIONE_SERVIZIO = 10;
+const VERSIONE_SERVIZIO = 11;
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const MB = 1024 * 1024;
 const MAX_FILE = 2048 * MB;
@@ -134,13 +144,13 @@ async function utente(request, env){
   const iss = ["https://login.microsoftonline.com/" + env.TENANT_ID + "/v2.0", "https://sts.windows.net/" + env.TENANT_ID + "/"];
   if(!iss.includes(p.iss)) throw new Errore(401, "Emittente del token non valido.");
   const ruoli = Array.isArray(p.roles) ? p.roles : [];
-  if(!ruoli.length) throw new Errore(403, "Nessun ruolo ShareDocs assegnato a questo utente.");
+  // Senza ruolo: è un cliente solo se compare tra i clienti ammessi di una commessa (verificato dopo).
   const email = String(p.email || p.preferred_username || p.upn || p.unique_name || "").toLowerCase().replace(/^live\.com#/, "");
   return {
     id: p.oid, nome: p.name || email, email, ruoli,
     dc: ruoli.includes("DocControl"),
     siciet: ruoli.includes("DocControl") || ruoli.includes("Engineer"),
-    cliente: ruoli.includes("Client") && !ruoli.includes("DocControl") && !ruoli.includes("Engineer")
+    cliente: !ruoli.includes("DocControl") && !ruoli.includes("Engineer")
   };
 }
 function chi(u){ return { nome: u.nome, email: u.email }; }
@@ -241,6 +251,19 @@ function vedeCommessa(u, c){
   if(!u.cliente) return false;
   const e = u.email, dom = e.slice(e.indexOf("@"));
   return (c.clienti || []).some(x => { x = String(x).toLowerCase().trim(); return x && (x === e || (x.startsWith("@") && x === dom)); });
+}
+// I clienti ammessi stanno nel registro (impostazioni) e, per decidere chi vede cosa, anche in
+// commesse.json: dopo ogni modifica si riallinea l'elenco.
+async function allineaClienti(env, id, clienti){
+  for(let i = 0; i < 3; i++){
+    const { data, etag } = await commesse(env);
+    const c = data.commesse.find(x => x.id === id); if(!c) return;
+    const nuovi = (clienti || []).slice();
+    if(JSON.stringify(c.clienti || []) === JSON.stringify(nuovi)) return;
+    c.clienti = nuovi;
+    try { await scriviFile(env, cartellaDati(env).concat("commesse.json"), new TextEncoder().encode(JSON.stringify(data)), "application/json", etag); return; }
+    catch(e){ if(e.status !== 412) throw e; }
+  }
 }
 async function commessaPer(env, u, id){
   id = idCommessa(id);
@@ -444,6 +467,7 @@ const OPERAZIONI = {
     if(x.startSeq !== undefined) c.startSeq = Math.max(1, Math.min(9999, Number(x.startSeq) || 1));
     if(x.dueDays !== undefined) c.dueDays = Math.max(1, Math.min(90, Number(x.dueDays) || 14));
     if(Array.isArray(x.clienti)) c.clienti = x.clienti.map(v => testo(v, 120).toLowerCase()).filter(Boolean).slice(0, 50);
+    if(Array.isArray(x.notificheSiciet)) c.notificheSiciet = x.notificheSiciet.map(v => emailValida(v)).filter(Boolean).slice(0, 20);
     return "Impostazioni salvate";
   },
   async docAdd(env, u, reg, x){
@@ -512,7 +536,7 @@ const OPERAZIONI = {
     }
     if(!items.length) throw new Errore(400, "Seleziona almeno un documento.");
     tr.items = items;
-    if(x.emetti) return OPERAZIONI.trIssue(env, u, reg, { id: tr.id }).then(m => ({ msg: m, id: tr.id }));
+    if(x.emetti) return OPERAZIONI.trIssue(env, u, reg, { id: tr.id }).then(m => Object.assign(m, { id: tr.id }));
     return { msg: "Bozza " + trNum(reg, tr) + " salvata", id: tr.id };
   },
   async trIssue(env, u, reg, x){
@@ -522,7 +546,7 @@ const OPERAZIONI = {
     const manca = tr.items.filter(i => !fileDi(i).length).map(i => trovaDoc(reg, i.docId).num);
     if(manca.length) throw new Errore(400, "Allega il file prima di emettere: " + manca.join(", "));
     tr.status = "emesso"; tr.date = oggi(); tr.issuedBy = chi(u); tr.issuedAt = new Date().toISOString();
-    return trNum(reg, tr) + " emesso";
+    return { msg: trNum(reg, tr) + " emesso", notifica: { tipo: "emissione", trId: tr.id } };
   },
   async trDelete(env, u, reg, x){
     serve(u, "dc");
@@ -570,6 +594,32 @@ const OPERAZIONI = {
     for(const s2 of a.fogli){ if(!s2.tr.sheet){ s2.tr.sheet = metaFile(s2.f, "archivio"); n++; } }
     return { msg: "Archivio: collegati " + n + " file", n };
   },
+  // Contatto del cliente invitato (registrato dopo l'invito Microsoft): riceve le notifiche.
+  async contattoAggiungi(env, u, reg, x){
+    serve(u, "dc");
+    const email = emailValida(x.email, true), c = reg.cfg;
+    c.contatti = (c.contatti || []).filter(p => p.email !== email);
+    c.contatti.push({ email, nome: testo(x.nome, 120), userId: testo(x.userId, 60), notifiche: x.notifiche !== false, invitatoIl: new Date().toISOString(), invitatoDa: chi(u) });
+    c.clienti = c.clienti || [];
+    const dom = email.slice(email.indexOf("@"));
+    if(!c.clienti.includes(email) && !c.clienti.includes(dom)) c.clienti.push(email);
+    return "Invito inviato a " + email;
+  },
+  async contattoRimuovi(env, u, reg, x){
+    serve(u, "dc");
+    const email = emailValida(x.email, true), c = reg.cfg;
+    c.contatti = (c.contatti || []).filter(p => p.email !== email);
+    c.clienti = (c.clienti || []).filter(v => v !== email);
+    const dom = email.slice(email.indexOf("@"));
+    return email + " non riceve più notifiche e non vede più la commessa" + ((c.clienti || []).includes(dom) ? " (attenzione: il dominio " + dom + " è ancora tra i clienti ammessi)" : "");
+  },
+  async contattoNotifiche(env, u, reg, x){
+    serve(u, "dc");
+    const p = (reg.cfg.contatti || []).find(y => y.email === emailValida(x.email, true));
+    if(!p) throw new Errore(404, "Contatto non trovato.");
+    p.notifiche = !!x.notifiche;
+    return p.notifiche ? "Notifiche attivate per " + p.email : "Notifiche disattivate per " + p.email;
+  },
   // --- Tecnici e Document Controller ---
   async cmtAdd(env, u, reg, x){
     serve(u, "siciet");
@@ -610,7 +660,8 @@ const OPERAZIONI = {
     if(!n && !commenti.length) throw new Errore(400, "Select at least one return code.");
     tr.status = tr.items.every(i => i.ret) ? "risposto" : "emesso";
     nuoviCommenti(reg, u, commenti, tr.id, origine);
-    return { msg: u.cliente ? "Review sent to SICIET" : "Risposta registrata a nome di SICIET (" + u.nome + ")", n, comments: commenti.length, attachments: allegati };
+    return { msg: u.cliente ? "Review sent to SICIET" : "Risposta registrata a nome di SICIET (" + u.nome + ")", n, comments: commenti.length, attachments: allegati,
+      notifica: u.cliente ? { tipo: "risposta", trId: tr.id } : null };
   }
 };
 
@@ -627,9 +678,107 @@ async function applica(env, ctx, u, c, op){
       await scriviFile(env, cartellaDati(env).concat(c.id, "registro.json"), new TextEncoder().encode(JSON.stringify(reg)), "application/json", etag);
     } catch(e){ if(e.status === 412) continue; throw e; }
     ctx.waitUntil(aggiornaExcel(env, reg).catch(e => console.log("Excel: " + e.message)));
+    if(["cfgSave", "contattoAggiungi", "contattoRimuovi"].includes(op.op)) await allineaClienti(env, c.id, reg.cfg.clienti);
+    // Notifiche via email: inviate subito, così la pagina può dire se sono partite.
+    if(esito && typeof esito === "object" && esito.notifica){
+      esito.email = await inviaNotifica(env, reg, esito.notifica, u).catch(e => ({ errore: e.message }));
+      delete esito.notifica;
+    }
     return { esito, registro: vistaPer(u, reg) };
   }
   throw new Errore(409, "Troppe modifiche contemporanee, riprova.");
+}
+
+/* ---------- Inviti e notifiche via email ---------- */
+
+function emailValida(v, obbl){
+  v = String(v || "").trim().toLowerCase();
+  if(!v){ if(obbl) throw new Errore(400, "Manca l'indirizzo email."); return ""; }
+  if(!/^[^\s@<>"(),;:]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(v) || v.length > 120) throw new Errore(400, "Indirizzo email non valido: " + v);
+  return v;
+}
+const appUrl = env => env.APP_URL || (env.ORIGIN || "https://hub.siciet.it") + "/sharedocs/";
+const mittente = env => env.MAIL_FROM || "sharedocs@siciet.it";
+const h = v => String(v == null ? "" : v).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const MESI = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const dataEn = iso => iso ? iso.slice(8, 10) + "-" + MESI[Number(iso.slice(5, 7)) - 1] + "-" + iso.slice(0, 4) : "";
+const dataIt = iso => iso ? iso.slice(8, 10) + "/" + iso.slice(5, 7) + "/" + iso.slice(0, 4) : "";
+
+async function invia(env, a, oggetto, html, cc){
+  const dest = [...new Set(a)].filter(Boolean);
+  if(!dest.length) return { inviata: false, motivo: "nessun destinatario" };
+  const res = await graph(env, "POST", "/users/" + encodeURIComponent(mittente(env)) + "/sendMail", {
+    message: { subject: oggetto, body: { contentType: "HTML", content: html },
+      toRecipients: dest.map(x => ({ emailAddress: { address: x } })),
+      ccRecipients: [...new Set(cc || [])].filter(x => x && !dest.includes(x)).map(x => ({ emailAddress: { address: x } })) },
+    saveToSentItems: true
+  });
+  if(res.status === 404) throw new Errore(500, "Casella " + mittente(env) + " non trovata: controlla MAIL_FROM.");
+  return { inviata: true, a: dest };
+}
+function cornice(titolo, corpo, link, testoLink){
+  return '<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#16202c;max-width:680px">' +
+    '<div style="background:#005baa;color:#fff;padding:14px 18px;font-weight:700;font-size:16px">SICIET ShareDocs</div>' +
+    '<div style="padding:18px;border:1px solid #d6dce4;border-top:0"><h2 style="margin:0 0 12px;font-size:18px">' + h(titolo) + '</h2>' + corpo +
+    (link ? '<p style="margin:20px 0 6px"><a href="' + h(link) + '" style="display:inline-block;background:#005baa;color:#fff;text-decoration:none;font-weight:700;padding:10px 18px;border-radius:6px">' + h(testoLink) + '</a></p><p style="font-size:12px;color:#5b6775;margin:0">' + h(link) + '</p>' : "") +
+    '</div><p style="font-size:11px;color:#5b6775;margin:10px 0 0">S.I.C.I.E.T. s.r.l. · Via Puglia 6, Fraz. Albinia – 58015 Orbetello (GR) – Italy · www.siciet.it</p></div>';
+}
+async function inviaNotifica(env, reg, n, u){
+  const tr = reg.trs.find(t => t.id === n.trId); if(!tr) return { inviata: false, motivo: "transmittal non trovato" };
+  const num = trNum(reg, tr), link = appUrl(env) + "#tr-" + tr.id, doc = id => reg.docs.find(d => d.id === id) || {};
+  const tdS = 'style="border:1px solid #d6dce4;padding:6px 8px;text-align:left;vertical-align:top"';
+  if(n.tipo === "emissione"){
+    // Al cliente, in inglese: comunicazione ufficiale.
+    const dest = (reg.cfg.contatti || []).filter(p => p.notifiche !== false).map(p => p.email);
+    if(!dest.length) return { inviata: false, motivo: "nessun contatto del cliente" };
+    const righe = tr.items.map((it, k) => { const d = doc(it.docId); return "<tr><td " + tdS + ">" + (k + 1) + "</td><td " + tdS + ">" + h(d.num) + "</td><td " + tdS + ">" + h(d.titleEn || d.title) + "</td><td " + tdS + ">" + h(it.rev) + "</td><td " + tdS + ">" + h(it.poi) + "</td><td " + tdS + ">" + fileDi(it).length + "</td></tr>"; }).join("");
+    const scad = piuGiorni(tr.date, tr.dueDays || reg.cfg.dueDays);
+    const corpo = "<p>Dear " + h(tr.attn || "Sir/Madam") + ",</p><p>please find on SICIET ShareDocs the documents of transmittal <b>" + h(num) + "</b> issued on " + h(dataEn(tr.date)) + " for the project <b>" + h(tr.projectName || reg.cfg.projectName) + "</b>.</p>" +
+      '<table style="border-collapse:collapse;font-size:13px;margin:10px 0"><tr><th ' + tdS + '>ID</th><th ' + tdS + '>Document No.</th><th ' + tdS + '>Description</th><th ' + tdS + '>Rev.</th><th ' + tdS + '>Purpose</th><th ' + tdS + '>Files</th></tr>' + righe + "</table>" +
+      (tr.note ? "<p><b>Remarks:</b> " + h(tr.note) + "</p>" : "") +
+      "<p>Please review the documents and return them with the applicable return code by <b>" + h(dataEn(scad)) + "</b>. You can view and download the files and send your review directly on the portal.</p><p>Best regards,<br>SICIET – Document Control</p>";
+    const r = await invia(env, dest, "SICIET Transmittal " + num + " – " + (tr.projectName || reg.cfg.projectName), cornice("Document transmittal " + num, corpo, link, "Open transmittal " + num), [tr.issuedBy && tr.issuedBy.email]);
+    return r;
+  }
+  if(n.tipo === "risposta"){
+    // A SICIET, in italiano.
+    // Destinatari: quelli indicati nelle impostazioni, altrimenti chi ha emesso il transmittal,
+    // altrimenti (transmittal importati) la casella di ShareDocs.
+    let dest = (reg.cfg.notificheSiciet || []).length ? reg.cfg.notificheSiciet : [tr.issuedBy && tr.issuedBy.email].filter(Boolean);
+    if(!dest.length) dest = [mittente(env)];
+    const righe = tr.items.map(it => { const d = doc(it.docId), nc = reg.cmts.filter(c => c.trId === tr.id && c.docId === it.docId && c.rev === it.rev).length;
+      return "<tr><td " + tdS + ">" + h(d.num) + " rev " + h(it.rev) + "</td><td " + tdS + ">" + (it.ret ? "<b>" + h(it.ret.code) + "</b> " + h(RET[it.ret.code] ? RET[it.ret.code].en : "") : "in attesa") + "</td><td " + tdS + ">" + nc + "</td><td " + tdS + ">" + (it.clientFiles || []).length + "</td></tr>"; }).join("");
+    const corpo = "<p><b>" + h(u.nome) + "</b> (" + h(u.email) + ") ha inviato la revisione del transmittal <b>" + h(num) + "</b>.</p>" +
+      '<table style="border-collapse:collapse;font-size:13px;margin:10px 0"><tr><th ' + tdS + '>Documento</th><th ' + tdS + '>Codice di ritorno</th><th ' + tdS + '>Commenti</th><th ' + tdS + '>Allegati</th></tr>' + righe + "</table>";
+    return invia(env, dest, "ShareDocs: risposta del cliente su " + num, cornice("Risposta del cliente su " + num, corpo, link, "Apri " + num + " in ShareDocs"));
+  }
+  return { inviata: false };
+}
+async function invitaCliente(env, u, reg, x){
+  serve(u, "dc");
+  const email = emailValida(x.email, true), nome = testo(x.nome, 120);
+  const msg = testo(x.messaggio, 1500) || ("You have been invited to SICIET ShareDocs to receive the document transmittals of the project " + (reg.cfg.projectName || reg.cfg.project) + " and send your review. After accepting, open " + appUrl(env) + " and sign in with this email address.");
+  const res = await graph(env, "POST", "/invitations", {
+    invitedUserEmailAddress: email, invitedUserDisplayName: nome || undefined, inviteRedirectUrl: appUrl(env), sendInvitationMessage: true,
+    invitedUserMessageInfo: { customizedMessageBody: msg, messageLanguage: "en-US" }
+  });
+  const j = await res.json().catch(() => ({}));
+  return { email, nome, userId: (j.invitedUser && j.invitedUser.id) || "", stato: j.status || "" };
+}
+async function statoClienti(env, reg){
+  const out = [];
+  for(const p of (reg.cfg.contatti || []).slice(0, 40)){
+    let stato = "", dal = "";
+    if(p.userId){
+      try {
+        const r = await graphJson(env, "GET", "/users/" + encodeURIComponent(p.userId) + "?$select=externalUserState,externalUserStateChangeDateTime,accountEnabled");
+        if(!r) stato = "eliminato";
+        else { stato = r.accountEnabled === false ? "disattivato" : (r.externalUserState || "membro"); dal = r.externalUserStateChangeDateTime || ""; }
+      } catch(e){ stato = "sconosciuto (" + e.message + ")"; }
+    }
+    out.push(Object.assign({}, p, { stato, dal }));
+  }
+  return out;
 }
 
 /* ---------- File: caricamento e scaricamento ---------- */
@@ -821,6 +970,7 @@ export async function handle(request, env, ctx){
 
     if(via === "/me" && request.method === "GET"){
       const elenco = (await commesse(env)).data.commesse.filter(c => vedeCommessa(u, c)).map(c => ({ id: c.id, nome: c.nome }));
+      if(!u.ruoli.length && !elenco.length) throw new Errore(403, "Your account has no access to SICIET ShareDocs yet. Please contact SICIET Document Control.");
       return json(env, 200, { nome: u.nome, email: u.email, ruoli: u.ruoli, cliente: u.cliente, documentController: u.dc, commesse: elenco, versione: VERSIONE_SERVIZIO });
     }
     if(via === "/registro" && request.method === "GET"){
@@ -846,6 +996,18 @@ export async function handle(request, env, ctx){
       const parti = cartellaArchivio(reg, q("cartella"));
       const files = await elencoRicorsivo(env, parti);
       return json(env, 200, rapportoArchivio(reg, analizzaArchivio(reg, files), parti.join("/"), files.length));
+    }
+    if(via === "/invita" && request.method === "POST"){
+      const c = await commessaPer(env, u, q("c"));
+      const { data: reg } = await leggiRegistro(env, c);
+      const inv = await invitaCliente(env, u, reg, await corpo(request));
+      const r = await applica(env, ctx, u, c, { op: "contattoAggiungi", email: inv.email, nome: inv.nome, userId: inv.userId });
+      return json(env, 200, Object.assign(r, { invito: inv }));
+    }
+    if(via === "/clienti" && request.method === "GET"){
+      serve(u, "dc");
+      const c = await commessaPer(env, u, q("c"));
+      return json(env, 200, { contatti: await statoClienti(env, (await leggiRegistro(env, c)).data) });
     }
     if(via === "/excel" && request.method === "POST"){
       serve(u, "siciet");
