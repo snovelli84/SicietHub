@@ -22,7 +22,8 @@
 - **Excel**: `VDRL <commessa>.xlsx` e `CRS <commessa>.xlsx` nella cartella della commessa si aggiornano da soli a ogni modifica.
 - **Vista Client** (selettore SICIET | Client, solo per i colleghi SICIET): mostra il portale come lo vede il cliente.
 - **Prima commessa e dati esistenti**: alla prima apertura il Document Controller crea la commessa (codice, nome, cartella, clienti ammessi). Poi da *Transmittal → Impostazioni commessa → Importazione iniziale* carica il file JSON con il registro esistente. I dati dei clienti **non vanno mai in questa repository**, che è pubblica: il file di importazione si conserva altrove.
-- **Clienti ammessi**: in *Impostazioni commessa*, uno per riga, indirizzi completi o domini (`@pegitaly.it`). Il cliente deve anche essere invitato come ospite in Entra ID e avere il ruolo **Cliente**.
+- **Clienti, inviti e notifiche** (*Impostazioni commessa → Clienti e notifiche*, Document Controller): si scrivono nome ed email del cliente e si preme **Invita cliente**. Il servizio manda l'invito Microsoft (ospite del tenant SICIET) con il messaggio indicato, aggiunge l'indirizzo ai *clienti ammessi* e lo registra tra i contatti della commessa. L'elenco mostra lo stato (*invito in attesa* / *attivo*), con **Reinvia invito**, **Togli accesso** e la scelta delle notifiche. Non serve più assegnare a mano il ruolo **Cliente**: un ospite è cliente di una commessa se il suo indirizzo o dominio è tra i clienti ammessi.
+- **Email automatiche** (da `sharedocs@siciet.it`): all'emissione di un transmittal, ai contatti del cliente in inglese (numero, documenti, scadenza, link diretto al transmittal) con in copia chi l'ha emesso; alla risposta del cliente, in italiano, ai destinatari indicati in *Impostazioni commessa* (altrimenti a chi ha emesso il transmittal, altrimenti a `sharedocs@siciet.it`). Dopo l'emissione la pagina dice a chi è partita l'email o perché non è partita.
 
 ## Configurazione di Entra ID e Microsoft Graph
 
@@ -214,6 +215,21 @@ Ogni modifica al registro è controllata (ruolo, dati, cartella dei file) e regi
 
 Quando la pagina userà il servizio, l'autorizzazione delegata `Files.ReadWrite.All`, usata solo dal test, si potrà togliere.
 
+### 7.4 Inviti ed email (servizio v11)
+
+1. **Casella condivisa** `sharedocs@siciet.it` (interfaccia di amministrazione di Microsoft 365 → *Team e gruppi → Cassette postali condivise → Aggiungi*). Non serve licenza.
+2. **Entra ID → SICIET ShareDocs → Autorizzazioni API → Microsoft Graph → Autorizzazioni applicazione**: `User.Invite.All`, `User.Read.All`, `Mail.Send` → **Concedi consenso amministratore**.
+3. **Applicazioni aziendali → SICIET ShareDocs → Proprietà → Assegnazione obbligatoria = No** (gli ospiti invitati entrano senza ruolo; l'accesso alle commesse lo decide ShareDocs).
+4. **Identità esterne → Impostazioni di collaborazione esterna**: gli inviti devono essere consentiti e i domini dei clienti non bloccati.
+5. Consigliato: limitare `Mail.Send` alla sola casella `sharedocs@siciet.it`, da Exchange Online PowerShell:
+   ```powershell
+   Connect-ExchangeOnline
+   New-DistributionGroup -Name "ShareDocs mittenti" -Alias sharedocs-mittenti -Type Security -Members sharedocs@siciet.it
+   New-ApplicationAccessPolicy -AppId 9e9b873b-2e7c-4011-aebd-7470627d55ec -PolicyScopeGroupId sharedocs-mittenti@siciet.it -AccessRight RestrictAccess -Description "ShareDocs: solo sharedocs@siciet.it"
+   Test-ApplicationAccessPolicy -Identity sharedocs@siciet.it -AppId 9e9b873b-2e7c-4011-aebd-7470627d55ec
+   ```
+6. Facoltativo su Cloudflare: variabile `MAIL_FROM` se la casella è un'altra.
+
 ## Architettura della versione reale (proposta)
 
 SICIET Quality salva su SharePoint tramite un **servizio** (Cloudflare Worker) che usa le credenziali dell'app con `Sites.Selected`, cioè con accesso al solo sito SICIET Qualità, e la pagina non fa accedere nessuno. Per ShareDocs l'accesso invece serve, perché le risposte del cliente sono atti ufficiali e vanno attribuite a una persona. La proposta unisce le due cose:
@@ -227,7 +243,7 @@ Il test di questa pagina usa invece le autorizzazioni **delegate** (`Files.ReadW
 
 ## Versione delle pagine
 
-**App** (`index.html` + `sharedocs.js`): versione 11 del 06/11/2026 (nuovo indirizzo https://hub.siciet.it/sharedocs/; v10: eliminazione dei transmittal emessi per prova; servizio v10; v9: importazione dell'archivio; v8: più file per documento con il nome originale; v7: pagina Commenti con una scheda per ogni risposta del cliente; v6: in fondo alla pagina la versione del servizio, con avviso se su Cloudflare è vecchio; v5: allegati del cliente nella risposta; v4: controllo dei file scaricati; v3: anteprima dei PDF dentro ShareDocs; v2: pulsante *Aggiorna Excel*; v1: prima versione collegata al servizio). A ogni modifica di `sharedocs.js` aumentare `VERSIONE`, il numero in `sharedocs.js?v=` e il footer di `index.html`.
+**App** (`index.html` + `sharedocs.js`): versione 12 del 09/11/2026 (inviti dei clienti ed email automatiche; servizio v11; v11: nuovo indirizzo https://hub.siciet.it/sharedocs/; v10: eliminazione dei transmittal emessi per prova; servizio v10; v9: importazione dell'archivio; v8: più file per documento con il nome originale; v7: pagina Commenti con una scheda per ogni risposta del cliente; v6: in fondo alla pagina la versione del servizio, con avviso se su Cloudflare è vecchio; v5: allegati del cliente nella risposta; v4: controllo dei file scaricati; v3: anteprima dei PDF dentro ShareDocs; v2: pulsante *Aggiorna Excel*; v1: prima versione collegata al servizio). A ogni modifica di `sharedocs.js` aumentare `VERSIONE`, il numero in `sharedocs.js?v=` e il footer di `index.html`.
 
 **Pagina di test** (`test/index.html`):
 
