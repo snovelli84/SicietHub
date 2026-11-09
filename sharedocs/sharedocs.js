@@ -17,7 +17,7 @@ var SHAREDOCS_CONFIG = {
   api: "https://siciet-sharedocs.amministrazione-c44.workers.dev/api",   // servizio su Cloudflare
   scope: "api://9e9b873b-2e7c-4011-aebd-7470627d55ec/access_as_user"
 };
-const VERSIONE = 12;
+const VERSIONE = 13;
 const SERVIZIO_ATTESO = 11;   // versione minima del servizio su Cloudflare (VERSIONE_SERVIZIO in api/worker.js)
 const LOGO_URL = new URL("icons/siciet-mark.png", location.href).href;
 
@@ -68,7 +68,7 @@ const DEFAULT_CFG = {project:"",projectName:"",customer:"",endClient:"",client:"
 /* Intestazione societaria, come nei transmittal SICIET in uso */
 const COMPANY = {name:"S.I.C.I.E.T. s.r.l.",addr:"Via Puglia 6, Fraz. Albinia – 58015 Orbetello (GR) – Italy",ids:"VAT IT01164350538 · Tel. +39 0564 870512 · www.siciet.it · info@siciet.it"};
 const TABS = [["cruscotto","Cruscotto","Dashboard"],["documenti","Registro documenti","Document register"],["transmittal","Transmittal","Transmittals"],["commenti","Commenti","Comments"]];
-const FORM_DRAWERS = ["newTr","newDoc","import","newCmt","settings","newCommessa","pdf","archivio"];
+const FORM_DRAWERS = ["newTr","newDoc","import","newCmt","settings","newCommessa","pdf","archivio","app"];
 
 /* ---------- Stato ---------- */
 const S = {docs:[],trs:[],cmts:[],cfg:{...DEFAULT_CFG},screen:"avvio",errore:"",me:null,commesse:[],c:null,canWrite:false,canComment:false,realClient:false,
@@ -406,7 +406,7 @@ function viewTrs(){
   const list=[...S.trs].sort((a,b)=>((b.status==="bozza")-(a.status==="bozza"))||String(b.date||"").localeCompare(String(a.date||""))||b.seq-a.seq);   // bozze in cima, poi dal più recente
   return `
   <div class="pagehead"><div><h1>${tx("Transmittal","Transmittals")}</h1><p>${S.excelUrl?`<a href="${esc(S.excelUrl)}" target="_blank" rel="noopener">${tx("Apri VDRL su SharePoint","Open VDRL on SharePoint")}</a> · `:""}${tx(`Registro di tutti i transmittal della commessa, numerati in automatico ${esc(S.cfg.prefix)}nn. Il foglio inviato al cliente è sempre in inglese.`,`Log of all project transmittals, numbered automatically ${esc(S.cfg.prefix)}nn. The sheet sent to the client is always in English.`)}</p></div>
-    <div class="actions">${S.canWrite?`<button class="btn" data-act="archivio" title="${tx("Collega ai transmittal emessi i file già trasmessi, riconoscendo documento e revisione dal nome","Link already transmitted files to issued transmittals, recognising document and revision from the name")}">${tx("Importa archivio","Import archive")}</button>`:""}${S.canComment?`<button class="btn" data-act="excel" title="${tx("Rigenera subito VDRL e CRS nella cartella SharePoint della commessa","Regenerate VDRL and CRS now in the project's SharePoint folder")}">${tx("Aggiorna Excel","Update Excel")}</button>`:""}<button class="btn" data-act="settings">${tx("Impostazioni commessa","Project settings")}</button><button class="btn primary" data-act="newTr" ${S.canWrite&&S.docs.length?"":"disabled"}>${tx("Nuovo transmittal","New transmittal")}</button></div></div>
+    <div class="actions">${S.canWrite?`<button class="btn" data-act="archivio" title="${tx("Collega ai transmittal emessi i file già trasmessi, riconoscendo documento e revisione dal nome","Link already transmitted files to issued transmittals, recognising document and revision from the name")}">${tx("Importa archivio","Import archive")}</button>`:""}${S.canComment?`<button class="btn" data-act="excel" title="${tx("Rigenera subito VDRL e CRS nella cartella SharePoint della commessa","Regenerate VDRL and CRS now in the project's SharePoint folder")}">${tx("Aggiorna Excel","Update Excel")}</button>`:""}<button class="btn primary" data-act="newTr" ${S.canWrite&&S.docs.length?"":"disabled"}>${tx("Nuovo transmittal","New transmittal")}</button></div></div>
   <div class="tablebox"><table>
     <thead><tr><th>${tx("Numero","Number")}</th><th>${tx("Data","Date")}</th><th>${tx("Destinatario","To")}</th><th>${tx("Documenti","Documents")}</th><th>${tx("Scopo","Purpose")}</th><th>${tx("Risposta entro","Reply due")}</th><th>${tx("Stato","Status")}</th></tr></thead>
     <tbody>${list.length?list.map(tr=>{const st=trState(tr), pois=[...new Set((tr.items||[]).map(i=>i.poi))];
@@ -632,7 +632,8 @@ function renderDrawer(){
   else if(d.type==="newDoc") { title=tx("Nuovo documento","New document"); body=docForm(); }
   else if(d.type==="import") { title=tx("Incolla elenco documenti","Paste document list"); body=importForm(); }
   else if(d.type==="newCmt") { title=tx("Registra commento del cliente","Log client comment"); body=cmtForm(d); }
-  else if(d.type==="settings") { title=tx("Impostazioni commessa","Project settings"); body=settingsForm(); }
+  else if(d.type==="settings") { const cm=S.commesse.find(x=>x.id===S.c); title=tx("Impostazioni commessa","Project settings")+(cm?` <span class="muted" style="font-weight:500">· ${esc(cm.nome)}</span>`:""); body=settingsForm(); }
+  else if(d.type==="app") { title=tx("Impostazioni ShareDocs","ShareDocs settings"); body=appPanel(d); }
   else if(d.type==="doc") { const doc=docById(d.id); if(!doc){closeDrawer();return;} title=`<span class="mono">${esc(doc.num)}</span>`; body=docCard(doc); }
   root.innerHTML=`<div class="scrim" data-act="close"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="${tx("Dettaglio","Details")}">
     <div class="dh"><h2>${title}</h2>${head}<button class="btn small" data-act="close">${tx("Chiudi","Close")}</button></div><div class="db">${body}</div></aside>`;
@@ -713,7 +714,7 @@ function settingsForm(){
     ${S.canWrite?clientiPanel():""}
     ${S.canWrite&&vuoto?`<div class="notice" style="margin-top:24px"><b>${tx("Importazione iniziale","Initial import")}</b><p class="hint" style="margin:4px 0 10px">${tx("Carica il file JSON con registro e transmittal esistenti (es. sharedoc-import-2040.json). Si può fare solo finché la commessa non ha transmittal né commenti.","Load the JSON file with the existing register and transmittals. Allowed only while the project has no transmittals or comments.")}</p>
       <input type="file" id="impJson" accept=".json,application/json"></div>`:""}
-    ${S.canWrite?`<div class="notice" style="margin-top:16px"><b>${tx("Nuova commessa","New project")}</b><p class="hint" style="margin:4px 0 10px">${tx("Crea un'altra commessa con il suo registro e la sua cartella su SharePoint.","Create another project with its own register and SharePoint folder.")}</p><button class="btn small" type="button" data-act="newCommessa">${tx("Crea commessa","Create project")}</button></div>`:""}`;
+    <p class="hint" style="margin-top:16px">${tx("Altre commesse, nuova commessa e versioni: menu ⚙ in alto a destra → Impostazioni ShareDocs.","Other projects, new project and versions: ⚙ menu at the top right → ShareDocs settings.")}</p>`;
 }
 /* Clienti della commessa: invito come ospiti, stato dell'invito, notifiche. */
 const MSG_INVITO = () => `You have been invited to SICIET ShareDocs to receive the document transmittals of the project ${S.cfg.projectName||S.cfg.project} and send your review. After accepting the invitation, open ${location.origin}${location.pathname.replace(/index\.html$/,"")} and sign in with this email address.`;
@@ -828,7 +829,7 @@ function screenHtml(){
     <span class="actions"><button class="btn small" data-act="retry">${tx("Riprova","Try again")}</button>${account?`<button class="btn small" data-act="logout">${tx("Esci","Sign out")}</button>`:""}</span></div>`;
   if(sc === "nessunaCommessa") return `<div class="notice">${S.realClient?"No project is available for your account yet. Please contact SICIET Document Control.":tx("Nessuna commessa disponibile per il tuo account.","No project available for your account.")}</div>`;
   if(sc === "nuovaCommessa") return `<div class="panel" style="max-width:720px;margin:0 auto;padding:20px;display:grid;gap:12px"><h1 style="font-size:20px">${tx("Crea la prima commessa","Create the first project")}</h1>
-    <p class="hint">${tx("Il registro e la cartella su SICIET Docs vengono creati dal servizio. Dopo puoi importare il registro esistente da Impostazioni commessa.","The service creates the register and the folder on SICIET Docs. Then you can import the existing register from Project settings.")}</p>${commessaForm()}</div>`;
+    <p class="hint">${tx("Il registro e la cartella su SICIET Docs vengono creati dal servizio. Dopo puoi importare il registro esistente dal menu ⚙ in alto a destra → Impostazioni commessa.","The service creates the register and the folder on SICIET Docs. Then you can import the existing register from the ⚙ menu at the top right → Project settings.")}</p>${commessaForm()}</div>`;
   return null;
 }
 // Testata: commessa, utente, vista. Chiamata dopo ogni render.
@@ -839,9 +840,44 @@ function dopoRender(){
     job.innerHTML = `<select id="selCommessa" aria-label="${tx("Commessa","Project")}">${S.commesse.map(c=>`<option value="${esc(c.id)}" ${c.id===S.c?"selected":""}>${esc(c.nome)}</option>`).join("")}</select>`;
   }
   const who = document.getElementById("who");
-  who.innerHTML = S.me ? `<span>${esc(S.me.nome)}</span> <button class="link" data-act="logout">${tx("Esci","Sign out")}</button>` : "";
-  document.getElementById("modeBox").hidden = !S.me || S.realClient;
+  const menu = !!S.me && !S.realClient;   // i colleghi SICIET hanno il menu ⚙ (con "Esci"); i clienti il link diretto
+  who.innerHTML = S.me ? `<span>${esc(S.me.nome)}</span>${menu?"":` <button class="link" data-act="logout">${tx("Esci","Sign out")}</button>`}` : "";
+  document.getElementById("modeBox").hidden = !menu;
+  document.getElementById("gearBox").hidden = !menu;
+  if(S.menu) apriMenu(true);
   if(S.screen){ document.getElementById("tabs").innerHTML = ""; }
+}
+
+/* ---------- Menu ⚙ in alto a destra e impostazioni di ShareDocs ---------- */
+function apriMenu(aperto){
+  S.menu = !!aperto && !!S.me && !S.realClient;
+  const m = document.getElementById("gearMenu"), b = document.getElementById("gearBtn"); if(!m) return;
+  m.hidden = !S.menu; b.setAttribute("aria-expanded", S.menu ? "true" : "false");
+  if(!S.menu){ m.innerHTML = ""; return; }
+  const cm = S.commesse.find(x=>x.id===S.c), ok = !!cm && !S.screen;
+  m.innerHTML = `<div class="mh"><b>${esc(S.me.nome)}</b>${esc(S.me.email||"")}<br>${tx("Ruoli","Roles")}: ${esc((S.me.ruoli||[]).join(", ")||"—")}</div>
+    <button type="button" role="menuitem" data-act="settings" ${ok?"":"disabled"}>${tx("Impostazioni commessa","Project settings")}<span>${ok?esc(cm.nome)+" · "+tx("dati, clienti e notifiche","details, clients and notifications"):tx("nessuna commessa aperta","no project open")}</span></button>
+    <button type="button" role="menuitem" data-act="appSettings">${tx("Impostazioni ShareDocs","ShareDocs settings")}<span>${tx("commesse, nuova commessa, versioni","projects, new project, versions")}</span></button>
+    <hr><button type="button" role="menuitem" data-act="logout">${tx("Esci","Sign out")}</button>`;
+}
+function appPanel(d){
+  const righe = S.commesse.map(c=>`<tr><td class="mono">${esc(c.id)}</td><td>${esc(c.nome)}</td><td style="text-align:right">${c.id===S.c?`<span class="chip t-ok">${tx("aperta","open")}</span>`:`<button class="btn small" type="button" data-act="apriCommessa" data-id="${esc(c.id)}">${tx("Apri","Open")}</button>`}</td></tr>`).join("");
+  const v = (S.me&&S.me.versione)||0, vecchio = v < SERVIZIO_ATTESO;
+  const guida = "https://github.com/snovelli84/SicietHub/blob/main/sharedocs/README.md";
+  return `<div style="display:grid;gap:16px">
+    <section class="notice" style="display:grid;gap:10px"><b>${tx("Commesse","Projects")}</b>
+      <div class="tablebox"><table><thead><tr><th>${tx("Codice","Code")}</th><th>${tx("Nome","Name")}</th><th></th></tr></thead><tbody>${righe||`<tr><td colspan="3" class="empty">${tx("Nessuna commessa.","No projects.")}</td></tr>`}</tbody></table></div>
+      ${!S.canWrite?`<p class="hint" style="margin:0">${tx("Solo il Document Control può creare commesse.","Only Document Control can create projects.")}</p>`
+        : d.nuova?`<div style="display:grid;gap:8px"><b style="font-size:14px">${tx("Nuova commessa","New project")}</b><p class="hint" style="margin:0">${tx("Il servizio crea il registro e la cartella su SICIET Docs. Poi apri la commessa e completa i dati da Impostazioni commessa.","The service creates the register and the folder on SICIET Docs. Then open the project and complete its details from Project settings.")}</p>${commessaForm()}</div>`
+        : `<div><button class="btn small" type="button" data-act="appNuova">${tx("Nuova commessa","New project")}</button></div>`}
+    </section>
+    <section class="notice" style="display:grid;gap:6px"><b>${tx("Utenti e ruoli","Users and roles")}</b>
+      <span>${tx("I ruoli (DocControl, Engineer) si assegnano in Entra ID: Applicazioni aziendali → SICIET ShareDocs → Utenti e gruppi. I clienti si invitano dalla commessa: Impostazioni commessa → Clienti e notifiche.","Roles (DocControl, Engineer) are assigned in Entra ID: Enterprise applications → SICIET ShareDocs → Users and groups. Clients are invited from the project: Project settings → Clients and notifications.")}</span>
+    </section>
+    <section class="notice" style="display:grid;gap:6px"><b>${tx("Versioni","Versions")}</b>
+      <span>${tx("Pagina","Page")} v${VERSIONE} · ${tx("servizio","service")} v${v||"?"}${vecchio?` · <b style="color:var(--bad)">${tx(`da aggiornare su Cloudflare (serve v${SERVIZIO_ATTESO})`,`to update on Cloudflare (v${SERVIZIO_ATTESO} needed)`)}</b>`:` · ${tx("aggiornati","up to date")}`}</span>
+      <span><a href="${guida}" target="_blank" rel="noopener">${tx("Guida e storico delle versioni","Guide and version history")}</a> · <a href="test/" target="_blank" rel="noopener">${tx("Test della connessione","Connection test")}</a></span>
+    </section></div>`;
 }
 
 // In fondo alla pagina: versione della pagina e del servizio, con avviso se il servizio è vecchio.
@@ -968,7 +1004,10 @@ async function apriCommessa(id){
 
 /* ---------- Eventi ---------- */
 document.addEventListener("click", async e=>{
+  if(S.menu && !e.target.closest("#gearBox")) apriMenu(false);   // clic fuori dal menu ⚙: si chiude
   const t=e.target.closest("[data-act],[data-tr],[data-go],[data-doc-open],[data-cmt-save],[data-cmt-close],[data-cmt-reopen],[data-lang],[data-view-mode],[data-ctr]"); if(!t) return;
+  if(t.dataset.act==="menu"){ apriMenu(!S.menu); return; }
+  if(t.closest("#gearMenu")) apriMenu(false);
   if(t.dataset.lang){ setLang(t.dataset.lang); return; }
   if(t.dataset.viewMode){ setMode(t.dataset.viewMode); return; }
   if(t.dataset.ctr){ openDrawer({type:"ctr",id:t.dataset.ctr}); return; }
@@ -989,7 +1028,10 @@ document.addEventListener("click", async e=>{
   else if(a==="newDoc") openDrawer({type:"newDoc"});
   else if(a==="importDocs") openDrawer({type:"import"});
   else if(a==="newCmt") openDrawer({type:"newCmt",doc:t.dataset.doc});
-  else if(a==="settings"){ openDrawer({type:"settings"}); caricaContatti(); }
+  else if(a==="settings"){ if(isClient()) setMode("siciet"); openDrawer({type:"settings"}); caricaContatti(); }
+  else if(a==="appSettings") openDrawer({type:"app"});
+  else if(a==="appNuova"){ S.drawer.nuova=true; renderDrawer(); document.getElementById("n_id")?.focus(); }
+  else if(a==="apriCommessa"){ closeDrawer(); apriCommessa(id); }
   else if(a==="cliInvita"){ const email=val("i_email"), nome=val("i_nome");
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ toast(tx("Scrivi un indirizzo email valido.","Enter a valid email address.")); return; }
     invitaCliente(email, nome, val("i_msg")); }
@@ -1046,7 +1088,7 @@ document.addEventListener("change", e=>{
   if(id==="selCommessa") apriCommessa(e.target.value);
   if(id==="impJson" && e.target.files[0]) importaRegistro(e.target.files[0]);
 });
-document.addEventListener("keydown", e=>{ if(e.key==="Escape"&&S.drawer) closeDrawer(); });
+document.addEventListener("keydown", e=>{ if(e.key!=="Escape") return; if(S.menu){ apriMenu(false); document.getElementById("gearBtn")?.focus(); } else if(S.drawer) closeDrawer(); });
 function route(){ const h=location.hash.slice(1);
   if(h.startsWith("tr-")){ S.apriTr=h.slice(3); S.view="transmittal"; try{ history.replaceState(null,"",location.pathname+"#transmittal"); }catch(_){} if(S.screen===""&&S.trs.length) apriTrDaLink(); else render(); return; }
   S.view=TABS.some(([k])=>k===h)?h:"cruscotto"; if(S.drawer) closeDrawer(); render(); window.scrollTo(0,0); }

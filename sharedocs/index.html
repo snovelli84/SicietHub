@@ -50,8 +50,20 @@ h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0}
 /* Top bar */
 header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
 .top .wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:10px}
-.top .toggles{display:flex;gap:6px;flex:none;align-items:center}
+.top .toggles{display:flex;gap:6px;flex:none;align-items:center;margin-left:auto}
 .who{font-size:12.5px;color:var(--muted);display:inline-flex;gap:6px;align-items:center;max-width:220px;overflow:hidden;white-space:nowrap}
+.menuwrap{position:relative;flex:none}
+.gear{display:inline-flex;align-items:center;justify-content:center;width:32px;height:28px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);color:var(--muted);cursor:pointer}
+.gear:hover,.gear[aria-expanded="true"]{color:var(--ink);border-color:var(--accent)}
+.menu{position:absolute;right:0;top:calc(100% + 6px);width:min(280px,calc(100vw - 32px));background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);padding:6px;z-index:30;display:grid}
+.menu[hidden]{display:none}
+.menu .mh{padding:8px 10px 10px;border-bottom:1px solid var(--line);margin-bottom:4px;font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.menu .mh b{display:block;color:var(--ink);font-size:13.5px}
+.menu button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border:0;background:none;padding:8px 10px;border-radius:6px;cursor:pointer;color:var(--ink);font:inherit;font-size:13.5px;font-weight:500}
+.menu button span{font-size:12px;color:var(--muted);font-weight:400}
+.menu button:hover:not([disabled]),.menu button:focus-visible{background:var(--bg)}
+.menu button[disabled]{opacity:.5;cursor:default}
+.menu hr{border:0;border-top:1px solid var(--line);margin:4px 0;width:100%}
 .job select{font:inherit;font-family:var(--f-mono);font-size:12px;font-weight:600;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);color:var(--ink);padding:2px 4px;max-width:240px}
 .top .lockup{text-decoration:none}
 .lockup{display:inline-flex;align-items:center;gap:10px;background:var(--logo-plate);border-radius:8px;padding:4px 10px 4px 6px}
@@ -232,15 +244,16 @@ a.btn:hover{text-decoration:none}
     <div class="job"><b id="jobCode"></b><span id="jobClient"></span></div>
     <nav class="tabs" id="tabs" aria-label="Sezioni"></nav>
     <div class="toggles"><span class="who" id="who"></span><div class="lang" id="modeBox" role="group" aria-label="Vista / View" hidden><button type="button" data-view-mode="siciet" aria-pressed="true">SICIET</button><button type="button" data-view-mode="client" aria-pressed="false">Client</button></div>
-    <div class="lang" id="langBox" role="group" aria-label="Lingua / Language"><button type="button" data-lang="it" aria-pressed="false">IT</button><button type="button" data-lang="en" aria-pressed="false">EN</button></div></div>
+    <div class="lang" id="langBox" role="group" aria-label="Lingua / Language"><button type="button" data-lang="it" aria-pressed="false">IT</button><button type="button" data-lang="en" aria-pressed="false">EN</button></div>
+    <div class="menuwrap" id="gearBox" hidden><button type="button" class="gear" id="gearBtn" data-act="menu" aria-haspopup="menu" aria-expanded="false" aria-label="Impostazioni / Settings" title="Impostazioni / Settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button><div class="menu" id="gearMenu" role="menu" hidden></div></div></div>
   </div>
 </header>
 <main class="wrap" id="main"><div class="empty">Caricamento… / Loading…</div></main>
 <!-- Aumentare versione e data a ogni modifica pubblicata, insieme a VERSIONE in sharedocs.js e a ?v= qui sotto. -->
-<footer class="wrap appver" id="appver">SICIET ShareDocs · versione 12 · 09/11/2026</footer>
+<footer class="wrap appver" id="appver">SICIET ShareDocs · versione 13 · 09/11/2026</footer>
 <div id="drawerRoot"></div>
 <div id="toastRoot"></div>
 
-<script src="sharedocs.js?v=12"></script>
+<script src="sharedocs.js?v=13"></script>
 </body>
 </html>
