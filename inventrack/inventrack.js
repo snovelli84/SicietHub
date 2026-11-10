@@ -659,11 +659,11 @@ var INVENTRACK_CONFIG = {
     var trovati = trova(q, righeTutte(), 8);
     trovati.forEach(function(t){ box.appendChild(voce(t.riga, function(){ apriScheda(t.riga); })); });
     var esatto = trovati.length && trovati[0].punti === 100;
-    // Si propone di aggiungere il codice solo se sembra un codice (ha una cifra) o non si trova nulla.
-    if(!esatto && R.canon(q).length >= 2 && (/\d/.test(q) || !trovati.length) && !blocco()){
+    // Se il codice scritto non è nell'elenco si può sempre aggiungerlo come nuovo.
+    if(!esatto && R.canon(q).length >= 2 && !blocco()){
       box.appendChild(el("button", { type: "button", class: "voce nuovo", onclick: function(){ apriScheda({ codice: R.codice(q), descrizione: "", commessa: S.inv.commessa || "", attesa: 0, valore: 0, extra: true, nuovo: true }); } },
         el("span", { class: "cod", text: "➕ " + R.codice(q) }),
-        el("span", { class: "des", text: "Il codice non è nel report: aggiungilo come articolo trovato in magazzino" })));
+        el("span", { class: "des", text: "Non è nell'elenco? Aggiungilo come nuovo codice trovato in magazzino" })));
     }
     if(!trovati.length && blocco()) box.appendChild(el("p", { class: "hint", text: "Nessun articolo trovato." }));
   }
@@ -687,8 +687,7 @@ var INVENTRACK_CONFIG = {
     $("codice").value = r.codice;
     disegnaInventario();
     $("scheda").scrollIntoView({ block: "nearest", behavior: "smooth" });
-    var campo = r.nuovo ? $("sDescr") : null;
-    if(campo) campo.focus();
+    if(r.nuovo && $("sReale")) $("sReale").focus();
   }
   function chiudiScheda(){
     S.scheda = null;
@@ -712,8 +711,8 @@ var INVENTRACK_CONFIG = {
       r.nuovo ? null : el("div", { text: r.descrizione }));
     if(r.nuovo){
       box.append(
-        el("div", { class: "avviso", text: "Questo codice non è nel report del gestionale. Controlla di averlo scritto bene: se l'articolo c'è davvero in magazzino, scrivi descrizione e quantità trovata." }),
-        el("label", { class: "field" }, el("span", { class: "flabel", text: "Descrizione" }), el("input", { type: "text", id: "sDescr", maxlength: "300" })),
+        el("div", { class: "avviso", text: "Questo codice non è nel report del gestionale. Controlla di averlo scritto bene: se l'articolo c'è davvero in magazzino, scrivi la quantità trovata." }),
+        el("label", { class: "field" }, el("span", { class: "flabel", text: "Descrizione (facoltativa)" }), el("input", { type: "text", id: "sDescr", maxlength: "300" })),
         S.inv.tipo === "generale" ? el("label", { class: "field" }, el("span", { class: "flabel", text: "Commessa (facoltativa)" }), el("input", { type: "text", id: "sCommessa", class: "maiuscolo", maxlength: "30" })) : null);
     } else {
       box.appendChild(el("div", { class: "attesa" }, el("small", { text: "Giacenza attesa" }), el("b", { text: fmt(r.attesa) })));
@@ -747,7 +746,6 @@ var INVENTRACK_CONFIG = {
       if(q === null){ reale.classList.add("invalid"); reale.focus(); return; }
       if(r.nuovo){
         var des = $("sDescr");
-        if(!R.pulisci(des.value)){ des.classList.add("invalid"); des.focus(); return; }
         r = { codice: r.codice, descrizione: R.pulisci(des.value), commessa: $("sCommessa") ? R.codice($("sCommessa").value) : r.commessa, attesa: 0, valore: 0, extra: true };
         var esiste = S.indice[R.chiave(r.codice, r.commessa)];
         if(esiste) r = esiste;

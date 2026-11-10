@@ -16,7 +16,7 @@ Serve a fare l'**inventario del magazzino generale o del magazzino di una commes
    - si scrive il **codice** (o parte del codice, o parole della descrizione) e si tocca l'articolo; con un lettore di codici a barre basta leggere il codice, che finisce con Invio;
    - oppure **📷**: si fotografa la targhetta e la pagina propone gli articoli del report che corrispondono al testo letto (vedi *Codice dalla foto*);
    - compare la **giacenza attesa**: **✅ Confermo** se è giusta, altrimenti si scrive la **giacenza reale** e **Salva** (sotto il campo si vede subito la differenza). Un articolo che non c'è va salvato con quantità **0**. Si può aggiungere una nota;
-   - un codice che non è nel report si può aggiungere come **articolo trovato in magazzino** (descrizione e quantità): nell'Excel risulta "Non presente nel report";
+   - un codice che non è nel report si può aggiungere come **articolo trovato in magazzino** (basta la quantità; la descrizione è facoltativa): nell'Excel risulta "Non presente nel report";
    - un articolo già contato si può riaprire per correggerlo o per **annullare il conteggio**.
 4. **Elenco** – Tutti gli articoli con i filtri *Da contare*, *Confermati*, *Differenze* e la ricerca: serve a vedere cosa manca.
 5. **Esporta** (dal PC) – Riepilogo, **Scarica Excel**, **Scarica CSV** per il gestionale, **Chiudi l'inventario**.
