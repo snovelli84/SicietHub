@@ -26,7 +26,7 @@ var INVENTRACK_CONFIG = {
 
   // Versione mostrata in fondo alla pagina: aumentarla a ogni modifica,
   // insieme al numero ?v= di inventrack.js in index.html.
-  versione: "1.4"
+  versione: "1.5"
 };
 
 (function(){
@@ -707,11 +707,15 @@ var INVENTRACK_CONFIG = {
   }
 
   /* ---------- Commesse collegate (varianti) ----------
-   * S1852V12 è una variante della commessa S1852. Se nello stesso giorno ci
+   * S1852V12 è collegata alla commessa S1852. Se nello stesso giorno ci
    * sono inventari di commesse collegate, un codice che manca in uno ma c'è nel
    * report dell'altro viene segnalato: probabilmente va contato là. */
-  function baseCommessa(c){ return R.codice(c).replace(/V\d+$/, ""); }
-  function collegate(a, b){ a = R.codice(a); b = R.codice(b); return !!a && !!b && a !== b && baseCommessa(a) === baseCommessa(b); }
+  // Una commessa è collegata a tutte quelle il cui codice inizia con il suo
+  // (S1852 con S1852V12 e S1852V31); due varianti tra loro non lo sono.
+  function collegate(a, b){
+    a = R.codice(a); b = R.codice(b);
+    return !!a && !!b && a !== b && (a.indexOf(b) === 0 || b.indexOf(a) === 0);
+  }
 
   var collegatiCache = null;
   async function inventariCollegati(){
