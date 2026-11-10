@@ -109,3 +109,5 @@ La cartella [`quality/`](quality/) contiene **SICIET Quality** (controllo qualit
 La cartella [`sharedocs/`](sharedocs/) contiene **SICIET ShareDocs** (transmittal e ciclo di revisione documentale con i clienti), all'indirizzo `https://hub.siciet.it/sharedocs/`: per ora la pagina di test di connessione a Microsoft 365 (Entra ID e SharePoint), vedi [`sharedocs/README.md`](sharedocs/README.md). Non compare nel portale.
 
 La cartella [`hr/`](hr/) contiene **SICIET HR** (comunicazione delle nuove assunzioni al consulente del lavoro e agli uffici interni), raggiungibile solo all'indirizzo `https://hub.siciet.it/hr` e protetta da password: vedi [`hr/README.md`](hr/README.md).
+
+La cartella [`inventrack/`](inventrack/) contiene **SICIET InvenTrack** (inventario del magazzino generale e dei magazzini di commessa: report del gestionale, conteggio dal telefono, Excel delle differenze), all'indirizzo `https://hub.siciet.it/inventrack/` e protetta da password: vedi [`inventrack/README.md`](inventrack/README.md). Non compare nel portale.
