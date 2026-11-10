@@ -1,0 +1,749 @@
+﻿//==============================================================================
+// Woorm code behind
+//==============================================================================
+
+Release 7 Maximized 
+PageInfo (2,9,2970,2100,100,1,1,True ) 
+
+FontStyles 
+	Begin
+		"CellNumber"  Facename "Arial"  Size 8 Style (0,0,0,400,0,0,0,0,1,2,1,34,TextColor (0,0,0) ) ;
+	End
+
+FormatStyles 
+	Begin
+		Double "Double"   Sign 1 Table "ZAEGHMPSTK,"  Precision 2 HideMs0  HideLs0 ;
+		Quantity "Quantity"   Sign 1 Table "ZAEGHMPSTK,"  Precision 2 HideLs0 ;
+		Money "DashedCurrency"   Style 153 NULL ""  Sign 1 Table "ZAEGHMPSTK,"  Precision 2;
+	End
+
+PageLayout "default" 
+	Begin
+		Text (0,0,15,1113) "{Company Name}" 
+			Begin
+				Transparent
+				Special
+				Align 2129 ;
+				Borders (0,0,0,0) ;
+			End
+
+		Text (12,701,25,777) "Selezioni" 
+			Begin
+				Align 2128 ;
+				Borders (0,0,0,0) ;
+			End
+
+		Field (12,779,26,929) Alias 12 
+			Begin
+				Transparent
+				Align 2150 ;
+				Borders (0,0,0,0) ;
+				Label "Da Deposito" 
+			End
+
+		Field (12,934,26,1077) Alias 18 FormatStyle "Date" 
+			Begin
+				Transparent
+				Align 2150 ;
+				Borders (0,0,0,0) ;
+				Label "Da Data Reg." 
+			End
+
+		Text (17,1,47,559) "Analisi Andamento Giacenza" 
+			Begin
+				Align 2128 ;
+				FontStyle "ListTitle" ;
+				Borders (0,0,0,0) ;
+			End
+
+		Field (25,779,39,929) Alias 13 
+			Begin
+				Transparent
+				Align 2150 ;
+				Borders (0,0,0,0) ;
+				Label "A Deposito" 
+			End
+
+		Field (25,934,39,1077) Alias 17 FormatStyle "Date" 
+			Begin
+				Transparent
+				Align 2146 ;
+				Borders (0,0,0,0) ;
+				Label "A Data Reg." 
+			End
+
+		Field (38,779,52,929) Alias 19 
+			Begin
+				Transparent
+				Align 2150 ;
+				Borders (0,0,0,0) ;
+				Label "Da Commessa" 
+			End
+
+		Text (49,5,70,430) "Per Deposito/Cantiere, Commessa" 
+			Begin
+				Align 2128 ;
+				FontStyle "ListSubTitle" ;
+				Borders (0,0,0,0) ;
+			End
+
+		Field (51,779,65,929) Alias 20 
+			Begin
+				Transparent
+				Align 2150 ;
+				Borders (0,0,0,0) ;
+				Label "A Commessa" 
+			End
+
+		Field (51,934,65,1077) Alias 66 
+			Begin
+				Transparent
+				Align 2146 ;
+				Borders (0,0,0,0) ;
+				Label "Da Articolo" 
+			End
+
+		Field (64,779,78,929) Alias 14 
+			Begin
+				Transparent
+				Align 2150 ;
+				Borders (0,0,0,0) ;
+				Label "Da Cliente" 
+			End
+
+		Field (64,934,78,1077) Alias 67 
+			Begin
+				Transparent
+				Align 2146 ;
+				Borders (0,0,0,0) ;
+				Label "A Articolo" 
+			End
+
+		Field (77,4,108,101) Alias 21 
+			Begin
+				Transparent
+				Align 2154 ;
+				FontStyle "ListSubTitle" ;
+				Label "Deposito" 
+			End
+
+		Field (77,100,108,600) Alias 30 
+			Begin
+				Transparent
+				Align 2153 ;
+				FontStyle "ListSubTitle" ;
+
+			End
+
+		Field (77,779,91,929) Alias 15 
+			Begin
+				Transparent
+				Align 2150 ;
+				Borders (0,0,0,0) ;
+				Label "A Cliente" 
+			End
+
+		Field (77,934,91,1077) Alias 64 FormatStyle "Bool" 
+			Begin
+				Transparent
+				Align 2146 ;
+				Borders (0,0,0,0) ;
+				Label "Stampa SubTotali" 
+			End
+
+		Field (90,934,104,1077) Alias 65 FormatStyle "Bool" 
+			Begin
+				Transparent
+				Align 2146 ;
+				Borders (0,0,0,0) ;
+				Label "Non Stampa SubTotali" 
+			End
+
+		Field (103,934,117,1077) Alias 73 
+			Begin
+				Transparent
+				Align 2150 ;
+				Borders (0,0,0,0) ;
+				Label "Divisa" 
+			End
+
+		Field (114,4,140,600) Alias 82 
+			Begin
+				Align 2152 ;
+				FontStyle "AccessoryDescription" ;
+				Borders (0,0,0,0) ;
+
+			End
+
+		Text (724,4,739,222) "{Date (dd-mm-yy)}" 
+			Begin
+				Transparent
+				Special
+				Align 2168 ;
+				FontStyle "AccessoryDescription" ;
+				Borders (0,0,0,0) ;
+			End
+
+		Text (724,1002,739,1077) "Pag. {Page}/{Page Number}" 
+			Begin
+				Transparent
+				Special
+				Align 2170 ;
+				FontStyle "AccessoryDescription" ;
+				Borders (0,0,0,0) ;
+			End
+
+		Text (153,894,169,1091) "Valori" 
+			Begin
+				BkgColor (192,192,192) ;
+				Align 2165 ;
+				FontStyle "ColumnTitle" ;
+			End
+
+		Text (153,548,168,895) "Quantità" 
+			Begin
+				BkgColor (192,192,192) ;
+				Align 2165 ;
+				FontStyle "ColumnTitle" ;
+			End
+
+		Table (42,13) "VwIxWMovMagPerCommEDep" Alias 11 Origin (4,137) Heights (16,32,12,18) 
+		HideTitle
+			Begin
+				"Articolo" Alias 3 Width 129 ;
+				"Descrizione" Alias 22 Width 229 Break ;
+				"Commessa" Alias 4 Width 76 ;
+				"Causale" Alias 7 Width 52 ;
+				"DtaReg" Alias 6 Width 59 FormatStyle "Date" ;
+				"Iniziale" Alias 54 Width 60 FormatStyle "Quantity" ;
+				"DocNo" Alias 112 Width 63 ;
+				"Entrata" Alias 92 Width 69 FormatStyle "Quantity" ;
+				"Uscita" Alias 93 Width 79 FormatStyle "Quantity" ;
+				"Saldo" Alias 32 Width 75 FormatStyle "Quantity" ;
+				"Unitario" Alias 69 Width 70 FormatStyle "DashedCurrency" ;
+				"% Sc" Alias 35 Width 37 ;
+				"Totale Riga" Alias 71 Width 89 FormatStyle "DashedCurrency" Total ;
+				Title
+					Begin
+						Column (5,6)  Align 2169 ;
+						Column (7,9)  Align 2153 ;
+						Column (10)  Align 2169 ;
+						Column (11,12)  Align 2153 ;
+					End
+				SubTotal
+					Begin
+						Column (0,4)  TextColor (0,0,255) ;
+						Column (9)  TextColor (0,0,255) ;
+						Column (11)  TextColor (0,0,255) ;
+						Column (12)  TextColor (0,0,255) ;
+					End
+				ColTotal
+					Begin
+						Column (4)  FontStyle "Text"  ;
+						Column (5)  FontStyle "CellNumber"  ;
+						Column (9)  FontStyle "Text"  ;
+						Column (11)  FontStyle "Text"  ;
+					End
+
+				Body
+					Begin
+						Cell (0,4,41,4)  FontStyle "Text"  ;
+						Cell (0,9,41,9)  FontStyle "Text"  ;
+						Cell (0,11,41,11)  FontStyle "Text"  ;
+					End
+
+			End
+
+
+	End
+
+
+Report 
+	Begin NoName
+		Tables
+			VwIxWMovMagPerCommEDep [42] Alias 11 ;
+		End
+
+		Variables
+Bool __DisposeContextHandleOk [10] Alias 101 Hidden ;
+Long h_InventoryByStorage [10] Alias 102 Hidden Init = ERP.Inventory.Components.InventoryValuation_Create();
+Long w_ItemsMng [10] Alias 103 Hidden Init = ERP.Inventory.Components.ItemsBalances_Create();
+Long h_CurrencyManager [10] Alias 104 Hidden Init = ERP.Currencies.Components.CurrencyManager_Create();			String       Articolo [26] Alias 3  Column ;
+			String       Commessa [14] Alias 4  Column ;
+			Date         DtaReg [19] Alias 6  Column ;
+			String       Causale [10] Alias 7  Column ;
+			Double       Quantita [15] Alias 8  Hidden ;
+			Bool         Entrata [1] Alias 9  Hidden ;
+			String       AskDaDeposito [15] Alias 12  Input Init = "Sede"  ;
+			String       AskADeposito [15] Alias 13  Input Init = "SEDE"  ;
+			String       AskDaCliente [15] Alias 14  Input Init = ""  ;
+			String       AskACliente [15] Alias 15  Input Init = AskDaCliente  ;
+			Date         AskADataReg [8] Alias 17  Input Init = LastMonthDay ( AppDate ( ) )  ;
+			Date         AskDaDataReg [8] Alias 18  Input Init = Date ( 01 , month ( appdate ( ) ) , year ( appdate ( ) ) )  ;
+			String       AskDaCommessa [15] Alias 19  Input Init = ""  ;
+			String       AskACommessa [15] Alias 20  Input Init = AskDaCommessa  ;
+			String       Deposito [8] Alias 21 ;
+			String       DescrizioneArticolo [45,1] Alias 22  Column ;
+			Bool         Storno [1] Alias 23  Hidden ;
+			Quantity     E_Quantita [13] Alias 24  Hidden ;
+			Quantity     TotE_Quantita = Csum (E_Quantita ) Alias 25  Hidden ;
+			String       DescrizioneDepositi [32] Alias 30 ;
+			Quantity     F_Saldo [13] Alias 32  Column ;
+			Money        ValUnit [15] Alias 34  Hidden ;
+			String       ScontoFormula [6] Alias 35  Column ;
+			Double       ImpSconto [15] Alias 36  Hidden ;
+			Money        ImpRiga [15] Alias 37  Hidden ;
+			Double       SubTotImpRiga [15] = Csum (ImpRiga ) Alias 42  Hidden ;
+			Double       SubTotImpSconto [15] = Csum (ImpSconto ) Alias 43  Hidden ;
+			Double       SubTotValUnit [15] = Csum (ValUnit ) Alias 44  Hidden ;
+			String       SubTotDescrizioneArticolo [45,1] = "SubTotale"  Alias 45  SubTotal of DescrizioneArticolo ;
+			Double       SubTotValUnit_46 [15] = Csum (ValUnit ) Alias 46  Hidden ;
+			Double       SubTotImpSconto_46 [15] = Csum (ImpSconto ) Alias 47  Hidden ;
+			Double       SubTotImpRiga_46 [15] = Csum (ImpRiga ) Alias 48  Hidden ;
+			Quantity     SubTotF_Saldo_46 [13] = Csum (F_Saldo ) Alias 49  SubTotal ;
+			String       SubTotDescrizioneArticolo_50 [45,1] = "SubTotale"  Alias 50  SubTotal of DescrizioneArticolo ;
+			Bool         ConsideraGiacenzaIniziale [2] Alias 53  Hidden ;
+			Quantity     Giacenza [13] Alias 54  Column ;
+			Bool         IxW_GetGiacenzaDeposito [2] Alias 56  Hidden ;
+			Date         DataInizioEffettivo [8] Alias 58  Hidden ;
+			Bool         Prima [2] Alias 59  Hidden Init = TRUE  ;
+			Bool         AskSubTotale [2] Alias 64  Input Init = true  ;
+			Bool         EndSubTotale [2] Alias 65  Input Init = false  ;
+			String       AskArticolo [15] Alias 66  Input Init = ""  ;
+			String       EndArticolo [15] Alias 67  Input Init = AskArticolo  ;
+			String       Pippo [15] Alias 68  Hidden  Input Init = ""  ;
+			Money        F_ValUnit [23] Alias 69  Column ;
+			Money        F_ImpRiga [23] Alias 71  Column ;
+			Money        TotF_ImpRiga = Csum (F_ImpRiga ) Alias 72  ColTotal ;
+			String       AskDivisa [6] Alias 73  Input Init = ERP.Currencies.Dbl.BaseCurrency ( )  ;
+			Long         IDMovMag [12] Alias 74  Hidden ;
+			Date         DtaDoc [10] Alias 75  Hidden ;
+			String       w_Currency [15] Alias 76  Hidden ;
+			Date         DtaFixing [10] Alias 77  Hidden ;
+			Bool         FixingManuale [2] Alias 78  Hidden ;
+			Money        Fixing [23] Alias 79  Hidden ;
+			Money        F_ImpSconto [23] Alias 80  Hidden ;
+			Money        SubTotF_ImpRiga [23] = Csum (F_ImpRiga ) Alias 81  SubTotal ;
+			String       E_ValoriDivisa [15] Alias 82 ;
+			Integer      Fase [6] Alias 88  Hidden ;
+			Integer      TotFase = Csum (Fase ) Alias 89  Hidden ;
+			Bool         F_Carico [2] Alias 90  Hidden ;
+			Bool         F_Scarico [2] Alias 91  Hidden ;
+			Quantity     F_Entrata [13] Alias 92  Column ;
+			Quantity     F_Uscita [13] Alias 93  Column ;
+			Quantity     F_Progressivo [13] Alias 94  Hidden ;
+			Enum[103]    TipoSpecificatore [15] Alias 95  Hidden ;
+			String       Specificatore [19] Alias 96  Hidden ;
+			Date         DataInizioLoc [8] Alias 97  Hidden ;
+			Integer      w_FiscalYear [6] Alias 98  Hidden ;
+			Bool         F_Azione [2] Alias 99  Hidden ;
+			Enum[186]	 /* Reason Type */ w_ReasonType Alias 87  Hidden ;
+			Quantity     TotF_Progressivo = Csum (F_Progressivo ) Alias 100  Hidden ;
+			Quantity     SubTotF_Entrata [13] = Csum (F_Entrata ) Alias 105  SubTotal ;
+			Quantity     SubTotF_Uscita [13] = Csum (F_Uscita ) Alias 106  SubTotal ;
+			Bool         Ask_VisualizzaMovimenti [2] Alias 107  Hidden  Input Init = false  ;
+			Bool         Ask_NoVisualizzaMovimenti [2] Alias 108  Hidden  Input Init = TRUE  ;
+			String       SubTotArticolo [26] = "SubTotale"  Alias 109  SubTotal of Articolo ;
+			String       SubTotCommessa [14] = "SubTotale"  Alias 110  SubTotal of Commessa ;
+			Bool         Ask_AbilitaFiltroComm [2] Alias 111  Hidden  Input Init = TRUE  ;
+			String       DocNo [11] Alias 112  Column ;
+			Bool         AskItemPositive [2] Alias 113  Hidden  Input Init = TRUE  ;
+			Bool         NoAskItemPositive [2] Alias 114  Hidden  Input Init = false  ;
+		End
+
+		Rules
+			From IM_InvEntryJobs 
+			Select 
+				IM_InvEntryJobs.Item Into Articolo ,
+				IM_InvEntryJobs.Job  Into Commessa ,
+				IM_InvEntryJobs.PostingDate Into DtaReg ,
+				IM_InvEntryJobs.InvRsn Into Causale ,
+				IM_InvEntryJobs.Qty  Into Quantita ,
+				IM_InvEntryJobs.Receipted Into Entrata ,
+				IM_InvEntryJobs.Storage Into Deposito ,
+				IM_InvEntryJobs.Cancel Into Storno ,
+				IM_InvEntryJobs.UnitValue Into ValUnit ,
+				IM_InvEntryJobs.DiscountFormula Into ScontoFormula ,
+				IM_InvEntryJobs.DiscountAmount Into ImpSconto ,
+				IM_InvEntryJobs.LineAmount Into ImpRiga ,
+				IM_InvEntryJobs.EntryId Into IDMovMag ,
+				IM_InvEntryJobs.Phase Into Fase ,
+				IM_InvEntryJobs.SpecificatorType Into TipoSpecificatore ,
+				IM_InvEntryJobs.Specificator Into Specificatore 
+				Where IM_InvEntryJobs.Storage Between AskDaDeposito And AskADeposito And 
+				IM_InvEntryJobs.PostingDate Between AskDaDataReg And AskADataReg And 
+				IM_InvEntryJobs.Job Between AskDaCommessa And AskACommessa And 
+				IM_InvEntryJobs.CliFor Between AskDaCliente And AskACliente And 
+				IM_InvEntryJobs.Item Between AskArticolo And EndArticolo  
+				Order By  IM_InvEntryJobs.Storage, IM_InvEntryJobs.Item, IM_InvEntryJobs.Job, IM_InvEntryJobs.PostingDate, IM_InvEntryJobs.EntryId ;
+
+			From MA_Items 
+			Select 
+				MA_Items.Description Into DescrizioneArticolo 
+				Where MA_Items.Item == Articolo  ;
+
+			If ( Storno ) 
+				Then E_Quantita = - Quantita  
+				Else E_Quantita = Quantita  ;
+
+			From MA_Storages 
+			Select 
+				MA_Storages.Description Into DescrizioneDepositi 
+				Where MA_Storages.Storage == Deposito  ;
+
+			From MA_InventoryEntries 
+			Select 
+				MA_InventoryEntries.DocumentDate Into DtaDoc ,
+				MA_InventoryEntries.Currency Into w_Currency ,
+				MA_InventoryEntries.FixingDate Into DtaFixing ,
+				MA_InventoryEntries.FixingIsManual Into FixingManuale ,
+				MA_InventoryEntries.Fixing Into Fixing ,
+				DocNo                Into DocNo 
+				Where MA_InventoryEntries.EntryId == IDMovMag  
+				Order By  MA_InventoryEntries.DocNo ;
+
+			E_ValoriDivisa = "Valori Espressi in Divisa " + AskDivisa  ;
+
+			w_FiscalYear = ERP.Company.Dbl.CurrentFiscalYear ( )  ;
+		End
+
+
+		Events
+			FormFeed : Do
+				Before 
+					Begin
+						Display TotE_Quantita ;
+						Display TotF_ImpRiga ;
+						Display TotFase ;
+						Reset TotFase ;
+						Display TotF_Progressivo ;
+						Reset TotF_Progressivo ;
+					End
+
+			Report : Do
+				Always 
+					Begin
+						If Causale is null 
+							Then Causale = ""  ;
+						If Entrata is null 
+							Then Entrata = FALSE  ;
+						If Storno is null 
+							Then Storno = FALSE  ;
+						If Articolo is not null 
+							Then 
+								Begin
+						If Causale = "trasp" 
+							Then F_entrata = 0  ;
+						F_Azione = ERP.Inventory.Components.InventoryValuation_SetReasonTypeForPhase ( h_InventoryByStorage, Causale , Fase , w_ReasonType );
+						If ( Entrata == TRUE ) 
+							Then 
+								Begin
+									F_Carico = TRUE  ;
+									F_Scarico = FALSE  ;
+								End 
+							Else 
+								Begin
+									F_Carico = FALSE  ;
+									F_Scarico = TRUE  ;
+								End ;
+						If ( Storno == TRUE ) 
+							Then 
+								Begin
+									If ( Entrata == TRUE ) 
+										Then 
+											Begin
+												F_Carico = FALSE  ;
+												F_Scarico = TRUE  ;
+											End 
+										Else 
+											Begin
+												F_Carico = TRUE  ;
+												F_Scarico = FALSE  ;
+											End ;
+								End ;
+						If ( Prima == TRUE ) 
+							Then 
+								Begin
+									Giacenza = ERP.Inventory.Components.ItemsBalances_BookInvToDate ( w_ItemsMng, DataInizioLoc , w_FiscalYear , Articolo , Deposito , TipoSpecificatore , Specificatore, '', '', '' )  ;
+									F_Saldo = Giacenza  ;
+									Prima = FALSE  ;
+								End ;
+						Call CalcolaQtaEntrataUscita ;
+						Call CalcolaValoriDivisa ;
+						If Causale == "TRASP" 
+							Then 
+								Begin
+									F_entrata = 0  ;
+									F_saldo = 0  ;
+								End ;
+						If Ask_VisualizzaMovimenti 
+							Then 
+								Begin
+									Display DtaReg ,F_Saldo ,ValUnit ,ScontoFormula ,ImpSconto ,ImpRiga ,F_ImpRiga ,F_ValUnit ,Causale ,Fase ,Specificatore ,TipoSpecificatore ,F_Carico ,F_Scarico ,F_Entrata ,F_Uscita ,DataInizioLoc ,w_FiscalYear ,F_Progressivo ,Storno ,Commessa ,F_Azione ,DocNo ;
+									Display Giacenza ;
+									NextLine ;
+								End ;
+						Eval SubTotF_Entrata ;
+						Eval SubTotF_Uscita ;
+						Reset F_Entrata ;
+						Reset F_Uscita ;
+								End ;
+						Eval TotE_Quantita ;
+						Eval SubTotImpRiga ;
+						Eval SubTotImpSconto ;
+						Eval SubTotValUnit ;
+						Eval SubTotDescrizioneArticolo ;
+						Eval SubTotValUnit_46 ;
+						Eval SubTotImpSconto_46 ;
+						Eval SubTotImpRiga_46 ;
+						Eval SubTotF_ImpRiga ;
+						Eval TotFase ;
+						Eval TotF_Progressivo ;
+							Eval SubTotArticolo ;
+
+						Eval SubTotCommessa ;
+					End
+				Before 
+					Begin
+						DataInizioLoc = AskDaDataReg - 1  ;
+					End
+				After 
+					Begin
+						Display TotF_ImpRiga ;
+						Display TotFase ;
+						Display TotF_Progressivo ;
+						If Causale is null 
+							Then Causale = ""  ;
+						If Causale = "trasp" 
+							Then F_entrata = 0  ;
+					End
+				Finalize 
+					Begin
+
+__DisposeContextHandleOk = ERP.Inventory.Components.InventoryValuation_Dispose(h_InventoryByStorage);
+__DisposeContextHandleOk = ERP.Inventory.Components.ItemsBalances_Dispose(w_ItemsMng);
+__DisposeContextHandleOk = ERP.Currencies.Components.CurrencyManager_Dispose(h_CurrencyManager);
+End
+			CambioCommessa : Breaking Deposito , Commessa , Articolo  Do
+				Before 
+					Begin
+					End
+				After 
+					Begin
+						Prima = TRUE  ;
+					End
+
+			CambioArticolo : Breaking Deposito , Articolo  Do
+				Before 
+					Begin
+						InterLine ;
+						If AskSubTotale = TRUE 
+							Then 
+								Begin
+									If ( F_Saldo > 0 Or AskItemPositive == FALSE ) 
+										Then 
+											Begin
+												Prima = TRUE  ;
+												Display SubTotImpSconto_46 ;
+												Display SubTotImpRiga_46 ;
+												SubTotF_Saldo_46 = F_Saldo  ;
+												Display SubTotF_Saldo_46 ;
+												Display SubTotF_ImpRiga ;
+												TotF_ImpRiga = TotF_ImpRiga + SubTotF_ImpRiga  ;
+												If Articolo is not null 
+													Then 
+														Begin
+															SubTotDescrizioneArticolo_50 = "TOTALE ARTICOLO " + Articolo  ;
+															SubTotArticolo = Articolo  ;
+														End ;
+												If Ask_VisualizzaMovimenti 
+													Then 
+														Begin
+															Reset SubTotArticolo ;
+															Display SubTotDescrizioneArticolo_50 ;
+															Display SubTotF_Entrata ;
+															Display SubTotF_Uscita ;
+															NextLine ;
+															NextLine ;
+														End 
+													Else 
+														Begin
+															SubTotDescrizioneArticolo_50 = "" ;
+																If DescrizioneArticolo is not null 
+																	Then SubTotDescrizioneArticolo_50 = DescrizioneArticolo  ;
+															SubTotCommessa = Commessa  ;
+															Display SubTotArticolo ;
+															Display SubTotDescrizioneArticolo_50 ;
+															Display SubTotCommessa ;
+															Display SubTotF_Entrata ;
+															Display SubTotF_Uscita ;
+															NextLine ;
+														End ;
+											End ;
+								End ;
+					End
+				After 
+					Begin
+						If Ask_VisualizzaMovimenti 
+							Then Display Articolo ,DescrizioneArticolo ;
+						Reset F_Saldo ;
+						Reset SubTotDescrizioneArticolo_50 ;
+						Reset SubTotImpSconto_46 ;
+						Reset SubTotImpRiga_46 ;
+						Reset SubTotF_Saldo_46 ;
+						Reset SubTotF_ImpRiga ;
+						Reset SubTotF_Entrata ;
+						Reset SubTotF_Uscita ;
+					End
+
+			CambioCantiere : Breaking Deposito  Do
+				Before 
+					Begin
+						FormFeed ;
+					End
+				After 
+					Begin
+						Reset TotF_ImpRiga ;
+					End
+
+		End
+
+	Procedures
+		Begin
+			Procedure  CalcolaValoriDivisa 
+				Begin
+					If Storno = TRUE 
+						Then 
+							Begin
+								ValUnit = - ValUnit  ;
+								ImpSconto = - ImpSconto  ;
+							End ;
+					If FixingManuale == False 
+						Then 
+							Begin
+								F_ValUnit = ERP.Currencies.Components.CurrencyManager_ConvertWithSaleFixing ( h_CurrencyManager , w_Currency , ValUnit , DtaFixing , AskDivisa , "" )  ;
+								F_ImpRiga = ERP.Currencies.Components.CurrencyManager_ConvertWithSaleFixing ( h_CurrencyManager , w_Currency , ImpRiga , DtaFixing , AskDivisa , "" )  ;
+								F_ImpSconto = ERP.Currencies.Components.CurrencyManager_ConvertWithSaleFixing ( h_CurrencyManager , w_Currency , ImpSconto , DtaFixing , AskDivisa , "" )  ;
+							End 
+						Else 
+							Begin
+								If AskDivisa = ERP.Currencies.Dbl.BaseCurrency ( ) 
+									Then 
+										Begin
+											F_ValUnit = ValUnit * Fixing  ;
+											F_ValUnit = ERP.Currencies.Components.CurrencyManager_Rounding ( h_CurrencyManager , F_ValUnit )  ;
+											F_ImpRiga = ImpRiga * Fixing  ;
+											F_ImpRiga = ERP.Currencies.Components.CurrencyManager_Rounding ( h_CurrencyManager , F_ImpRiga )  ;
+											F_ImpSconto = ImpSconto * Fixing  ;
+											F_ImpSconto = ERP.Currencies.Components.CurrencyManager_Rounding ( h_CurrencyManager , F_ImpSconto )  ;
+										End 
+									Else 
+										Begin
+											F_ValUnit = ValUnit * Fixing  ;
+											F_ValUnit = ERP.Currencies.Components.CurrencyManager_ConvertDomesticCurrencies ( h_CurrencyManager , F_ValUnit , DtaReg , "" )  ;
+											F_ImpRiga = ImpRiga * Fixing  ;
+											F_ImpRiga = ERP.Currencies.Components.CurrencyManager_ConvertDomesticCurrencies ( h_CurrencyManager , F_ImpRiga , DtaReg , "" )  ;
+											F_ImpSconto = ImpSconto * Fixing  ;
+											F_ImpSconto = ERP.Currencies.Components.CurrencyManager_ConvertDomesticCurrencies ( h_CurrencyManager , F_ImpSconto , DtaReg , "" )  ;
+										End ;
+							End ;
+				End
+
+			Procedure  CalcolaQtaEntrataUscita 
+				Begin
+					If cAUSALE == "trasp" 
+						Then 
+							Begin
+								F_entrata = 0  ;
+								F_Saldo = F_entrata  ;
+							End 
+						Else 
+							Begin
+								If ( F_Carico = False And F_Scarico = False ) 
+									Then 
+										Begin
+											F_Entrata = Quantita  ;
+											Impriga = Impriga  ;
+										End ;
+								If F_Carico = TRUE 
+									Then 
+										Begin
+											F_Entrata = Quantita  ;
+											Impriga = Impriga  ;
+										End ;
+								If F_Scarico = TRUE 
+									Then 
+										Begin
+											F_Uscita = Quantita  ;
+											Impriga = ( - Impriga )  ;
+										End ;
+											F_Saldo = F_Saldo + ( F_Entrata - F_Uscita )  ;
+							End ;
+				End
+
+		End
+	Dialogs
+		Begin
+			Dialog dasda  "Selezioni" 
+				Begin
+					Before 
+						Begin
+						End
+					Controls
+						Begin
+							Begin  "Deposito/Cantiere"  
+								AskDaDeposito Prompt = "Dal Codice" LowerLimit HotLink ERP.MultiStorage.Dbl.Storages ( 0 ) ;
+								AskADeposito Prompt = "Al Codice" UpperLimit HotLink ERP.MultiStorage.Dbl.Storages ( 0 ) ;
+							End
+							Begin  "Commessa"  
+								Ask_AbilitaFiltroComm Prompt = "Abilita filtro commesse" ;
+								AskDaCommessa Prompt = "Dal Codice" LowerLimit ReadOnly Ask_AbilitaFiltroComm == false  HotLink ERP.Jobs.Dbl.Jobs ( 0 ) ;
+								AskACommessa Prompt = "Al Codice" UpperLimit ReadOnly Ask_AbilitaFiltroComm == false  HotLink ERP.Jobs.Dbl.Jobs ( 0 ) ;
+							End
+							Begin  "Cliente"  
+								AskDaCliente Prompt = "Dal Codice" LowerLimit HotLink ERP.CustomersSuppliers.Dbl.CustSupp ( 0 , 0 ) ;
+								AskACliente Prompt = "Al Codice" UpperLimit HotLink ERP.CustomersSuppliers.Dbl.CustSupp ( 0 , 0 ) ;
+							End
+							Begin  "Articoli"  
+								AskArticolo Prompt = "Da Articolo" LowerLimit HotLink ERP.Items.Dbl.Items ( 0 ) ;
+								EndArticolo Prompt = "A Articolo" UpperLimit HotLink ERP.Items.Dbl.Items ( 0 ) ;
+							End
+						End
+					After 
+						Begin
+						End
+				End
+			Dialog adas  "Selezioni" 
+				Begin
+					Before 
+						Begin
+						End
+					Controls
+						Begin
+							Begin  "Data Registrazione"  
+								AskDaDataReg Prompt = "Dalla Data" ;
+								AskADataReg Prompt = "Alla Data" ;
+							End
+							Begin  "Visualizza Movimenti"  
+								Ask_VisualizzaMovimenti Style = 1 Prompt = "Si" ;
+								Ask_NoVisualizzaMovimenti Style = 1 Prompt = "No" ;
+							End
+							Begin  "Visualizza Articoli Positivi"  
+								AskItemPositive Style = 1 Prompt = "Visualizza Solo Articoli Positivi" ;
+								NoAskItemPositive Style = 1 Prompt = "Visualizza Tutti gli articoli" ;
+							End
+							Begin  "Visualizza SubTotali"  
+								AskSubTotale Style = 1 Prompt = "Si" ;
+								EndSubTotale Style = 1 Prompt = "No" ;
+							End
+							Begin  "Valori Espressi in Divisa"  
+								AskDivisa Prompt = "Divisa" HotLink ERP.Currencies.Dbl.CompanyCurrencies ( ) ;
+							End
+						End
+					After 
+						Begin
+						End
+				End
+		End
+End
+
