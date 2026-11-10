@@ -22,7 +22,11 @@ var INVENTRACK_CONFIG = {
   // File per il gestionale: una riga per articolo, nel formato
   //   "CODICE" ; quantità; valore unitario
   // con 15 decimali e il punto come separatore decimale.
-  csvDecimali: 15
+  csvDecimali: 15,
+
+  // Versione mostrata in fondo alla pagina: aumentarla a ogni modifica,
+  // insieme al numero ?v= di inventrack.js in index.html.
+  versione: "1.5"
 };
 
 (function(){
@@ -58,6 +62,11 @@ var INVENTRACK_CONFIG = {
     return n;
   }
   function svuota(n){ while(n.firstChild) n.removeChild(n.firstChild); return n; }
+  // Come append, ma salta gli elementi vuoti (append scriverebbe "null" come testo).
+  function accoda(n){
+    for(var i = 1; i < arguments.length; i++) if(arguments[i]) n.appendChild(arguments[i]);
+    return n;
+  }
 
   function memoria(chiave, valore){
     try{
@@ -304,13 +313,14 @@ var INVENTRACK_CONFIG = {
       var stato = inv.stato === "chiuso" ? el("span", { class: "chip", text: "Chiuso" })
         : inv.data === oggi() ? el("span", { class: "chip ok", text: "Oggi" })
         : el("span", { class: "chip warn", text: "Non di oggi" });
-      lista.appendChild(el("button", { type: "button", class: "inv", onclick: function(){ location.hash = "i=" + encodeURIComponent(inv.id); } },
+      lista.appendChild(el("div", { class: "invbox" }, el("button", { type: "button", class: "inv", onclick: function(){ location.hash = "i=" + encodeURIComponent(inv.id); } },
         el("div", { class: "riga spazio" }, el("strong", { text: titoloInv(inv) }), stato),
         el("div", { class: "hint", text: [dataIt(inv.data), inv.deposito && "deposito " + inv.deposito, inv.creatoDa].filter(Boolean).join(" · ") }),
         el("div", { class: "barra" }, el("i", { style: "width:" + perc + "%" })),
         el("div", { class: "riga spazio hint" },
           el("span", { text: fmt(inv.contati || 0) + " contati su " + fmt(inv.righe) + " articoli" }),
-          inv.differenze ? el("span", { class: "chip diff", text: fmt(inv.differenze) + " differenze" }) : null)));
+          inv.differenze ? el("span", { class: "chip diff", text: fmt(inv.differenze) + " differenze" }) : null)),
+        el("div", { class: "riga" }, el("button", { type: "button", class: "linkbtn elimina", text: "🗑 Elimina inventario", onclick: function(){ elimina(inv); } }))));
     });
   }
   $("nuovoBtn").addEventListener("click", function(){ location.hash = "nuovo"; });
@@ -696,13 +706,67 @@ var INVENTRACK_CONFIG = {
     $("codice").focus();
   }
 
+  /* ---------- Commesse collegate (varianti) ----------
+   * S1852V12 è collegata alla commessa S1852. Se nello stesso giorno ci
+   * sono inventari di commesse collegate, un codice che manca in uno ma c'è nel
+   * report dell'altro viene segnalato: probabilmente va contato là. */
+  // Una commessa è collegata a tutte quelle il cui codice inizia con il suo
+  // (S1852 con S1852V12 e S1852V31); due varianti tra loro non lo sono.
+  function collegate(a, b){
+    a = R.codice(a); b = R.codice(b);
+    return !!a && !!b && a !== b && (a.indexOf(b) === 0 || b.indexOf(a) === 0);
+  }
+
+  var collegatiCache = null;
+  async function inventariCollegati(){
+    var inv = S.inv;
+    if(inv.tipo !== "commessa") return [];
+    if(collegatiCache && collegatiCache.id === inv.id && Date.now() - collegatiCache.t < 60000) return collegatiCache.v;
+    var lista;
+    try{ lista = inProva() ? ((await kv.get("lista")) || []) : (await api("GET", "/inventari")).inventari; }
+    catch(_){ lista = (await kv.get("lista")) || []; }
+    var out = [];
+    for(var i = 0; i < lista.length; i++){
+      var x = lista[i];
+      if(x.id === inv.id || x.tipo !== "commessa" || x.data !== inv.data || !collegate(x.commessa, inv.commessa)) continue;
+      var loc = await kv.get("inv:" + x.id), righe = loc && loc.righe;
+      if(!righe && !inProva()){
+        try{
+          righe = (await api("GET", "/inventari/" + x.id + "/report")).righe;
+          await kv.set("inv:" + x.id, { inv: x, righe: righe });
+        }catch(_){}
+      }
+      if(righe) out.push({ inv: x, righe: righe });
+    }
+    collegatiCache = { id: inv.id, t: Date.now(), v: out };
+    return out;
+  }
+
+  async function cercaCollegati(r){
+    var box = $("collegati"), trovati = [];
+    if(!box) return;
+    try{
+      (await inventariCollegati()).forEach(function(c){
+        var t = R.cerca([r.codice], c.righe).filter(function(x){ return x.punti >= 90; })[0];
+        if(t) trovati.push({ inv: c.inv, riga: t.riga });
+      });
+    }catch(_){}
+    if(S.scheda !== r || $("collegati") !== box) return; // nel frattempo si è cambiato articolo
+    trovati.forEach(function(t){
+      box.appendChild(el("div", { class: "avviso errore" },
+        el("b", { text: "⚠️ Il codice è nel report della commessa collegata " + t.inv.commessa }),
+        el("span", { text: "Lo stesso giorno (" + dataIt(t.inv.data) + ") esiste anche l'inventario della commessa " + t.inv.commessa + ", collegata alla " + S.inv.commessa + ". Nel suo report c'è " + t.riga.codice + (t.riga.descrizione ? " (" + t.riga.descrizione + ")" : "") + ", giacenza attesa " + fmt(t.riga.attesa) + ". Probabilmente l'articolo appartiene a quella commessa e va contato là. Aggiungilo qui sotto solo se sei sicuro che sia della " + S.inv.commessa + "." }),
+        el("div", { class: "riga" }, el("a", { class: "btn small primary", href: "#i=" + encodeURIComponent(t.inv.id), text: "Apri l'inventario " + t.inv.commessa }))));
+    });
+  }
+
   function disegnaScheda(){
     var box = svuota($("scheda")), r = S.scheda;
     box.hidden = !r;
     $("suggerimenti").hidden = !!r;
     if(!r) return;
     var c = conteggioDi(r), perche = blocco(), st = statoRiga(r);
-    box.append(
+    accoda(box,
       el("div", { class: "riga spazio" },
         el("span", { class: "scheda-codice", text: r.codice }),
         el("span", { class: "riga" },
@@ -710,13 +774,15 @@ var INVENTRACK_CONFIG = {
           r.extra ? el("span", { class: "chip warn", text: "Non nel report" }) : null)),
       r.nuovo ? null : el("div", { text: r.descrizione }));
     if(r.nuovo){
-      box.append(
+      accoda(box,
+        el("div", { id: "collegati", style: "display:grid;gap:10px" }),
         el("div", { class: "avviso", text: "Questo codice non è nel report del gestionale. Controlla di averlo scritto bene: se l'articolo c'è davvero in magazzino, scrivi la quantità trovata." }),
         el("label", { class: "field" }, el("span", { class: "flabel", text: "Descrizione (facoltativa)" }), el("input", { type: "text", id: "sDescr", maxlength: "300" })),
         S.inv.tipo === "generale" ? el("label", { class: "field" }, el("span", { class: "flabel", text: "Commessa (facoltativa)" }), el("input", { type: "text", id: "sCommessa", class: "maiuscolo", maxlength: "30" })) : null);
     } else {
       box.appendChild(el("div", { class: "attesa" }, el("small", { text: "Giacenza attesa" }), el("b", { text: fmt(r.attesa) })));
     }
+    if(r.nuovo) cercaCollegati(r);
     if(c){
       var d = c.reale - r.attesa;
       box.appendChild(el("div", { class: "avviso " + (st === "diff" ? "errore" : "bene") },
@@ -965,19 +1031,24 @@ var INVENTRACK_CONFIG = {
     disegnaInventario();
   }
 
-  async function elimina(){
-    var inv = S.inv;
-    if(prompt("Eliminare definitivamente questo inventario con tutte le quantità contate?\nPer confermare scrivi ELIMINA.") !== "ELIMINA") return;
+  async function elimina(inv){
+    inv = inv || S.inv;
+    if(prompt("Eliminare definitivamente l'inventario " + titoloInv(inv) + " del " + dataIt(inv.data) + " con tutte le quantità contate?\nL'operazione non si può annullare. Per confermare scrivi ELIMINA.") !== "ELIMINA") return;
     try{
       if(inProva()) await kv.set("lista", ((await kv.get("lista")) || []).filter(function(x){ return x.id !== inv.id; }));
-      else await api("DELETE", "/inventari/" + inv.id);
+      else{
+        try{ await api("DELETE", "/inventari/" + inv.id); }
+        catch(e){ if(e.status !== 404) throw e; } // già eliminato da un altro dispositivo
+        await kv.set("lista", ((await kv.get("lista")) || []).filter(function(x){ return x.id !== inv.id; }));
+      }
       S.coda = S.coda.filter(function(x){ return x.inv !== inv.id; });
       await kv.set("coda", S.coda);
       await kv.del("inv:" + inv.id);
       await kv.del("cnt:" + inv.id);
-      S.inv = null;
+      if(S.inv && S.inv.id === inv.id) S.inv = null;
+      collegatiCache = null;
       toast("Inventario eliminato");
-      location.hash = "";
+      if(location.hash.replace(/^#/, "") === "") apriHome(); else location.hash = "";
     }catch(e){ if(e.status !== 401) toast(e.message, true); }
   }
 
@@ -1029,7 +1100,7 @@ var INVENTRACK_CONFIG = {
           : el("button", { class: "btn", type: "button", text: "🔒 Chiudi l'inventario", onclick: function(){
               if(confirm(n.da ? "Mancano ancora " + n.da + " articoli da contare. Chiudere comunque l'inventario?" : "Chiudere l'inventario?")) cambiaStato("chiuso");
             } }),
-        el("button", { class: "btn pericolo", type: "button", text: "Elimina", onclick: elimina }))));
+        el("button", { class: "btn pericolo", type: "button", text: "🗑 Elimina inventario", onclick: function(){ elimina(S.inv); } }))));
   }
 
   /* ---------- Invio e lettura dei conteggi ---------- */
@@ -1308,6 +1379,8 @@ var INVENTRACK_CONFIG = {
 
   // Per le prove automatiche.
   window.InvenTrack = { stato: S, righeCsv: righeCsv, decimali: decimali, quantitaScritta: quantitaScritta };
+
+  $("versione").textContent = "SICIET InvenTrack · versione " + CONFIG.versione;
 
   naviga();
 })();
