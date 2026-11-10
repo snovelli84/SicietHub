@@ -26,7 +26,7 @@ var INVENTRACK_CONFIG = {
 
   // Versione mostrata in fondo alla pagina: aumentarla a ogni modifica,
   // insieme al numero ?v= di inventrack.js in index.html.
-  versione: "1.5"
+  versione: "1.6"
 };
 
 (function(){
@@ -219,7 +219,7 @@ var INVENTRACK_CONFIG = {
   }
 
   function mostraAccesso(errore){
-    intestazione("Inventario di magazzino", "Magazzino generale e magazzini di commessa");
+    intestazione("Inventario di magazzino", "Magazzino aziendale e magazzini di commessa");
     $("utente").hidden = true;
     $("operatore").value = operatore();
     $("pwd").value = "";
@@ -264,7 +264,7 @@ var INVENTRACK_CONFIG = {
 
   /* ---------- Elenco degli inventari ---------- */
 
-  function titoloInv(inv){ return inv.tipo === "commessa" ? "Commessa " + inv.commessa : "Magazzino generale"; }
+  function titoloInv(inv){ return inv.tipo === "commessa" ? "Commessa " + inv.commessa : "Magazzino aziendale"; }
 
   async function contaLocale(inv){
     var d = await kv.get("cnt:" + inv.id), n = { contati: 0, differenze: 0 };
@@ -279,7 +279,7 @@ var INVENTRACK_CONFIG = {
 
   async function apriHome(){
     S.inv = null;
-    intestazione("Inventario di magazzino", "Magazzino generale e magazzini di commessa");
+    intestazione("Inventario di magazzino", "Magazzino aziendale e magazzini di commessa");
     $("provaAvviso").hidden = !inProva();
     $("offlineAvviso").hidden = true;
     mostra("vHome");
@@ -422,7 +422,8 @@ var INVENTRACK_CONFIG = {
         el("b", { text: "Report letto: " + fmt(sel.righe.length) + " articoli" + (valore ? ", valore " + euro(valore) : "") }),
         el("span", { text: [r.nome,
           r.info.deposito && "deposito " + r.info.deposito,
-          commesse.length <= 4 ? "commesse: " + commesse.map(function(c){ return c || "(nessuna)"; }).join(", ") : commesse.length + " commesse",
+          commesse.filter(Boolean).length && (commesse.length <= 4 ? "commesse: " + commesse.map(function(c){ return c || "(nessuna)"; }).join(", ") : commesse.length + " commesse"),
+          r.info.tipo === "valorizzazione" && "giacenza al " + dataIt(r.info.finoAl),
           r.info.stampatoIl && "stampato il " + dataIt(r.info.stampatoIl)].filter(Boolean).join(" · ") })));
       var avvisi = [];
       if(tipo === "commessa"){
@@ -434,7 +435,7 @@ var INVENTRACK_CONFIG = {
         avvisi.push("Il report è stato stampato per la sola commessa " + commesse[0] + ": se è l'inventario di quella commessa scegli “Magazzino di commessa”.");
       }
       if(r.info.stampatoIl && data && r.info.stampatoIl !== data) avvisi.push("Il report è stato stampato il " + dataIt(r.info.stampatoIl) + ", ma la data dell'inventario è il " + dataIt(data) + ": le giacenze attese potrebbero non essere quelle giuste. Meglio ristampare il report il giorno dell'inventario.");
-      if(r.info.finoAl && data && r.info.finoAl < data) avvisi.push("Il report considera i movimenti solo fino al " + dataIt(r.info.finoAl) + ".");
+      if(r.info.finoAl && data && r.info.finoAl < data) avvisi.push("Il report considera i movimenti solo fino al " + dataIt(r.info.finoAl) + ", ma l'inventario è del " + dataIt(data) + ": i movimenti successivi non sono compresi e le differenze potrebbero non essere vere. Meglio ristampare il report alla data dell'inventario.");
       if(data && data !== oggi()) avvisi.push("La data dell'inventario non è oggi (" + dataIt(oggi()) + ").");
       if(r.info.ripetuti) avvisi.push(fmt(r.info.ripetuti) + " righe ripetevano lo stesso articolo e la stessa commessa: le quantità sono state sommate.");
       if(avvisi.length) esito.appendChild(el("div", { class: "avviso" }, el("ul", {}, ...avvisi.map(function(a){ return el("li", { text: a }); }))));
@@ -651,12 +652,14 @@ var INVENTRACK_CONFIG = {
     return max ? out.slice(0, max) : out;
   }
 
+  function conUm(n, r){ return fmt(n) + (r.um ? " " + r.um : ""); }
+
   function voce(r, onclick){
     var c = conteggioDi(r), st = statoRiga(r), qta = el("span", { class: "qta" });
     if(c){
-      qta.append(el("span", { text: fmt(r.attesa) + " → " + fmt(c.reale) }),
+      qta.append(el("span", { text: fmt(r.attesa) + " → " + conUm(c.reale, r) }),
         st === "diff" ? el("span", { class: "chip diff", text: fmtDiff(c.reale - r.attesa) }) : el("span", { class: "chip ok", text: "✓ confermata" }));
-    } else qta.append(el("span", { text: "attesa " + fmt(r.attesa) }), el("span", { class: "chip", text: "da contare" }));
+    } else qta.append(el("span", { text: "attesa " + conUm(r.attesa, r) }), el("span", { class: "chip", text: "da contare" }));
     return el("button", { type: "button", class: "voce", onclick: onclick },
       el("span", { class: "cod", text: r.codice + (S.inv.tipo === "generale" && r.commessa ? "  · " + r.commessa : "") }),
       el("span", { class: "des", text: (r.extra ? "Non nel report · " : "") + r.descrizione }),
@@ -780,7 +783,7 @@ var INVENTRACK_CONFIG = {
         el("label", { class: "field" }, el("span", { class: "flabel", text: "Descrizione (facoltativa)" }), el("input", { type: "text", id: "sDescr", maxlength: "300" })),
         S.inv.tipo === "generale" ? el("label", { class: "field" }, el("span", { class: "flabel", text: "Commessa (facoltativa)" }), el("input", { type: "text", id: "sCommessa", class: "maiuscolo", maxlength: "30" })) : null);
     } else {
-      box.appendChild(el("div", { class: "attesa" }, el("small", { text: "Giacenza attesa" }), el("b", { text: fmt(r.attesa) })));
+      box.appendChild(el("div", { class: "attesa" }, el("small", { text: "Giacenza attesa" + (r.um ? " (" + r.um + ")" : "") }), el("b", { text: fmt(r.attesa) })));
     }
     if(r.nuovo) cercaCollegati(r);
     if(c){
@@ -898,7 +901,7 @@ var INVENTRACK_CONFIG = {
         : r.extra ? "Non presente nel report"
         : Math.abs(diff) <= TOLLERANZA ? "Confermata" : "Differenza";
       return {
-        codice: r.codice, descrizione: r.descrizione, commessa: r.commessa, attesa: r.attesa, reale: reale, diff: diff,
+        codice: r.codice, descrizione: r.descrizione, commessa: r.commessa, um: r.um || "", attesa: r.attesa, reale: reale, diff: diff,
         valore: r.valore, valoreDiff: diff === null ? null : Math.round(diff * r.valore * 100) / 100, esito: esito,
         operatore: c ? c.operatore : "", quando: c ? c.quando : "", nota: c ? c.nota : "",
         fuoriData: !!c && giornoDi(c.quando) !== S.inv.data
@@ -906,12 +909,12 @@ var INVENTRACK_CONFIG = {
     });
   }
   function nomeFile(suffisso, est){
-    var inv = S.inv, base = "Inventario " + (inv.tipo === "commessa" ? inv.commessa : "magazzino generale") + (inv.deposito ? " " + inv.deposito : "") + " " + inv.data;
+    var inv = S.inv, base = "Inventario " + (inv.tipo === "commessa" ? inv.commessa : "magazzino aziendale") + (inv.deposito ? " " + inv.deposito : "") + " " + inv.data;
     return (base + (suffisso ? " - " + suffisso : "")).replace(/[\\/:*?"<>|]/g, "-") + "." + est;
   }
 
   var COLONNE = [
-    ["Codice", 22, "codice"], ["Descrizione", 48, "descrizione"], ["Commessa", 12, "commessa"],
+    ["Codice", 22, "codice"], ["Descrizione", 48, "descrizione"], ["Commessa", 12, "commessa"], ["U.M.", 7, "um"],
     ["Giacenza attesa", 13, "attesa", "q"], ["Giacenza reale", 13, "reale", "q"], ["Differenza", 12, "diff", "q"],
     ["Valore unitario", 13, "valore", "v"], ["Valore differenza", 14, "valoreDiff", "e"], ["Esito", 24, "esito"],
     ["Contato da", 20, "operatore"], ["Data e ora del conteggio", 18, "quando", "d"], ["Note", 36, "nota"]
@@ -945,8 +948,9 @@ var INVENTRACK_CONFIG = {
         if(c[3] === "e") cella.numFmt = "#,##0.00";
       });
       var colore = x.esito === "Confermata" ? null : x.diff === null ? "FFFFF4D6" : Math.abs(x.diff) > TOLLERANZA ? "FFFBE4E2" : null;
-      if(colore) [5, 6, 8, 9].forEach(function(j){ rg.getCell(j).fill = { type: "pattern", pattern: "solid", fgColor: { argb: colore } }; });
-      if(x.diff !== null && Math.abs(x.diff) > TOLLERANZA) rg.getCell(6).font = { bold: true, color: { argb: "FFB3261E" } };
+      var col = function(k){ return COLONNE.findIndex(function(c){ return c[2] === k; }) + 1; };
+      if(colore) ["reale", "diff", "valoreDiff", "esito"].forEach(function(k){ rg.getCell(col(k)).fill = { type: "pattern", pattern: "solid", fgColor: { argb: colore } }; });
+      if(x.diff !== null && Math.abs(x.diff) > TOLLERANZA) rg.getCell(col("diff")).font = { bold: true, color: { argb: "FFB3261E" } };
     });
     ws.autoFilter = { from: { row: rigaTitoli, column: 1 }, to: { row: rigaTitoli + righe.length, column: COLONNE.length } };
     return ws;
@@ -957,7 +961,7 @@ var INVENTRACK_CONFIG = {
     var inv = S.inv, righe = righeEsporta(nonContatiZero), n = numeri(), wb = new window.ExcelJS.Workbook();
     wb.creator = "SICIET InvenTrack";
     wb.created = new Date();
-    var titolo = "SICIET InvenTrack – Inventario " + (inv.tipo === "commessa" ? "della commessa " + inv.commessa : "del magazzino generale");
+    var titolo = "SICIET InvenTrack – Inventario " + (inv.tipo === "commessa" ? "della commessa " + inv.commessa : "del magazzino aziendale");
     var testa = [titolo,
       "Data dell'inventario: " + dataIt(inv.data) + (inv.deposito ? " · Deposito: " + inv.deposito : "") + " · Stato: " + (inv.stato === "chiuso" ? "chiuso" : "aperto"),
       "Report del gestionale: " + [inv.report.nome, inv.report.stampatoIl && "stampato il " + dataIt(inv.report.stampatoIl)].filter(Boolean).join(", "),
@@ -990,8 +994,8 @@ var INVENTRACK_CONFIG = {
     return d > 6 ? s + new Array(d - 6 + 1).join("0") : s;
   }
   var CSV_TIPI = {
-    piu: ["Differenze in più (da caricare)", "differenze in piu"],
-    meno: ["Differenze in meno (da scaricare)", "differenze in meno"],
+    piu: ["Movimento positivo (differenze in più)", "movimento positivo"],
+    meno: ["Movimento negativo (differenze in meno)", "movimento negativo"],
     reali: ["Giacenze reali di tutti gli articoli contati", "giacenze reali"]
   };
   function righeCsv(tipo, nonContatiZero){
@@ -1079,16 +1083,25 @@ var INVENTRACK_CONFIG = {
       catch(e){ toast(e.message || String(e), true); }
       finally{ btn.disabled = false; }
     }
-    var tipo = el("select", { id: "eTipo" }, ...Object.keys(CSV_TIPI).map(function(k){ return el("option", { value: k, text: CSV_TIPI[k][0] }); }));
     box.appendChild(el("div", { class: "card" },
       el("h2", { text: "Excel dell'inventario" }),
       el("p", { class: "hint", text: "Tutti gli articoli con giacenza attesa, giacenza reale, differenza, valore, chi ha contato e quando; un secondo foglio con le sole differenze e un riepilogo." }),
       el("button", { class: "btn primary", type: "button", text: "⬇️ Scarica Excel", onclick: function(){ var b = this; prima(b, function(){ return scaricaExcel(zero.checked); }); } })));
+    var nPiu = righeCsv("piu", zero.checked).length, nMeno = righeCsv("meno", zero.checked).length;
+    function bottoneCsv(tipo, quanti, primario){
+      return el("button", { class: "btn" + (primario ? " primary" : ""), type: "button", disabled: !quanti, text: "⬇️ " + CSV_TIPI[tipo][0].split(" (")[0] + " (" + fmt(quanti) + (quanti === 1 ? " articolo)" : " articoli)"),
+        onclick: function(){ var b = this; prima(b, function(){ scaricaCsv(tipo, zero.checked); }); } });
+    }
     box.appendChild(el("div", { class: "card" },
-      el("h2", { text: "File per il gestionale" }),
-      el("p", { class: "hint", text: "File CSV da importare nel gestionale, una riga per articolo: \"codice\" ; quantità ; valore unitario. Le differenze in più e in meno sono in due file separati, con le quantità sempre positive." }),
-      tipo,
-      el("button", { class: "btn", type: "button", text: "⬇️ Scarica CSV", onclick: function(){ var b = this; prima(b, function(){ scaricaCsv(tipo.value, zero.checked); }); } })));
+      el("h2", { text: "Movimenti d'inventario per il gestionale" }),
+      el("p", { class: "hint", text: "Due file CSV da importare nel gestionale, una riga per articolo: \"codice\" ; quantità ; valore unitario. Uno con le differenze in più (movimento positivo) e uno con le differenze in meno (movimento negativo), con le quantità sempre positive." }),
+      bottoneCsv("piu", nPiu, true),
+      bottoneCsv("meno", nMeno, true),
+      el("button", { class: "btn", type: "button", disabled: !nPiu && !nMeno, text: "⬇️ Scarica entrambi", onclick: function(){
+        var b = this;
+        prima(b, async function(){ if(nPiu) scaricaCsv("piu", zero.checked); if(nPiu && nMeno) await new Promise(function(r){ setTimeout(r, 700); }); if(nMeno) scaricaCsv("meno", zero.checked); });
+      } }),
+      el("button", { class: "linkbtn", type: "button", text: "Scarica invece le giacenze reali di tutti gli articoli contati", onclick: function(){ var b = this; prima(b, function(){ scaricaCsv("reali", zero.checked); }); } })));
     box.appendChild(el("div", { class: "card" },
       el("h2", { text: inv.stato === "chiuso" ? "Inventario chiuso" : "Chiudi l'inventario" }),
       el("p", { class: "hint", text: inv.stato === "chiuso"

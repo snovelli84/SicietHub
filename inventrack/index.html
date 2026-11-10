@@ -238,7 +238,7 @@ footer{max-width:900px;margin:0 auto;padding:0 16px calc(24px + env(safe-area-in
       <div class="user" id="utente" hidden><span id="utenteNome"></span><button type="button" id="utenteCambia">Cambia</button></div>
     </div>
     <h1 id="titolo">Inventario di magazzino</h1>
-    <p id="sottotitolo">Magazzino generale e magazzini di commessa</p>
+    <p id="sottotitolo">Magazzino aziendale e magazzini di commessa</p>
   </div>
 </header>
 
@@ -273,7 +273,7 @@ footer{max-width:900px;margin:0 auto;padding:0 16px calc(24px + env(safe-area-in
       <div class="field">
         <span class="flabel">Quale magazzino?</span>
         <div class="choices">
-          <label class="choice"><input type="radio" name="tipo" value="generale"><span>Magazzino generale<small>Tutti gli articoli del deposito</small></span></label>
+          <label class="choice"><input type="radio" name="tipo" value="generale"><span>Magazzino aziendale<small>Tutti gli articoli del magazzino</small></span></label>
           <label class="choice"><input type="radio" name="tipo" value="commessa"><span>Magazzino di commessa<small>Solo gli articoli di una commessa</small></span></label>
         </div>
       </div>
@@ -287,9 +287,9 @@ footer{max-width:900px;margin:0 auto;padding:0 16px calc(24px + env(safe-area-in
       </div>
       <p class="hint">L'inventario vale per il giorno in cui viene fatto: le giacenze attese sono quelle del report caricato qui sotto, che va stampato dal gestionale lo stesso giorno.</p>
       <div class="field">
-        <span class="flabel">Report del gestionale (Analisi Andamento Giacenza)</span>
+        <span class="flabel">Report del gestionale</span>
         <input type="file" id="nFile" accept=".pdf,.xlsx,.csv,application/pdf">
-        <span class="hint">Il PDF stampato dal gestionale, oppure lo stesso report esportato in Excel (.xlsx) o CSV con le colonne Articolo, Descrizione, Commessa e Saldo.</span>
+        <span class="hint">Il PDF stampato dal gestionale: <i>Analisi Andamento Giacenza</i> (per commessa) oppure <i>Valorizzazione a costi</i> (magazzino aziendale). In alternativa lo stesso report esportato in Excel (.xlsx) o CSV, con le colonne Articolo, Descrizione e Saldo (o Giacenza alla data).</span>
       </div>
       <div id="nEsito" style="display:grid;gap:10px"></div>
       <label class="field"><span class="flabel">Note (facoltative)</span>
@@ -366,7 +366,7 @@ footer{max-width:900px;margin:0 auto;padding:0 16px calc(24px + env(safe-area-in
 
 <div id="toast" role="status" hidden></div>
 
-<script src="report.js?v=1"></script>
-<script src="inventrack.js?v=5"></script>
+<script src="report.js?v=2"></script>
+<script src="inventrack.js?v=6"></script>
 </body>
 </html>

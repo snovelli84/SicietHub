@@ -104,7 +104,7 @@ function rigaReport(r){
   if(!r || typeof r !== "object") throw new Errore(400, "Riga del report non valida.");
   const codice = testo(r.codice, 80).toUpperCase();
   if(!codice) throw new Errore(400, "Riga del report senza codice.");
-  return { codice, descrizione: testo(r.descrizione, 400), commessa: testo(r.commessa, 40).toUpperCase(), attesa: quantita(r.attesa), valore: quantita(r.valore === undefined ? 0 : r.valore) };
+  return { codice, descrizione: testo(r.descrizione, 400), commessa: testo(r.commessa, 40).toUpperCase(), attesa: quantita(r.attesa), valore: quantita(r.valore === undefined ? 0 : r.valore), um: testo(r.um, 12).toUpperCase() };
 }
 function conteggio(c){
   if(!c || typeof c !== "object") throw new Errore(400, "Conteggio non valido.");

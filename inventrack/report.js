@@ -59,30 +59,46 @@
     return out;
   }
 
-  function riga(codice, descrizione, commessa, saldo, unitario, totale){
+  function riga(codice, descrizione, commessa, saldo, unitario, totale, um){
     var valore = 0;
     if(unitario !== null && unitario !== undefined) valore = unitario;
     else if(totale !== null && totale !== undefined && saldo) valore = arrotonda(totale / saldo, 6);
-    return { codice: codicePulito(codice), descrizione: pulisci(descrizione), commessa: codicePulito(commessa), attesa: saldo || 0, valore: valore };
+    var r = { codice: codicePulito(codice), descrizione: pulisci(descrizione), commessa: codicePulito(commessa), attesa: saldo || 0, valore: valore };
+    if(um) r.um = pulisci(um).toUpperCase();
+    return r;
   }
 
-  /* ---------- PDF ---------- */
-
-  var NUMERICHE = ["Iniziale", "DocNo", "Entrata", "Uscita", "Saldo", "Unitario", "% Sc", "Totale Riga"];
+  /* ---------- PDF ----------
+   * Due report del gestionale, riconosciuti dalle intestazioni delle colonne:
+   *   "analisi"        Analisi Andamento Giacenza (per deposito e commessa):
+   *                    Articolo, Descrizione, Commessa, …, Saldo, …, Totale Riga
+   *   "valorizzazione" Valorizzazione a costi (magazzino aziendale, senza commessa):
+   *                    Articolo, Descrizione, Cat. merc., Un. mis., Giacenza alla data,
+   *                    Valore alla data (il valore unitario è Valore / Giacenza)
+   */
+  var NUM_ANALISI = ["Iniziale", "DocNo", "Entrata", "Uscita", "Saldo", "Unitario", "% Sc", "Totale Riga"];
+  var NUM_VALORIZZ = ["Giacenza iniziale", "Giacenza alla data", "Valore alla data", "Valore Giacenza Iniziale"];
 
   function colonne(items){
-    var c = { num: [] }, y = null;
+    var c = { num: [], tipo: "" }, y = null, commesse = [];
     items.forEach(function(i){
       var s = pulisci(i.s);
       if(s === "Articolo"){ c.fineCodice = i.x + i.w; y = y === null ? i.y : Math.min(y, i.y); }
-      else if(/^Commessa\b/.test(s) && c.commessa === undefined) c.commessaTmp = c.commessaTmp ? c.commessaTmp.concat(i) : [i];
-      else if(NUMERICHE.indexOf(s) >= 0){ c.num.push({ nome: s, destra: i.x + i.w, x: i.x }); y = y === null ? i.y : Math.min(y, i.y); }
+      else if(/^Commessa\b/.test(s)) commesse.push(i);
+      else if(s === "Un. mis.") c.umX = i.x;
+      else if(s === "Cat. merc.") c.catX = i.x;
+      else if(NUM_ANALISI.indexOf(s) >= 0 || NUM_VALORIZZ.indexOf(s) >= 0){ c.num.push({ nome: s, destra: i.x + i.w, x: i.x }); y = y === null ? i.y : Math.min(y, i.y); }
     });
-    if(c.fineCodice === undefined || !c.num.some(function(n){ return n.nome === "Saldo"; })) return null;
+    if(c.fineCodice === undefined) return null;
+    var nomi = c.num.map(function(n){ return n.nome; });
+    if(nomi.indexOf("Saldo") >= 0) c.tipo = "analisi";
+    else if(nomi.indexOf("Giacenza alla data") >= 0) c.tipo = "valorizzazione";
+    else return null;
     // "Commessa" compare anche nelle selezioni in alto: serve quella sulla riga delle intestazioni.
-    var vicina = (c.commessaTmp || []).filter(function(i){ return Math.abs(i.y - y) < 12; })[0];
+    var vicina = commesse.filter(function(i){ return Math.abs(i.y - y) < 12; })[0];
     c.commessa = vicina ? vicina.x - 8 : null;
     c.inizioNumeri = Math.min.apply(null, c.num.map(function(n){ return n.x; })) - 20;
+    c.umInizio = c.umX !== undefined ? c.umX - 8 : c.inizioNumeri;
     c.y = y;
     return c;
   }
@@ -95,48 +111,119 @@
     return v ? pulisci(v.s) : "";
   }
 
+  // Nel report di valorizzazione la categoria merceologica sta in una colonna
+  // a destra della descrizione: si riconosce perché inizia sempre alla stessa
+  // posizione. Con descrizioni lunghe può finire attaccata alla descrizione.
+  function colonnaCategoria(gruppi, col, prec){
+    if(col.catX === undefined) return null;
+    var conta = {};
+    gruppi.forEach(function(g){
+      g.items.forEach(function(i){
+        if(i.x >= col.catX - 40 && i.x < col.umInizio && i.x >= col.fineCodice){
+          var k = Math.round(i.x), t = pulisci(i.s);
+          var o = conta[k] = conta[k] || { n: 0, x: i.x, testi: {} };
+          o.n++;
+          o.testi[t] = (o.testi[t] || 0) + 1;
+        }
+      });
+    });
+    var best = null;
+    Object.keys(conta).forEach(function(k){ if(!best || conta[k].n > best.n) best = conta[k]; });
+    if(best && best.n >= 2){
+      var testo = Object.keys(best.testi).sort(function(a, b){ return best.testi[b] - best.testi[a]; })[0];
+      return { x: best.x, testo: testo };
+    }
+    return prec || null;
+  }
+
+  function rigaAnalisi(g, col){
+    var cod = [], des = [], com = [], num = {};
+    g.items.sort(function(a, b){ return a.x - b.x; }).forEach(function(i){
+      if(i.x < col.fineCodice) cod.push(i.s);
+      else if(i.x >= col.inizioNumeri){
+        var n = numero(i.s);
+        if(n === null) return;
+        var migliore = null, destra = i.x + i.w;
+        col.num.forEach(function(h){ if(!migliore || Math.abs(h.destra - destra) < Math.abs(migliore.destra - destra)) migliore = h; });
+        num[migliore.nome] = n;
+      }
+      else if(col.commessa !== null && i.x >= col.commessa){ if(!com.length && i.x < col.commessa + 40) com.push(i.s); }
+      else des.push(i.s);
+    });
+    var codice = pulisci(cod.join(" ")), descr = pulisci(des.join(" "));
+    var haNumeri = "Saldo" in num || "Entrata" in num || "Uscita" in num;
+    return { codice: codice, descr: descr, haNumeri: haNumeri, vuota: !Object.keys(num).length,
+      riga: codice && haNumeri ? riga(codice, descr, com.join(""), num.Saldo, num.Unitario, num["Totale Riga"]) : null };
+  }
+
+  function rigaValorizzazione(g, col, cat){
+    var cod = [], des = [], um = [], num = {};
+    g.items.sort(function(a, b){ return a.x - b.x; }).forEach(function(i){
+      if(i.x < col.fineCodice) cod.push(i.s);
+      else if(i.x >= col.inizioNumeri){
+        var n = numero(i.s);
+        if(n === null) return;
+        var migliore = null, destra = i.x + i.w;
+        col.num.forEach(function(h){ if(!migliore || Math.abs(h.destra - destra) < Math.abs(migliore.destra - destra)) migliore = h; });
+        num[migliore.nome] = n;
+      }
+      else if(i.x >= col.umInizio) um.push(i.s);
+      else if(cat && Math.abs(i.x - cat.x) <= 1.5) return; // categoria merceologica
+      else des.push(i);
+    });
+    var codice = pulisci(cod.join(" ")), prefisso = codicePulito(codice).slice(0, 3);
+    var descr = pulisci(des.map(function(i, k){
+      var t = i.s;
+      // Categoria attaccata alla descrizione ("… S3-4-5ABB"): solo se il testo arriva fino alla sua colonna.
+      if(cat && k === des.length - 1 && i.x + i.w > cat.x - 1){
+        [cat.testo, prefisso].forEach(function(c){
+          if(c && t.length > c.length && t.slice(-c.length) === c) t = t.slice(0, -c.length);
+        });
+      }
+      return t;
+    }).join(" "));
+    var haNumeri = "Giacenza alla data" in num;
+    return { codice: codice, descr: descr, haNumeri: haNumeri, vuota: !Object.keys(num).length,
+      riga: codice && haNumeri ? riga(codice, descr, "", num["Giacenza alla data"], null, num["Valore alla data"], um.join(" ")) : null };
+  }
+
   function daPdf(pagine){
-    var righe = [], info = { deposito: "", commessa: "", stampatoIl: "", finoAl: "", pagine: pagine.length }, col = null, corrente = null;
+    var righe = [], info = { tipo: "", deposito: "", commessa: "", stampatoIl: "", finoAl: "", pagine: pagine.length }, col = null, corrente = null, cat = null;
     pagine.forEach(function(pag){
       var items = pag.items.filter(function(i){ return pulisci(i.s); });
       var c = colonne(items);
       if(c) col = c;
       if(!col) return;
-      if(!info.deposito) info.deposito = accanto(items, "Da Deposito").toUpperCase();
-      if(!info.commessa) info.commessa = accanto(items, "Da Commessa").toUpperCase();
-      if(!info.finoAl) info.finoAl = dataIso(accanto(items, "A Data Reg."));
-      items.forEach(function(i){ if(i.y < 60 && RE_DATA.test(pulisci(i.s)) && !info.stampatoIl) info.stampatoIl = dataIso(pulisci(i.s)); });
+      info.tipo = col.tipo;
+      if(col.tipo === "analisi"){
+        if(!info.deposito) info.deposito = accanto(items, "Da Deposito").toUpperCase();
+        if(!info.commessa) info.commessa = accanto(items, "Da Commessa").toUpperCase();
+        if(!info.finoAl) info.finoAl = dataIso(accanto(items, "A Data Reg."));
+      } else if(!info.finoAl){
+        // "Valorizzazione in data 31/10/2026": la giacenza è quella di quel giorno.
+        items.forEach(function(i){
+          var m = /(?:Valorizzazione in data|^In data)\s+(\d{2}\/\d{2}\/\d{4})/.exec(pulisci(i.s));
+          if(m && !info.finoAl) info.finoAl = dataIso(m[1]);
+        });
+      }
+      // Data di stampa: da sola in alto o in basso nella pagina.
+      items.forEach(function(i){ if((i.y < 60 || (col.tipo === "valorizzazione" && i.y > 560)) && RE_DATA.test(pulisci(i.s)) && !info.stampatoIl) info.stampatoIl = dataIso(pulisci(i.s)); });
 
       // Righe della tabella: il testo sotto le intestazioni, raggruppato per altezza.
-      var sotto = items.filter(function(i){ return i.y < (c ? c.y : 1e9) - 3; }).sort(function(a, b){ return b.y - a.y || a.x - b.x; });
+      var sotto = items.filter(function(i){ return i.y < col.y - 3; }).sort(function(a, b){ return b.y - a.y || a.x - b.x; });
       var gruppi = [];
       sotto.forEach(function(i){
         var g = gruppi[gruppi.length - 1];
         if(g && Math.abs(g.y - i.y) <= 2.5) g.items.push(i);
         else gruppi.push({ y: i.y, items: [i] });
       });
+      if(col.tipo === "valorizzazione") cat = colonnaCategoria(gruppi, col, cat);
       gruppi.forEach(function(g){
-        var cod = [], des = [], com = [], num = {};
-        g.items.sort(function(a, b){ return a.x - b.x; }).forEach(function(i){
-          if(i.x < col.fineCodice) cod.push(i.s);
-          else if(i.x >= col.inizioNumeri){
-            var n = numero(i.s);
-            if(n === null) return;
-            var destra = i.x + i.w, migliore = null;
-            col.num.forEach(function(h){ if(!migliore || Math.abs(h.destra - destra) < Math.abs(migliore.destra - destra)) migliore = h; });
-            num[migliore.nome] = n;
-          }
-          else if(col.commessa !== null && i.x >= col.commessa){ if(!com.length && i.x < col.commessa + 40) com.push(i.s); }
-          else des.push(i.s);
-        });
-        var codice = pulisci(cod.join(" ")), descr = pulisci(des.join(" "));
-        var haNumeri = "Saldo" in num || "Entrata" in num || "Uscita" in num;
-        if(codice && haNumeri){
-          corrente = riga(codice, descr, com.join(""), num.Saldo, num.Unitario, num["Totale Riga"]);
-          righe.push(corrente);
-        } else if(!codice && descr && !Object.keys(num).length && corrente){
+        var l = col.tipo === "analisi" ? rigaAnalisi(g, col) : rigaValorizzazione(g, col, cat);
+        if(l.riga){ corrente = l.riga; righe.push(corrente); }
+        else if(!l.codice && l.descr && l.vuota && corrente){
           // Descrizione su più righe (anche a cavallo di due pagine).
-          corrente.descrizione = pulisci(corrente.descrizione + " " + descr);
+          corrente.descrizione = pulisci(corrente.descrizione + " " + l.descr);
         }
       });
     });
@@ -155,7 +242,12 @@
         if(c.codice === undefined && /^(articolo|codice|cod\.?|codice articolo)$/.test(s)) c.codice = j;
         else if(c.descrizione === undefined && /^descr/.test(s)) c.descrizione = j;
         else if(c.commessa === undefined && /^commessa/.test(s)) c.commessa = j;
-        else if(c.saldo === undefined && /^(saldo|giacenza|esistenza|quantit[aà]|qta|q\.t[aà])/.test(s)) c.saldo = j;
+        else if(/^(saldo|giacenza|esistenza|quantit[aà]|qta|q\.t[aà])/.test(s)){
+          // Con più colonne di giacenza (iniziale, alla data) vale quella "alla data" o il saldo.
+          var preferita = /alla data|saldo/.test(s);
+          if(c.saldo === undefined || (preferita && !c.saldoPreferita)){ c.saldo = j; c.saldoPreferita = preferita; }
+        }
+        else if(c.um === undefined && /^(un\.? ?mis|u\.? ?m\.?$|unit[aà] di misura)/.test(s)) c.um = j;
         else if(c.unitario === undefined && /unitario|prezzo|costo/.test(s)) c.unitario = j;
         else if(c.totale === undefined && /^(totale|valore)/.test(s)) c.totale = j;
       });
@@ -166,7 +258,7 @@
       var t = tabella[k] || [], cod = pulisci(t[col.codice]), saldo = numero(t[col.saldo]);
       if(!cod || saldo === null) continue;
       righe.push(riga(cod, col.descrizione === undefined ? "" : t[col.descrizione], col.commessa === undefined ? "" : t[col.commessa], saldo,
-        col.unitario === undefined ? null : numero(t[col.unitario]), col.totale === undefined ? null : numero(t[col.totale])));
+        col.unitario === undefined ? null : numero(t[col.unitario]), col.totale === undefined ? null : numero(t[col.totale]), col.um === undefined ? "" : t[col.um]));
     }
     return { righe: unisci(righe, info), info: info };
   }
