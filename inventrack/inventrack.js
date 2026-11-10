@@ -10,7 +10,7 @@ var INVENTRACK_CONFIG = {
   // "https://siciet-inventrack.<nome-account>.workers.dev/api".
   // Finché è vuoto la pagina funziona IN PROVA: gli inventari restano solo
   // sul dispositivo su cui sono stati creati.
-  api: "",
+  api: "https://siciet-inventrack.amministrazione-c44.workers.dev/api",
 
   // Ogni quanti secondi si inviano i conteggi in attesa e si leggono quelli
   // fatti dagli altri dispositivi.
