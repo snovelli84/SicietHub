@@ -17,9 +17,11 @@ Serve a fare l'**inventario del magazzino generale o del magazzino di una commes
    - oppure **📷**: si fotografa la targhetta e la pagina propone gli articoli del report che corrispondono al testo letto (vedi *Codice dalla foto*);
    - compare la **giacenza attesa**: **✅ Confermo** se è giusta, altrimenti si scrive la **giacenza reale** e **Salva** (sotto il campo si vede subito la differenza). Un articolo che non c'è va salvato con quantità **0**. Si può aggiungere una nota;
    - un codice che non è nel report si può aggiungere come **articolo trovato in magazzino** (basta la quantità; la descrizione è facoltativa): nell'Excel risulta "Non presente nel report";
-   - un articolo già contato si può riaprire per correggerlo o per **annullare il conteggio**.
+   - un articolo già contato si può riaprire per correggerlo o per **annullare il conteggio**;
+   - **commesse collegate**: una variante come `S1852V12` è collegata alla commessa `S1852` (e viceversa, e le varianti tra loro). Se aggiungi come nuovo un codice che manca nell'inventario che stai facendo, ma è nel report dell'inventario **dello stesso giorno** di una commessa collegata, compare un avviso rosso che lo segnala ("probabilmente va contato là") con il pulsante per aprire quell'altro inventario. Si può comunque aggiungere il codice, se si è sicuri.
 4. **Elenco** – Tutti gli articoli con i filtri *Da contare*, *Confermati*, *Differenze* e la ricerca: serve a vedere cosa manca.
 5. **Esporta** (dal PC) – Riepilogo, **Scarica Excel**, **Scarica CSV** per il gestionale, **Chiudi l'inventario**.
+6. **Eliminare un inventario** – Dall'elenco degli inventari (**🗑 Elimina inventario**, sotto ogni inventario) oppure dalla scheda *Esporta*. Serve scrivere ELIMINA per confermare; l'inventario e tutte le quantità contate vengono cancellati da ogni dispositivo e non si possono recuperare (conviene aver scaricato prima l'Excel).
 
 Più persone possono contare insieme lo stesso inventario da telefoni diversi: ogni dispositivo riceve i conteggi degli altri ogni 20 secondi. Se due persone contano lo stesso articolo vale il conteggio più recente.
 
@@ -91,6 +93,6 @@ Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo.
 - La lettura dalla foto sbaglia con scritte poco contrastate, riflessi o targhette storte: il codice proposto va sempre controllato.
 - Le librerie (pdf.js per leggere il PDF, ExcelJS per l'Excel, Tesseract.js per le foto) sono caricate da `cdn.jsdelivr.net`, che deve essere raggiungibile.
 
-**Aggiornamenti** – A ogni modifica di `inventrack.js` o `report.js` aumentare il numero in `?v=…` in fondo a `index.html`.
+**Aggiornamenti** – A ogni modifica di `inventrack.js` o `report.js` aumentare il numero in `?v=…` in fondo a `index.html` e la `versione` in `INVENTRACK_CONFIG` (all'inizio di `inventrack.js`): la versione compare in fondo a ogni pagina ("SICIET InvenTrack · versione 1.4") e serve a controllare che un telefono abbia caricato la pagina aggiornata.
 
 **Logo e icone** – In [`icons/`](icons/): marchio SICIET con la scritta INVENTRACK (font Orbitron, gradiente blu → verde come in SICIET HUB e SICIET Quality). `logo.png` è usato nell'intestazione, le altre sono le icone per la schermata Home e il browser.

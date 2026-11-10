@@ -210,6 +210,9 @@ table.riepilogo{width:100%;border-collapse:collapse;font-size:15px}
 table.riepilogo td{padding:8px 4px;border-bottom:1px solid var(--border)}
 table.riepilogo td:last-child{text-align:right;font-weight:700;white-space:nowrap}
 
+.invbox{display:grid;gap:2px}
+.linkbtn.elimina{color:var(--error);font-size:13px}
+footer{max-width:900px;margin:0 auto;padding:0 16px calc(24px + env(safe-area-inset-bottom));text-align:center;color:var(--muted);font-size:12px}
 #sync{font-size:13px;color:var(--muted);text-align:center}
 #sync.attesa-invio{color:var(--warn);font-weight:600}
 
@@ -343,6 +346,8 @@ table.riepilogo td:last-child{text-align:right;font-weight:700;white-space:nowra
 
 </main>
 
+<footer id="versione"></footer>
+
 <!-- Lettura del codice dalla foto della targhetta -->
 <div class="dlg" id="ocrDlg" hidden>
   <div class="card">
@@ -362,6 +367,6 @@ table.riepilogo td:last-child{text-align:right;font-weight:700;white-space:nowra
 <div id="toast" role="status" hidden></div>
 
 <script src="report.js?v=1"></script>
-<script src="inventrack.js?v=3"></script>
+<script src="inventrack.js?v=4"></script>
 </body>
 </html>
