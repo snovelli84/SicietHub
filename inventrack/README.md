@@ -2,15 +2,17 @@
 
 **SICIET InvenTrack** è un progetto separato da SICIET HUB, pubblicato all'indirizzo `https://hub.siciet.it/inventrack/` (cartella [`inventrack/`](.) di questa repository). Non compare nel portale e non è indicizzato dai motori di ricerca. Si può aggiungere alla schermata Home del telefono come un'app, con il proprio logo.
 
-Serve a fare l'**inventario del magazzino generale o del magazzino di una commessa**: si carica il report delle giacenze stampato dal gestionale, si contano gli articoli con il telefono (scrivendo il codice o fotografando la targhetta), e dal PC si scarica l'**Excel** con giacenze attese, giacenze reali e differenze, più il **file CSV** da importare nel gestionale per sistemare le discordanze.
+Serve a fare l'**inventario del magazzino aziendale o del magazzino di una commessa**: si carica il report delle giacenze stampato dal gestionale, si contano gli articoli con il telefono (scrivendo il codice o fotografando la targhetta), e dal PC si scarica l'**Excel** con giacenze attese, giacenze reali e differenze, più il **file CSV** da importare nel gestionale per sistemare le discordanze.
 
 ## Uso
 
 1. **Accesso** – Al primo uso si scrivono **nome e cognome** (finiscono accanto a ogni quantità contata) e la **password**. Restano memorizzati sul dispositivo (**Cambia** in alto).
 2. **Nuovo inventario** (di solito dal PC):
-   - si sceglie **Magazzino generale** oppure **Magazzino di commessa**; per la commessa va scritta la **commessa** (es. `S1852`);
+   - si sceglie **Magazzino aziendale** oppure **Magazzino di commessa**; per la commessa va scritta la **commessa** (es. `S1852`);
    - **data dell'inventario**: è proposta quella di oggi;
-   - si carica il **report del gestionale** *Analisi Andamento Giacenza* (il PDF così come lo stampa il gestionale; in alternativa lo stesso report in Excel `.xlsx` o CSV, con le colonne Articolo, Descrizione, Commessa, Saldo). La pagina legge codice, descrizione, commessa e giacenza (colonna **Saldo**), e ricava il valore unitario da *Totale riga / Saldo*;
+   - si carica il **report del gestionale**, il PDF così come lo stampa il gestionale (in alternativa lo stesso report in Excel `.xlsx` o CSV). La pagina riconosce da sola quale dei due report è:
+     - **Analisi Andamento Giacenza** (per commessa): legge codice, descrizione, commessa e giacenza (colonna **Saldo**); il valore unitario è *Totale riga / Saldo*;
+     - **Valorizzazione a costi** (magazzino aziendale, senza commessa): legge codice, descrizione, unità di misura (PCE, LM, NR…) e **Giacenza alla data**; il valore unitario è *Valore alla data / Giacenza alla data*. La giacenza è quella del giorno indicato nel report ("Valorizzazione in data …"), e il report estrae solo gli articoli con giacenza maggiore di 0: un articolo che in magazzino c'è ma non è nel report va aggiunto come nuovo codice;
    - compare il riepilogo (numero di articoli, valore, deposito, commesse, data di stampa) con gli eventuali avvisi: report stampato in un giorno diverso dalla data dell'inventario, righe di altre commesse (che in un inventario di commessa non vengono importate; valgono anche le varianti, es. `S1852V31` per `S1852`), commessa non presente nel report.
 3. **Conta** (dal telefono, aprendo lo stesso inventario dall'elenco):
    - si scrive il **codice** (o parte del codice, o parole della descrizione) e si tocca l'articolo; con un lettore di codici a barre basta leggere il codice, che finisce con Invio;
@@ -36,11 +38,19 @@ Un inventario vale **solo per il giorno in cui viene fatto**: le giacenze attese
 - Data, ora e autore di ogni conteggio sono nell'Excel.
 - A giro finito **Chiudi l'inventario**: da quel momento nessun dispositivo può più modificare le quantità (si può riaprire). Excel e CSV si possono sempre scaricare.
 
+### Magazzino aziendale: il giro di fine giornata
+
+1. Dal gestionale si stampa il report **Valorizzazione a costi** (o *Analisi Andamento Giacenza*) **alla data dell'inventario** e lo si carica in **Nuovo inventario → Magazzino aziendale**. Se il report è alla data di un giorno diverso (es. giacenza al 31/10 per un inventario del 10/11) la pagina avvisa: i movimenti successivi non sono compresi e le differenze potrebbero non essere vere.
+2. L'operatore conta articolo per articolo dal telefono (con l'unità di misura accanto alla giacenza attesa).
+3. A fine giornata, da **Esporta**, si scarica **Movimento positivo** (articoli in più) e **Movimento negativo** (articoli in meno), uno per uno oppure con **Scarica entrambi**: sono i due file CSV da importare nel gestionale per creare i movimenti d'inventario. Gli articoli non contati non generano movimenti, a meno di spuntare *Considera gli articoli non contati come giacenza 0*.
+
+Il **valore unitario** dei CSV è ricavato dal report: per il report di valorizzazione è *Valore alla data / Giacenza alla data*, e il report arrotonda il valore ai centesimi (per un articolo da 1 pezzo che costa 21,805 il report stampa 21,80, e nel CSV finisce 21.8). Per gli articoli trovati e non presenti nel report il valore unitario è 0.
+
 ### I file che si scaricano
 
-**Excel** (`Inventario S1852 SEDE 2026-11-10.xlsx`), tre fogli:
+**Excel** (`Inventario S1852 SEDE 2026-11-10.xlsx`, oppure `Inventario magazzino aziendale 2026-11-10.xlsx`), tre fogli:
 
-- **Inventario**: una riga per articolo con codice, descrizione, commessa, giacenza attesa, giacenza reale, differenza, valore unitario, valore della differenza, esito (*Confermata*, *Differenza*, *Non contato*, *Non presente nel report*), chi ha contato, quando, note. Filtri già attivi sulla riga dei titoli; differenze evidenziate.
+- **Inventario**: una riga per articolo con codice, descrizione, commessa, unità di misura, giacenza attesa, giacenza reale, differenza, valore unitario, valore della differenza, esito (*Confermata*, *Differenza*, *Non contato*, *Non presente nel report*), chi ha contato, quando, note. Filtri già attivi sulla riga dei titoli; differenze evidenziate.
 - **Differenze**: le sole righe con una differenza.
 - **Riepilogo**: totali e valore delle differenze.
 
@@ -50,7 +60,7 @@ Un inventario vale **solo per il giorno in cui viene fatto**: le giacenze attese
 "ABBAF16301011" ; 1.000000000000000; 21.805000000000000
 ```
 
-Si sceglie cosa esportare: **differenze in più** (da caricare), **differenze in meno** (da scaricare) — in due file separati, con quantità sempre positive — oppure le **giacenze reali** di tutti gli articoli contati. Gli articoli non contati non entrano nei file, a meno di spuntare *Considera gli articoli non contati come giacenza 0*. Il numero di decimali si cambia con `csvDecimali` in [`inventrack.js`](inventrack.js).
+Sono due file separati, **movimento positivo** (differenze in più) e **movimento negativo** (differenze in meno), con quantità sempre positive; in alternativa le **giacenze reali** di tutti gli articoli contati. Gli articoli non contati non entrano nei file, a meno di spuntare *Considera gli articoli non contati come giacenza 0*. Il numero di decimali si cambia con `csvDecimali` in [`inventrack.js`](inventrack.js).
 
 ### Codice dalla foto
 
@@ -81,14 +91,14 @@ Finché `api` in `INVENTRACK_CONFIG` (all'inizio di [`inventrack.js`](inventrack
 
 Verifica: aprire `hub.siciet.it/inventrack/`, inserire nome e password, creare un inventario di prova con un report e poi eliminarlo (scheda *Esporta* → **Elimina**). "Servizio non configurato" indica che manca l'associazione `DB` o la variabile `PASSWORD`.
 
-Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo.
+Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo. Dalla versione 1.6 il servizio salva anche l'**unità di misura** degli articoli: finché non si ricopia il nuovo `worker.js` tutto funziona ma l'unità di misura si vede solo sul dispositivo che ha creato l'inventario.
 
 ## Limiti
 
 - La password è unica e condivisa: chi la conosce vede gli inventari (con i valori di magazzino) e può modificarli. Va cambiata su Cloudflare se esce dall'azienda.
 - I dati stanno nel database D1 di Cloudflare, non in Microsoft 365: l'archivio "ufficiale" di un inventario è l'Excel scaricato, da conservare nella cartella della commessa. Gli inventari vecchi si possono eliminare dalla pagina; l'elenco mostra gli ultimi 100.
 - Piano gratuito di Cloudflare: 100.000 scritture al giorno sul database, ampiamente sufficienti (un conteggio = una scrittura).
-- Il report viene letto in base alla posizione delle colonne del PDF *Analisi Andamento Giacenza* (Articolo, Descrizione, Commessa, Saldo, Totale riga): se il gestionale cambia l'impaginazione va aggiornato [`report.js`](report.js). Dopo ogni caricamento conviene controllare nel riepilogo numero di articoli e valore totale, che devono coincidere con quelli del report.
+- I report PDF vengono letti in base alla posizione delle colonne (*Analisi Andamento Giacenza*: Articolo, Descrizione, Commessa, Saldo, Totale riga; *Valorizzazione a costi*: Articolo, Descrizione, Cat. merc., Un. mis., Giacenza alla data, Valore alla data): se il gestionale cambia l'impaginazione va aggiornato [`report.js`](report.js). Dopo ogni caricamento conviene controllare nel riepilogo numero di articoli e valore totale, che devono coincidere con quelli del report.
 - Se nel report lo stesso articolo compare più volte per la stessa commessa le quantità vengono sommate (la pagina lo segnala).
 - La lettura dalla foto sbaglia con scritte poco contrastate, riflessi o targhette storte: il codice proposto va sempre controllato.
 - Le librerie (pdf.js per leggere il PDF, ExcelJS per l'Excel, Tesseract.js per le foto) sono caricate da `cdn.jsdelivr.net`, che deve essere raggiungibile.
