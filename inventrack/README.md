@@ -46,6 +46,7 @@ Per questo, se il report caricato contiene anche le varianti, la pagina propone 
 
 - **Il report va stampato comprendendo le varianti**: *Da Commessa* `S1852`, *A Commessa* `S1852ZZ` (con `S1852/` le varianti restano fuori). Se il report contiene solo la commessa, la pagina lo ricorda.
 - Va bene sia il report riassunto (una riga per articolo e commessa) sia quello con il **dettaglio dei movimenti** (una riga per movimento): in quel caso vale il saldo dell'ultima riga di ogni commessa.
+- **Controllo automatico**: con il report dei movimenti, per ogni articolo la pagina confronta la giacenza letta con la riga *TOTALE ARTICOLO* stampata dal report (entrate − uscite). Nel riepilogo compare "✓ N articoli coincidono con i totali del report", oppure l'elenco degli articoli che non tornano, da controllare prima di contare.
 - Nella scheda dell'articolo **Somma della commessa e delle varianti** mostra la giacenza del gestionale commessa per commessa; lo stesso dettaglio è nell'ultima colonna dell'Excel.
 - I CSV dei movimenti contengono la differenza sul totale (non hanno la commessa): su quale commessa registrare il movimento si decide nel gestionale.
 - Togliendo la spunta ogni variante resta una riga separata, con la sua commessa.

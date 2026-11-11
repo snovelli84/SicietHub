@@ -201,7 +201,7 @@
 
   function daPdf(pagine){
     var righe = [], info = { tipo: "", deposito: "", commessa: "", stampatoIl: "", finoAl: "", pagine: pagine.length }, col = null, corrente = null, cat = null;
-    var articolo = null, movimenti = {};
+    var articolo = null, movimenti = {}, articoli = [];
     pagine.forEach(function(pag){
       var items = pag.items.filter(function(i){ return pulisci(i.s); });
       var c = colonne(items);
@@ -239,14 +239,19 @@
           return;
         }
         var l = rigaAnalisi(g, col);
-        if(l.codice && l.haNumeri) articolo = { codice: l.codice, descrizione: l.descr, righe: [] };
+        if(l.codice && l.haNumeri){
+          // Lo stesso codice ripetuto in cima a una nuova pagina continua l'articolo già iniziato.
+          if(!articolo || codicePulito(articolo.codice) !== codicePulito(l.codice)){ articolo = { codice: l.codice, descrizione: l.descr, righe: [] }; articoli.push(articolo); }
+        }
         else if(!l.codice && l.haNumeri && l.commessa && articolo){
           // Report con il dettaglio dei movimenti: il codice è scritto solo sulla prima riga dell'articolo.
           if(l.descr) descrizioneIn(articolo, l.descr);
         }
         else{
-          // Descrizione su più righe (anche a cavallo di due pagine). Le righe dei totali non hanno commessa.
-          if(!l.codice && l.descr && l.vuota && articolo) descrizioneIn(articolo, l.descr);
+          // "TOTALE ARTICOLO …": entrate e uscite dell'articolo, per controllare la lettura.
+          if(!l.codice && articolo && /^TOTALE ARTICOLO\b/i.test(l.descr) && "Entrata" in l.num && "Uscita" in l.num) articolo.totale = arrotonda(l.num.Entrata - l.num.Uscita, 6);
+          // Descrizione su più righe (anche a cavallo di due pagine).
+          else if(!l.codice && l.descr && l.vuota && articolo) descrizioneIn(articolo, l.descr);
           return;
         }
         var k = chiave(articolo.codice, l.commessa), gia = l.movimento ? movimenti[k] : null;
@@ -261,6 +266,16 @@
         righe.push(nuova);
         if(l.movimento){ movimenti[k] = nuova; info.movimenti = true; }
       });
+    });
+    // Controllo con i totali stampati dal report: entrate − uscite di ogni articolo
+    // deve essere uguale alla somma dei saldi letti per le sue commesse.
+    info.controllati = 0;
+    info.nonQuadrano = [];
+    articoli.forEach(function(a){
+      if(a.totale === undefined) return;
+      info.controllati++;
+      var somma = a.righe.reduce(function(t, r){ return t + r.attesa; }, 0);
+      if(Math.abs(somma - a.totale) > 0.0001) info.nonQuadrano.push(a.codice);
     });
     return { righe: unisci(righe, info), info: info };
   }

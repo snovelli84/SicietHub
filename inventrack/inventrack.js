@@ -430,7 +430,8 @@ var INVENTRACK_CONFIG = {
           r.info.deposito && "deposito " + r.info.deposito,
           commesse.filter(Boolean).length && (commesse.length <= 4 ? "commesse: " + commesse.map(function(c){ return c || "(nessuna)"; }).join(", ") : commesse.length + " commesse"),
           r.info.tipo === "valorizzazione" && "giacenza al " + dataIt(r.info.finoAl),
-          r.info.stampatoIl && "stampato il " + dataIt(r.info.stampatoIl)].filter(Boolean).join(" · ") })));
+          r.info.stampatoIl && "stampato il " + dataIt(r.info.stampatoIl),
+          r.info.controllati && !r.info.nonQuadrano.length && "✓ " + fmt(r.info.controllati) + " articoli coincidono con i totali del report"].filter(Boolean).join(" · ") })));
       var avvisi = [];
       if(tipo === "commessa"){
         var c = R.codice($("nCommessa").value);
@@ -453,6 +454,7 @@ var INVENTRACK_CONFIG = {
       if(r.info.stampatoIl && data && r.info.stampatoIl !== data) avvisi.push("Il report è stato stampato il " + dataIt(r.info.stampatoIl) + ", ma la data dell'inventario è il " + dataIt(data) + ": le giacenze attese potrebbero non essere quelle giuste. Meglio ristampare il report il giorno dell'inventario.");
       if(r.info.finoAl && data && r.info.finoAl < data) avvisi.push("Il report considera i movimenti solo fino al " + dataIt(r.info.finoAl) + ", ma l'inventario è del " + dataIt(data) + ": i movimenti successivi non sono compresi e le differenze potrebbero non essere vere. Meglio ristampare il report alla data dell'inventario.");
       if(data && data !== oggi()) avvisi.push("La data dell'inventario non è oggi (" + dataIt(oggi()) + ").");
+      if(r.info.nonQuadrano && r.info.nonQuadrano.length) avvisi.push("Per " + fmt(r.info.nonQuadrano.length) + " articoli su " + fmt(r.info.controllati) + " la giacenza letta non coincide con il totale stampato dal report (entrate − uscite): " + r.info.nonQuadrano.slice(0, 8).join(", ") + (r.info.nonQuadrano.length > 8 ? "…" : "") + ". Controlla questi articoli prima di contare.");
       if(r.info.ripetuti) avvisi.push(fmt(r.info.ripetuti) + " righe ripetevano lo stesso articolo e la stessa commessa: le quantità sono state sommate.");
       if(avvisi.length) esito.appendChild(el("div", { class: "avviso" }, el("ul", {}, ...avvisi.map(function(a){ return el("li", { text: a }); }))));
     }
