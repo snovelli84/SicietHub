@@ -216,6 +216,14 @@ footer{max-width:900px;margin:0 auto;padding:0 16px calc(24px + env(safe-area-in
 .dettaglio{font-size:13px;color:var(--muted)}
 .dettaglio summary{cursor:pointer;font-weight:600}
 .dettaglio div{margin-top:6px;overflow-wrap:anywhere}
+.dividi{border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-size:14px;color:var(--text)}
+.dividi p{color:var(--muted);font-size:13px;margin-top:6px}
+.dividi select{margin-top:8px}
+.parti{display:grid;gap:8px}
+.parte{display:grid;grid-template-columns:1fr 130px;gap:10px;align-items:center}
+.parte small{display:block;color:var(--muted)}
+.parte input{text-align:center;font-weight:700;font-size:18px}
+input[readonly]{opacity:.75}
 #sync{font-size:13px;color:var(--muted);text-align:center}
 #sync.attesa-invio{color:var(--warn);font-weight:600}
 
@@ -374,7 +382,7 @@ footer{max-width:900px;margin:0 auto;padding:0 16px calc(24px + env(safe-area-in
 
 <div id="toast" role="status" hidden></div>
 
-<script src="report.js?v=3"></script>
-<script src="inventrack.js?v=7"></script>
+<script src="report.js?v=4"></script>
+<script src="inventrack.js?v=8"></script>
 </body>
 </html>

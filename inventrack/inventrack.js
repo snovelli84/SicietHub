@@ -26,7 +26,7 @@ var INVENTRACK_CONFIG = {
 
   // Versione mostrata in fondo alla pagina: aumentarla a ogni modifica,
   // insieme al numero ?v= di inventrack.js in index.html.
-  versione: "1.7"
+  versione: "1.8"
 };
 
 (function(){
@@ -581,6 +581,7 @@ var INVENTRACK_CONFIG = {
     S.inv = inv;
     S.righe = righe;
     S.indice = {};
+    S.commesse = null;
     righe.forEach(function(r){ S.indice[R.chiave(r.codice, r.commessa)] = r; });
     S.conteggi = cnt.conteggi;
     S.da = cnt.da;
@@ -668,6 +669,25 @@ var INVENTRACK_CONFIG = {
     });
     out.sort(function(a, b){ return b.punti - a.punti || (a.riga.codice < b.riga.codice ? -1 : 1); });
     return max ? out.slice(0, max) : out;
+  }
+
+  // "S1852: 10900 · S1852V04: -500" → [{ commessa, q }]
+  function leggiParti(t){
+    return String(t || "").split(" · ").map(function(x){
+      var p = x.split(": ");
+      return p.length === 2 && p[0] ? { commessa: p[0], q: Number(p[1].replace(",", ".")) } : null;
+    }).filter(function(x){ return x && isFinite(x.q); });
+  }
+  function scriviParti(parti){ return parti.map(function(x){ return x.commessa + ": " + String(x.q).replace(".", ","); }).join(" · "); }
+  function mostraParti(t){ return leggiParti(t).map(function(x){ return x.commessa + ": " + fmt(x.q); }).join(" · "); }
+  // Commesse (padre e varianti) presenti nell'inventario, se è stato creato sommando le varianti.
+  function commesseInventario(){
+    if(!S.commesse){
+      var viste = {};
+      S.righe.forEach(function(r){ leggiParti(r.dettaglio).forEach(function(x){ viste[x.commessa] = 1; }); });
+      S.commesse = Object.keys(viste).sort();
+    }
+    return S.commesse;
   }
 
   function conUm(n, r){ return fmt(n) + (r.um ? " " + r.um : ""); }
@@ -806,7 +826,7 @@ var INVENTRACK_CONFIG = {
         // Giacenza del gestionale commessa per commessa: la somma è la giacenza attesa.
         box.appendChild(el("details", { class: "dettaglio" },
           el("summary", { text: "Somma della commessa e delle varianti" }),
-          el("div", { text: r.dettaglio.split(" · ").map(function(x){ var p = x.split(": "); return p[0] + ": " + fmt(Number(p[1].replace(",", "."))); }).join(" · ") })));
+          el("div", { text: mostraParti(r.dettaglio) })));
       }
     }
     if(r.nuovo) cercaCollegati(r);
@@ -814,6 +834,7 @@ var INVENTRACK_CONFIG = {
       var d = c.reale - r.attesa;
       box.appendChild(el("div", { class: "avviso " + (st === "diff" ? "errore" : "bene") },
         el("b", { text: st === "diff" ? "Già contato: giacenza reale " + fmt(c.reale) + " (differenza " + fmtDiff(d) + ")" : "Già contato: giacenza confermata" }),
+        c.parti ? el("span", { text: "Per commessa: " + mostraParti(c.parti) }) : null,
         el("span", { text: [c.operatore, oraIt(c.quando), c.nota && "nota: " + c.nota].filter(Boolean).join(" · ") })));
     }
     if(perche){
@@ -834,8 +855,66 @@ var INVENTRACK_CONFIG = {
       else if(Math.abs(q - r.attesa) <= TOLLERANZA){ anteprima.textContent = "Uguale alla giacenza attesa"; anteprima.className = "ok"; }
       else{ anteprima.textContent = "Giacenza reale " + fmt(q) + " · differenza " + fmtDiff(q - r.attesa); anteprima.className = "diff"; }
     });
+    /* Divisione per commessa: quanto c'è per la commessa padre e quanto per ogni
+     * variante. La giacenza reale è la somma; la differenza resta sul totale. */
+    var campiParti = [], boxParti = null, tutte = r.nuovo ? [] : commesseInventario();
+    function sommaParti(){
+      var usati = campiParti.filter(function(x){ return x.input.value.trim() !== ""; });
+      if(!usati.length) return null;
+      var tot = 0, errore = false;
+      usati.forEach(function(x){
+        var q = quantitaScritta(x.input.value);
+        x.input.classList.toggle("invalid", q === null);
+        if(q === null) errore = true; else tot += q;
+      });
+      return errore ? NaN : arrotonda(tot);
+    }
+    function aggiornaParti(){
+      var tot = sommaParti();
+      reale.readOnly = tot !== null;
+      if(tot !== null){ reale.value = isNaN(tot) ? "" : String(tot).replace(".", ","); reale.dispatchEvent(new Event("input")); }
+      if(tot !== null && isNaN(tot)) anteprima.textContent = "Scrivi solo numeri, es. 12 oppure 12,5";
+    }
+    function rigaParte(commessa, libro, valore){
+      var input = el("input", { type: "text", inputmode: "decimal", autocomplete: "off", placeholder: "0", "aria-label": "Giacenza reale " + commessa, value: valore === undefined ? "" : String(valore).replace(".", ",") });
+      input.addEventListener("input", aggiornaParti);
+      campiParti.push({ commessa: commessa, input: input });
+      return el("label", { class: "parte" },
+        el("span", {}, el("b", { text: commessa }), libro === undefined ? null : el("small", { text: "gestionale " + fmt(libro) })),
+        input);
+    }
+    if(tutte.length){
+      var libro = {}, gia = {}, elenco = [];
+      leggiParti(r.dettaglio).forEach(function(x){ libro[x.commessa] = x.q; });
+      leggiParti(c && c.parti).forEach(function(x){ gia[x.commessa] = x.q; });
+      // Prima la commessa dell'inventario, poi le varianti dell'articolo e quelle già contate.
+      [S.inv.commessa].concat(Object.keys(libro), Object.keys(gia)).forEach(function(k){ if(k && elenco.indexOf(k) < 0) elenco.push(k); });
+      var righeParti = el("div", { class: "parti" }, ...elenco.map(function(k){ return rigaParte(k, libro[k], gia[k]); }));
+      var altre = tutte.filter(function(k){ return elenco.indexOf(k) < 0; });
+      var scelta = altre.length ? el("select", { "aria-label": "Aggiungi una variante" }, el("option", { value: "", text: "+ Aggiungi un'altra variante…" }), ...altre.map(function(k){ return el("option", { value: k, text: k }); })) : null;
+      if(scelta) scelta.addEventListener("change", function(){
+        if(!scelta.value) return;
+        var riga = rigaParte(scelta.value);
+        righeParti.appendChild(riga);
+        scelta.querySelector('option[value="' + scelta.value + '"]').remove();
+        scelta.value = "";
+        if(scelta.options.length < 2) scelta.hidden = true;
+        riga.querySelector("input").focus();
+      });
+      boxParti = el("details", { class: "dettaglio dividi", open: Object.keys(gia).length > 0 },
+        el("summary", { text: "Dividi per commessa (" + S.inv.commessa + " e varianti)" }),
+        el("p", { text: "Scrivi quanto c'è per ogni commessa: la giacenza reale è la somma. Lascia vuote quelle dove non c'è nulla." }),
+        righeParti, scelta);
+    }
+
     function salvaReale(){
       var q = quantitaScritta(reale.value);
+      var tot = sommaParti();
+      if(tot !== null && isNaN(tot)){ campiParti.filter(function(x){ return x.input.classList.contains("invalid"); })[0].input.focus(); return; }
+      if(tot !== null){
+        salvaConteggio(r, tot, nota.value, scriviParti(campiParti.filter(function(x){ return x.input.value.trim() !== ""; }).map(function(x){ return { commessa: x.commessa, q: arrotonda(quantitaScritta(x.input.value)) }; })));
+        return;
+      }
       if(q === null){ reale.classList.add("invalid"); reale.focus(); return; }
       if(r.nuovo){
         var des = $("sDescr");
@@ -853,7 +932,13 @@ var INVENTRACK_CONFIG = {
     }
     box.append(
       el("div", { class: "reale" }, reale, el("button", { class: "btn primary", type: "button", text: "Salva", onclick: salvaReale })),
-      anteprima, nota,
+      anteprima);
+    if(boxParti){
+      box.appendChild(boxParti);
+      campiParti.forEach(function(x){ x.input.addEventListener("keydown", function(ev){ if(ev.key === "Enter"){ ev.preventDefault(); salvaReale(); } }); });
+      if(Object.keys(leggiParti(c && c.parti)).length) aggiornaParti();
+    }
+    box.append(nota,
       el("div", { class: "riga spazio" },
         el("button", { class: "linkbtn", type: "button", text: "Chiudi senza salvare", onclick: chiudiScheda }),
         c ? el("button", { class: "linkbtn", type: "button", text: "Annulla il conteggio", onclick: function(){
@@ -861,12 +946,12 @@ var INVENTRACK_CONFIG = {
         } }) : null));
   }
 
-  function salvaConteggio(r, reale, nota){
+  function salvaConteggio(r, reale, nota, parti){
     var k = R.chiave(r.codice, r.commessa);
     var c = {
       chiave: k, codice: r.codice, commessa: r.commessa, descrizione: r.descrizione, attesa: r.attesa,
       reale: reale === null ? null : arrotonda(reale), nota: R.pulisci(nota), operatore: operatore(),
-      quando: new Date().toISOString(), extra: !!r.extra
+      quando: new Date().toISOString(), extra: !!r.extra, parti: reale === null ? "" : (parti || "")
     };
     S.conteggi[k] = c;
     kv.set("cnt:" + S.inv.id, { conteggi: S.conteggi, da: S.da });
@@ -927,7 +1012,7 @@ var INVENTRACK_CONFIG = {
       return {
         codice: r.codice, descrizione: r.descrizione, commessa: r.commessa, um: r.um || "", dettaglio: r.dettaglio || "", attesa: r.attesa, reale: reale, diff: diff,
         valore: r.valore, valoreDiff: diff === null ? null : Math.round(diff * r.valore * 100) / 100, esito: esito,
-        operatore: c ? c.operatore : "", quando: c ? c.quando : "", nota: c ? c.nota : "",
+        operatore: c ? c.operatore : "", quando: c ? c.quando : "", nota: c ? c.nota : "", parti: c && c.parti ? c.parti : "",
         fuoriData: !!c && giornoDi(c.quando) !== S.inv.data
       };
     });
@@ -942,7 +1027,7 @@ var INVENTRACK_CONFIG = {
     ["Giacenza attesa", 13, "attesa", "q"], ["Giacenza reale", 13, "reale", "q"], ["Differenza", 12, "diff", "q"],
     ["Valore unitario", 13, "valore", "v"], ["Valore differenza", 14, "valoreDiff", "e"], ["Esito", 24, "esito"],
     ["Contato da", 20, "operatore"], ["Data e ora del conteggio", 18, "quando", "d"], ["Note", 36, "nota"],
-    ["Giacenza per commessa (gestionale)", 60, "dettaglio"]
+    ["Giacenza reale per commessa", 40, "parti"], ["Giacenza per commessa (gestionale)", 60, "dettaglio"]
   ];
 
   function foglio(wb, nome, intestazione, righe){

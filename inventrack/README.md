@@ -48,6 +48,7 @@ Per questo, se il report caricato contiene anche le varianti, la pagina propone 
 - Va bene sia il report riassunto (una riga per articolo e commessa) sia quello con il **dettaglio dei movimenti** (una riga per movimento): in quel caso vale il saldo dell'ultima riga di ogni commessa.
 - **Controllo automatico**: con il report dei movimenti, per ogni articolo la pagina confronta la giacenza letta con la riga *TOTALE ARTICOLO* stampata dal report (entrate − uscite). Nel riepilogo compare "✓ N articoli coincidono con i totali del report", oppure l'elenco degli articoli che non tornano, da controllare prima di contare.
 - Nella scheda dell'articolo **Somma della commessa e delle varianti** mostra la giacenza del gestionale commessa per commessa; lo stesso dettaglio è nell'ultima colonna dell'Excel.
+- **Dividi per commessa**: al momento del conteggio si può scrivere solo il totale, oppure aprire *Dividi per commessa* e scrivere quanto c'è per la commessa padre e quanto per ogni variante (quelle dell'articolo sono già elencate, con la giacenza del gestionale; le altre si aggiungono dal menu). La giacenza reale è la somma e la differenza resta calcolata sul totale. La divisione è salvata con il conteggio, si vede dagli altri dispositivi ed è nella colonna *Giacenza reale per commessa* dell'Excel.
 - I CSV dei movimenti contengono la differenza sul totale (non hanno la commessa): su quale commessa registrare il movimento si decide nel gestionale.
 - Togliendo la spunta ogni variante resta una riga separata, con la sua commessa.
 
@@ -104,7 +105,7 @@ Finché `api` in `INVENTRACK_CONFIG` (all'inizio di [`inventrack.js`](inventrack
 
 Verifica: aprire `hub.siciet.it/inventrack/`, inserire nome e password, creare un inventario di prova con un report e poi eliminarlo (scheda *Esporta* → **Elimina**). "Servizio non configurato" indica che manca l'associazione `DB` o la variabile `PASSWORD`.
 
-Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo. Dalla versione 1.6 il servizio salva anche l'**unità di misura** degli articoli e dalla 1.7 il **dettaglio per commessa** della somma con le varianti: finché non si ricopia il nuovo `worker.js` tutto funziona, ma questi due dati si vedono solo sul dispositivo che ha creato l'inventario.
+Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo. Dalla versione 1.6 il servizio salva anche l'**unità di misura** degli articoli dalla 1.7 il **dettaglio per commessa** della somma con le varianti e dalla 1.8 la **divisione per commessa** della giacenza reale (il servizio aggiunge da solo la colonna che serve al database esistente): finché non si ricopia il nuovo `worker.js` tutto funziona, ma questi dati si vedono solo sul dispositivo su cui sono stati inseriti.
 
 ## Limiti
 
@@ -116,6 +117,6 @@ Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo. 
 - La lettura dalla foto sbaglia con scritte poco contrastate, riflessi o targhette storte: il codice proposto va sempre controllato.
 - Le librerie (pdf.js per leggere il PDF, ExcelJS per l'Excel, Tesseract.js per le foto) sono caricate da `cdn.jsdelivr.net`, che deve essere raggiungibile.
 
-**Aggiornamenti** – A ogni modifica di `inventrack.js` o `report.js` aumentare il numero in `?v=…` in fondo a `index.html` e la `versione` in `INVENTRACK_CONFIG` (all'inizio di `inventrack.js`): la versione compare in fondo a ogni pagina ("SICIET InvenTrack · versione 1.7") e serve a controllare che un telefono abbia caricato la pagina aggiornata.
+**Aggiornamenti** – A ogni modifica di `inventrack.js` o `report.js` aumentare il numero in `?v=…` in fondo a `index.html` e la `versione` in `INVENTRACK_CONFIG` (all'inizio di `inventrack.js`): la versione compare in fondo a ogni pagina ("SICIET InvenTrack · versione 1.8") e serve a controllare che un telefono abbia caricato la pagina aggiornata.
 
 **Logo e icone** – In [`icons/`](icons/): marchio SICIET con la scritta INVENTRACK (font Orbitron, gradiente blu → verde come in SICIET HUB e SICIET Quality). `logo.png` è usato nell'intestazione, le altre sono le icone per la schermata Home e il browser.
