@@ -30,7 +30,7 @@
  *   POST   /inventari/<id>/stato          { stato: "aperto" | "chiuso", operatore }
  *   DELETE /inventari/<id>                elimina l'inventario e i suoi conteggi
  *
- * Un conteggio è { chiave, codice, commessa, descrizione, attesa, reale, nota,
+ * Un conteggio è { chiave, codice, commessa, descrizione, attesa, reale, nota, parti,
  * operatore, quando, extra }: reale = null vuol dire "conteggio annullato";
  * extra = articolo trovato in magazzino ma non presente nel report. Se due
  * dispositivi contano lo stesso articolo vale il conteggio più recente (quando).
@@ -104,7 +104,7 @@ function rigaReport(r){
   if(!r || typeof r !== "object") throw new Errore(400, "Riga del report non valida.");
   const codice = testo(r.codice, 80).toUpperCase();
   if(!codice) throw new Errore(400, "Riga del report senza codice.");
-  return { codice, descrizione: testo(r.descrizione, 400), commessa: testo(r.commessa, 40).toUpperCase(), attesa: quantita(r.attesa), valore: quantita(r.valore === undefined ? 0 : r.valore), um: testo(r.um, 12).toUpperCase() };
+  return { codice, descrizione: testo(r.descrizione, 400), commessa: testo(r.commessa, 40).toUpperCase(), attesa: quantita(r.attesa), valore: quantita(r.valore === undefined ? 0 : r.valore), um: testo(r.um, 12).toUpperCase(), dettaglio: testo(r.dettaglio, 1500) };
 }
 function conteggio(c){
   if(!c || typeof c !== "object") throw new Errore(400, "Conteggio non valido.");
@@ -116,6 +116,7 @@ function conteggio(c){
     attesa: quantita(c.attesa === undefined ? 0 : c.attesa),
     reale: quantita(c.reale, true),
     nota: testo(c.nota, 500),
+    parti: testo(c.parti, 1500),
     operatore: testo(c.operatore, 100),
     quando: momento(c.quando),
     extra: c.extra ? 1 : 0
@@ -133,6 +134,9 @@ async function tabelle(db){
     db.prepare("CREATE TABLE IF NOT EXISTS conteggi (inventario TEXT NOT NULL, chiave TEXT NOT NULL, codice TEXT NOT NULL, commessa TEXT NOT NULL DEFAULT '', descrizione TEXT NOT NULL DEFAULT '', attesa REAL NOT NULL DEFAULT 0, reale REAL, nota TEXT NOT NULL DEFAULT '', operatore TEXT NOT NULL DEFAULT '', quando TEXT NOT NULL, extra INTEGER NOT NULL DEFAULT 0, agg INTEGER NOT NULL, PRIMARY KEY (inventario, chiave))"),
     db.prepare("CREATE INDEX IF NOT EXISTS conteggi_agg ON conteggi (inventario, agg)")
   ]);
+  // Colonna aggiunta dopo la prima versione: nei database già esistenti va creata.
+  const colonne = await db.prepare("PRAGMA table_info(conteggi)").all();
+  if(!colonne.results.some(c => c.name === "parti")) await db.prepare("ALTER TABLE conteggi ADD COLUMN parti TEXT NOT NULL DEFAULT ''").run();
   tabellePronte = true;
 }
 
@@ -229,7 +233,7 @@ async function handle(request, env){
     if(azione === "conteggi" && m === "GET"){
       const inv = await leggi(db, id);
       const da = Number(url.searchParams.get("da")) || 0, ora = Date.now();
-      const r = await db.prepare("SELECT chiave, codice, commessa, descrizione, attesa, reale, nota, operatore, quando, extra, agg FROM conteggi WHERE inventario = ?1 AND agg >= ?2 ORDER BY agg").bind(id, da).all();
+      const r = await db.prepare("SELECT chiave, codice, commessa, descrizione, attesa, reale, nota, parti, operatore, quando, extra, agg FROM conteggi WHERE inventario = ?1 AND agg >= ?2 ORDER BY agg").bind(id, da).all();
       return json(env, 200, { conteggi: r.results.map(c => Object.assign(c, { extra: !!c.extra })), ora, inventario: inventario(inv) });
     }
 
@@ -241,11 +245,11 @@ async function handle(request, env){
       const lista = d.conteggi.map(conteggio);
       // Un'unica istruzione per tutti i conteggi; tra due conteggi dello stesso articolo vale il più recente.
       await db.prepare(
-        "INSERT INTO conteggi (inventario, chiave, codice, commessa, descrizione, attesa, reale, nota, operatore, quando, extra, agg) " +
+        "INSERT INTO conteggi (inventario, chiave, codice, commessa, descrizione, attesa, reale, nota, parti, operatore, quando, extra, agg) " +
         "SELECT ?1, json_extract(value, '$.chiave'), json_extract(value, '$.codice'), json_extract(value, '$.commessa'), json_extract(value, '$.descrizione'), " +
-        "json_extract(value, '$.attesa'), json_extract(value, '$.reale'), json_extract(value, '$.nota'), json_extract(value, '$.operatore'), json_extract(value, '$.quando'), json_extract(value, '$.extra'), ?3 " +
+        "json_extract(value, '$.attesa'), json_extract(value, '$.reale'), json_extract(value, '$.nota'), json_extract(value, '$.parti'), json_extract(value, '$.operatore'), json_extract(value, '$.quando'), json_extract(value, '$.extra'), ?3 " +
         "FROM json_each(?2) WHERE true " +
-        "ON CONFLICT (inventario, chiave) DO UPDATE SET descrizione = excluded.descrizione, attesa = excluded.attesa, reale = excluded.reale, nota = excluded.nota, " +
+        "ON CONFLICT (inventario, chiave) DO UPDATE SET descrizione = excluded.descrizione, attesa = excluded.attesa, reale = excluded.reale, nota = excluded.nota, parti = excluded.parti, " +
         "operatore = excluded.operatore, quando = excluded.quando, extra = excluded.extra, agg = excluded.agg WHERE excluded.quando >= conteggi.quando"
       ).bind(id, JSON.stringify(lista), Date.now()).run();
       return json(env, 200, { ok: true, salvati: lista.length });

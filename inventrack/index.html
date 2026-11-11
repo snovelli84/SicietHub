@@ -213,6 +213,17 @@ table.riepilogo td:last-child{text-align:right;font-weight:700;white-space:nowra
 .invbox{display:grid;gap:2px}
 .linkbtn.elimina{color:var(--error);font-size:13px}
 footer{max-width:900px;margin:0 auto;padding:0 16px calc(24px + env(safe-area-inset-bottom));text-align:center;color:var(--muted);font-size:12px}
+.dettaglio{font-size:13px;color:var(--muted)}
+.dettaglio summary{cursor:pointer;font-weight:600}
+.dettaglio div{margin-top:6px;overflow-wrap:anywhere}
+.dividi{border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-size:14px;color:var(--text)}
+.dividi p{color:var(--muted);font-size:13px;margin-top:6px}
+.dividi select{margin-top:8px}
+.parti{display:grid;gap:8px}
+.parte{display:grid;grid-template-columns:1fr 130px;gap:10px;align-items:center}
+.parte small{display:block;color:var(--muted)}
+.parte input{text-align:center;font-weight:700;font-size:18px}
+input[readonly]{opacity:.75}
 #sync{font-size:13px;color:var(--muted);text-align:center}
 #sync.attesa-invio{color:var(--warn);font-weight:600}
 
@@ -292,6 +303,11 @@ footer{max-width:900px;margin:0 auto;padding:0 16px calc(24px + env(safe-area-in
         <span class="hint">Il PDF stampato dal gestionale: <i>Analisi Andamento Giacenza</i> (per commessa) oppure <i>Valorizzazione a costi</i> (magazzino aziendale). In alternativa lo stesso report esportato in Excel (.xlsx) o CSV, con le colonne Articolo, Descrizione e Saldo (o Giacenza alla data).</span>
       </div>
       <div id="nEsito" style="display:grid;gap:10px"></div>
+      <div class="avviso info" id="sommaCampo" hidden>
+        <span id="sommaTesto"></span>
+        <label class="riga"><input type="checkbox" id="nSomma" checked><span><b>Somma la commessa e le sue varianti</b></span></label>
+        <span>Il materiale comprato per la commessa viene spesso scaricato su una variante: per ogni articolo la giacenza attesa diventa la somma della commessa e delle varianti, cioè quello che c'è davvero in magazzino. Senza la spunta ogni variante resta una riga separata.</span>
+      </div>
       <label class="field"><span class="flabel">Note (facoltative)</span>
         <input type="text" id="nNote" maxlength="300"></label>
       <div class="avviso errore" id="nErr" hidden></div>
@@ -366,7 +382,7 @@ footer{max-width:900px;margin:0 auto;padding:0 16px calc(24px + env(safe-area-in
 
 <div id="toast" role="status" hidden></div>
 
-<script src="report.js?v=2"></script>
-<script src="inventrack.js?v=6"></script>
+<script src="report.js?v=4"></script>
+<script src="inventrack.js?v=8"></script>
 </body>
 </html>

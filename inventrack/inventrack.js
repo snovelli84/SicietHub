@@ -26,7 +26,7 @@ var INVENTRACK_CONFIG = {
 
   // Versione mostrata in fondo alla pagina: aumentarla a ogni modifica,
   // insieme al numero ?v= di inventrack.js in index.html.
-  versione: "1.6"
+  versione: "1.8"
 };
 
 (function(){
@@ -387,12 +387,11 @@ var INVENTRACK_CONFIG = {
       r.nome = f.name;
       S.nuovo = r;
       var commesse = Object.keys(r.info.commesse).filter(Boolean);
-      if(!tipoScelto()){
-        // Un report con una sola commessa è quasi certamente un inventario di commessa.
-        var t = commesse.length === 1 && Object.keys(r.info.commesse).length === 1 ? "commessa" : "generale";
-        document.querySelector("input[name=tipo][value=" + t + "]").checked = true;
-      }
-      if(!$("nCommessa").value && commesse.length === 1) $("nCommessa").value = commesse[0];
+      // Una commessa sola, oppure una commessa con le sue varianti (tutte iniziano con il suo codice).
+      var base = commesse.slice().sort(function(x, y){ return x.length - y.length; })[0] || "";
+      var famiglia = commesse.length > 0 && commesse.length === Object.keys(r.info.commesse).length && commesse.every(function(x){ return x.indexOf(base) === 0; });
+      if(!tipoScelto()) document.querySelector("input[name=tipo][value=" + (famiglia ? "commessa" : "generale") + "]").checked = true;
+      if(!$("nCommessa").value && famiglia) $("nCommessa").value = base;
       if(!$("nDeposito").value && r.info.deposito) $("nDeposito").value = r.info.deposito;
     }catch(e){
       $("nErr").hidden = false;
@@ -405,16 +404,23 @@ var INVENTRACK_CONFIG = {
   // (anche con la variante, es. S1852V31 per la commessa S1852).
   function righeNuovo(){
     var r = S.nuovo;
-    if(!r) return { righe: [], scartate: 0 };
-    if(tipoScelto() !== "commessa") return { righe: r.righe, scartate: 0 };
+    if(!r) return { righe: [], scartate: 0, varianti: [] };
+    if(tipoScelto() !== "commessa") return { righe: r.righe, scartate: 0, varianti: [] };
     var c = R.codice($("nCommessa").value);
     var righe = r.righe.filter(function(x){ return c && (x.commessa === c || x.commessa.indexOf(c) === 0); });
-    return { righe: righe, scartate: r.righe.length - righe.length };
+    var scartate = r.righe.length - righe.length, varianti = {};
+    righe.forEach(function(x){ if(x.commessa !== c) varianti[x.commessa] = 1; });
+    varianti = Object.keys(varianti).sort();
+    // Con le varianti nel report, la giacenza attesa di ogni articolo è la somma di commessa e varianti.
+    var sommate = varianti.length > 0 && $("nSomma").checked;
+    if(sommate) righe = R.sommaVarianti(righe, c);
+    return { righe: righe, scartate: scartate, varianti: varianti, sommate: sommate };
   }
 
   function aggiornaNuovo(){
     var tipo = tipoScelto(), r = S.nuovo, esito = svuota($("nEsito")), ok = !!r && !!tipo;
     $("commessaCampo").hidden = tipo !== "commessa";
+    $("sommaCampo").hidden = true;
     if(r){
       var commesse = Object.keys(r.info.commesse), sel = righeNuovo(), data = $("nData").value;
       var valore = sel.righe.reduce(function(s, x){ return s + x.attesa * x.valore; }, 0);
@@ -424,19 +430,31 @@ var INVENTRACK_CONFIG = {
           r.info.deposito && "deposito " + r.info.deposito,
           commesse.filter(Boolean).length && (commesse.length <= 4 ? "commesse: " + commesse.map(function(c){ return c || "(nessuna)"; }).join(", ") : commesse.length + " commesse"),
           r.info.tipo === "valorizzazione" && "giacenza al " + dataIt(r.info.finoAl),
-          r.info.stampatoIl && "stampato il " + dataIt(r.info.stampatoIl)].filter(Boolean).join(" · ") })));
+          r.info.stampatoIl && "stampato il " + dataIt(r.info.stampatoIl),
+          r.info.controllati && !r.info.nonQuadrano.length && "✓ " + fmt(r.info.controllati) + " articoli coincidono con i totali del report"].filter(Boolean).join(" · ") })));
       var avvisi = [];
       if(tipo === "commessa"){
         var c = R.codice($("nCommessa").value);
         if(!c){ ok = false; avvisi.push("Scrivi la commessa dell'inventario."); }
         else if(!sel.righe.length){ ok = false; avvisi.push("Il report non contiene articoli della commessa " + c + " (contiene: " + commesse.map(function(x){ return x || "nessuna commessa"; }).join(", ") + ")."); }
         else if(sel.scartate) avvisi.push(fmt(sel.scartate) + " righe del report sono di altre commesse e non entrano in questo inventario.");
+        if(c && sel.varianti.length){
+          $("sommaCampo").hidden = false;
+          $("sommaTesto").textContent = "Il report contiene anche " + (sel.varianti.length === 1 ? "la variante " : sel.varianti.length + " varianti: ") + (sel.varianti.length <= 6 ? sel.varianti.join(", ") : sel.varianti.slice(0, 6).join(", ") + "…") + ".";
+          if(sel.sommate){
+            var negativi = sel.righe.filter(function(x){ return x.attesa < 0; }).length;
+            if(negativi) avvisi.push(fmt(negativi) + " articoli hanno giacenza attesa negativa anche sommando le varianti: forse manca qualche commessa nel report.");
+          }
+        } else if(c && sel.righe.length && !/V\d+$/.test(c)){
+          avvisi.push("Il report contiene solo la commessa " + c + ". Se la commessa ha delle varianti (" + c + "V01, " + c + "V02…) su cui è stato scaricato materiale, ristampa il report da " + c + " a " + c + "ZZ: così la giacenza attesa tiene conto anche di quegli scarichi.");
+        }
       } else if(tipo === "generale" && r.info.commessa && commesse.length === 1){
         avvisi.push("Il report è stato stampato per la sola commessa " + commesse[0] + ": se è l'inventario di quella commessa scegli “Magazzino di commessa”.");
       }
       if(r.info.stampatoIl && data && r.info.stampatoIl !== data) avvisi.push("Il report è stato stampato il " + dataIt(r.info.stampatoIl) + ", ma la data dell'inventario è il " + dataIt(data) + ": le giacenze attese potrebbero non essere quelle giuste. Meglio ristampare il report il giorno dell'inventario.");
       if(r.info.finoAl && data && r.info.finoAl < data) avvisi.push("Il report considera i movimenti solo fino al " + dataIt(r.info.finoAl) + ", ma l'inventario è del " + dataIt(data) + ": i movimenti successivi non sono compresi e le differenze potrebbero non essere vere. Meglio ristampare il report alla data dell'inventario.");
       if(data && data !== oggi()) avvisi.push("La data dell'inventario non è oggi (" + dataIt(oggi()) + ").");
+      if(r.info.nonQuadrano && r.info.nonQuadrano.length) avvisi.push("Per " + fmt(r.info.nonQuadrano.length) + " articoli su " + fmt(r.info.controllati) + " la giacenza letta non coincide con il totale stampato dal report (entrate − uscite): " + r.info.nonQuadrano.slice(0, 8).join(", ") + (r.info.nonQuadrano.length > 8 ? "…" : "") + ". Controlla questi articoli prima di contare.");
       if(r.info.ripetuti) avvisi.push(fmt(r.info.ripetuti) + " righe ripetevano lo stesso articolo e la stessa commessa: le quantità sono state sommate.");
       if(avvisi.length) esito.appendChild(el("div", { class: "avviso" }, el("ul", {}, ...avvisi.map(function(a){ return el("li", { text: a }); }))));
     }
@@ -563,6 +581,7 @@ var INVENTRACK_CONFIG = {
     S.inv = inv;
     S.righe = righe;
     S.indice = {};
+    S.commesse = null;
     righe.forEach(function(r){ S.indice[R.chiave(r.codice, r.commessa)] = r; });
     S.conteggi = cnt.conteggi;
     S.da = cnt.da;
@@ -650,6 +669,25 @@ var INVENTRACK_CONFIG = {
     });
     out.sort(function(a, b){ return b.punti - a.punti || (a.riga.codice < b.riga.codice ? -1 : 1); });
     return max ? out.slice(0, max) : out;
+  }
+
+  // "S1852: 10900 · S1852V04: -500" → [{ commessa, q }]
+  function leggiParti(t){
+    return String(t || "").split(" · ").map(function(x){
+      var p = x.split(": ");
+      return p.length === 2 && p[0] ? { commessa: p[0], q: Number(p[1].replace(",", ".")) } : null;
+    }).filter(function(x){ return x && isFinite(x.q); });
+  }
+  function scriviParti(parti){ return parti.map(function(x){ return x.commessa + ": " + String(x.q).replace(".", ","); }).join(" · "); }
+  function mostraParti(t){ return leggiParti(t).map(function(x){ return x.commessa + ": " + fmt(x.q); }).join(" · "); }
+  // Commesse (padre e varianti) presenti nell'inventario, se è stato creato sommando le varianti.
+  function commesseInventario(){
+    if(!S.commesse){
+      var viste = {};
+      S.righe.forEach(function(r){ leggiParti(r.dettaglio).forEach(function(x){ viste[x.commessa] = 1; }); });
+      S.commesse = Object.keys(viste).sort();
+    }
+    return S.commesse;
   }
 
   function conUm(n, r){ return fmt(n) + (r.um ? " " + r.um : ""); }
@@ -773,7 +811,7 @@ var INVENTRACK_CONFIG = {
       el("div", { class: "riga spazio" },
         el("span", { class: "scheda-codice", text: r.codice }),
         el("span", { class: "riga" },
-          r.commessa ? el("span", { class: "chip", text: r.commessa }) : null,
+          r.commessa ? el("span", { class: "chip", text: r.commessa + (r.dettaglio ? " + varianti" : "") }) : null,
           r.extra ? el("span", { class: "chip warn", text: "Non nel report" }) : null)),
       r.nuovo ? null : el("div", { text: r.descrizione }));
     if(r.nuovo){
@@ -784,12 +822,19 @@ var INVENTRACK_CONFIG = {
         S.inv.tipo === "generale" ? el("label", { class: "field" }, el("span", { class: "flabel", text: "Commessa (facoltativa)" }), el("input", { type: "text", id: "sCommessa", class: "maiuscolo", maxlength: "30" })) : null);
     } else {
       box.appendChild(el("div", { class: "attesa" }, el("small", { text: "Giacenza attesa" + (r.um ? " (" + r.um + ")" : "") }), el("b", { text: fmt(r.attesa) })));
+      if(r.dettaglio){
+        // Giacenza del gestionale commessa per commessa: la somma è la giacenza attesa.
+        box.appendChild(el("details", { class: "dettaglio" },
+          el("summary", { text: "Somma della commessa e delle varianti" }),
+          el("div", { text: mostraParti(r.dettaglio) })));
+      }
     }
     if(r.nuovo) cercaCollegati(r);
     if(c){
       var d = c.reale - r.attesa;
       box.appendChild(el("div", { class: "avviso " + (st === "diff" ? "errore" : "bene") },
         el("b", { text: st === "diff" ? "Già contato: giacenza reale " + fmt(c.reale) + " (differenza " + fmtDiff(d) + ")" : "Già contato: giacenza confermata" }),
+        c.parti ? el("span", { text: "Per commessa: " + mostraParti(c.parti) }) : null,
         el("span", { text: [c.operatore, oraIt(c.quando), c.nota && "nota: " + c.nota].filter(Boolean).join(" · ") })));
     }
     if(perche){
@@ -810,8 +855,66 @@ var INVENTRACK_CONFIG = {
       else if(Math.abs(q - r.attesa) <= TOLLERANZA){ anteprima.textContent = "Uguale alla giacenza attesa"; anteprima.className = "ok"; }
       else{ anteprima.textContent = "Giacenza reale " + fmt(q) + " · differenza " + fmtDiff(q - r.attesa); anteprima.className = "diff"; }
     });
+    /* Divisione per commessa: quanto c'è per la commessa padre e quanto per ogni
+     * variante. La giacenza reale è la somma; la differenza resta sul totale. */
+    var campiParti = [], boxParti = null, tutte = r.nuovo ? [] : commesseInventario();
+    function sommaParti(){
+      var usati = campiParti.filter(function(x){ return x.input.value.trim() !== ""; });
+      if(!usati.length) return null;
+      var tot = 0, errore = false;
+      usati.forEach(function(x){
+        var q = quantitaScritta(x.input.value);
+        x.input.classList.toggle("invalid", q === null);
+        if(q === null) errore = true; else tot += q;
+      });
+      return errore ? NaN : arrotonda(tot);
+    }
+    function aggiornaParti(){
+      var tot = sommaParti();
+      reale.readOnly = tot !== null;
+      if(tot !== null){ reale.value = isNaN(tot) ? "" : String(tot).replace(".", ","); reale.dispatchEvent(new Event("input")); }
+      if(tot !== null && isNaN(tot)) anteprima.textContent = "Scrivi solo numeri, es. 12 oppure 12,5";
+    }
+    function rigaParte(commessa, libro, valore){
+      var input = el("input", { type: "text", inputmode: "decimal", autocomplete: "off", placeholder: "0", "aria-label": "Giacenza reale " + commessa, value: valore === undefined ? "" : String(valore).replace(".", ",") });
+      input.addEventListener("input", aggiornaParti);
+      campiParti.push({ commessa: commessa, input: input });
+      return el("label", { class: "parte" },
+        el("span", {}, el("b", { text: commessa }), libro === undefined ? null : el("small", { text: "gestionale " + fmt(libro) })),
+        input);
+    }
+    if(tutte.length){
+      var libro = {}, gia = {}, elenco = [];
+      leggiParti(r.dettaglio).forEach(function(x){ libro[x.commessa] = x.q; });
+      leggiParti(c && c.parti).forEach(function(x){ gia[x.commessa] = x.q; });
+      // Prima la commessa dell'inventario, poi le varianti dell'articolo e quelle già contate.
+      [S.inv.commessa].concat(Object.keys(libro), Object.keys(gia)).forEach(function(k){ if(k && elenco.indexOf(k) < 0) elenco.push(k); });
+      var righeParti = el("div", { class: "parti" }, ...elenco.map(function(k){ return rigaParte(k, libro[k], gia[k]); }));
+      var altre = tutte.filter(function(k){ return elenco.indexOf(k) < 0; });
+      var scelta = altre.length ? el("select", { "aria-label": "Aggiungi una variante" }, el("option", { value: "", text: "+ Aggiungi un'altra variante…" }), ...altre.map(function(k){ return el("option", { value: k, text: k }); })) : null;
+      if(scelta) scelta.addEventListener("change", function(){
+        if(!scelta.value) return;
+        var riga = rigaParte(scelta.value);
+        righeParti.appendChild(riga);
+        scelta.querySelector('option[value="' + scelta.value + '"]').remove();
+        scelta.value = "";
+        if(scelta.options.length < 2) scelta.hidden = true;
+        riga.querySelector("input").focus();
+      });
+      boxParti = el("details", { class: "dettaglio dividi", open: Object.keys(gia).length > 0 },
+        el("summary", { text: "Dividi per commessa (" + S.inv.commessa + " e varianti)" }),
+        el("p", { text: "Scrivi quanto c'è per ogni commessa: la giacenza reale è la somma. Lascia vuote quelle dove non c'è nulla." }),
+        righeParti, scelta);
+    }
+
     function salvaReale(){
       var q = quantitaScritta(reale.value);
+      var tot = sommaParti();
+      if(tot !== null && isNaN(tot)){ campiParti.filter(function(x){ return x.input.classList.contains("invalid"); })[0].input.focus(); return; }
+      if(tot !== null){
+        salvaConteggio(r, tot, nota.value, scriviParti(campiParti.filter(function(x){ return x.input.value.trim() !== ""; }).map(function(x){ return { commessa: x.commessa, q: arrotonda(quantitaScritta(x.input.value)) }; })));
+        return;
+      }
       if(q === null){ reale.classList.add("invalid"); reale.focus(); return; }
       if(r.nuovo){
         var des = $("sDescr");
@@ -829,7 +932,13 @@ var INVENTRACK_CONFIG = {
     }
     box.append(
       el("div", { class: "reale" }, reale, el("button", { class: "btn primary", type: "button", text: "Salva", onclick: salvaReale })),
-      anteprima, nota,
+      anteprima);
+    if(boxParti){
+      box.appendChild(boxParti);
+      campiParti.forEach(function(x){ x.input.addEventListener("keydown", function(ev){ if(ev.key === "Enter"){ ev.preventDefault(); salvaReale(); } }); });
+      if(Object.keys(leggiParti(c && c.parti)).length) aggiornaParti();
+    }
+    box.append(nota,
       el("div", { class: "riga spazio" },
         el("button", { class: "linkbtn", type: "button", text: "Chiudi senza salvare", onclick: chiudiScheda }),
         c ? el("button", { class: "linkbtn", type: "button", text: "Annulla il conteggio", onclick: function(){
@@ -837,12 +946,12 @@ var INVENTRACK_CONFIG = {
         } }) : null));
   }
 
-  function salvaConteggio(r, reale, nota){
+  function salvaConteggio(r, reale, nota, parti){
     var k = R.chiave(r.codice, r.commessa);
     var c = {
       chiave: k, codice: r.codice, commessa: r.commessa, descrizione: r.descrizione, attesa: r.attesa,
       reale: reale === null ? null : arrotonda(reale), nota: R.pulisci(nota), operatore: operatore(),
-      quando: new Date().toISOString(), extra: !!r.extra
+      quando: new Date().toISOString(), extra: !!r.extra, parti: reale === null ? "" : (parti || "")
     };
     S.conteggi[k] = c;
     kv.set("cnt:" + S.inv.id, { conteggi: S.conteggi, da: S.da });
@@ -901,9 +1010,9 @@ var INVENTRACK_CONFIG = {
         : r.extra ? "Non presente nel report"
         : Math.abs(diff) <= TOLLERANZA ? "Confermata" : "Differenza";
       return {
-        codice: r.codice, descrizione: r.descrizione, commessa: r.commessa, um: r.um || "", attesa: r.attesa, reale: reale, diff: diff,
+        codice: r.codice, descrizione: r.descrizione, commessa: r.commessa, um: r.um || "", dettaglio: r.dettaglio || "", attesa: r.attesa, reale: reale, diff: diff,
         valore: r.valore, valoreDiff: diff === null ? null : Math.round(diff * r.valore * 100) / 100, esito: esito,
-        operatore: c ? c.operatore : "", quando: c ? c.quando : "", nota: c ? c.nota : "",
+        operatore: c ? c.operatore : "", quando: c ? c.quando : "", nota: c ? c.nota : "", parti: c && c.parti ? c.parti : "",
         fuoriData: !!c && giornoDi(c.quando) !== S.inv.data
       };
     });
@@ -917,7 +1026,8 @@ var INVENTRACK_CONFIG = {
     ["Codice", 22, "codice"], ["Descrizione", 48, "descrizione"], ["Commessa", 12, "commessa"], ["U.M.", 7, "um"],
     ["Giacenza attesa", 13, "attesa", "q"], ["Giacenza reale", 13, "reale", "q"], ["Differenza", 12, "diff", "q"],
     ["Valore unitario", 13, "valore", "v"], ["Valore differenza", 14, "valoreDiff", "e"], ["Esito", 24, "esito"],
-    ["Contato da", 20, "operatore"], ["Data e ora del conteggio", 18, "quando", "d"], ["Note", 36, "nota"]
+    ["Contato da", 20, "operatore"], ["Data e ora del conteggio", 18, "quando", "d"], ["Note", 36, "nota"],
+    ["Giacenza reale per commessa", 40, "parti"], ["Giacenza per commessa (gestionale)", 60, "dettaglio"]
   ];
 
   function foglio(wb, nome, intestazione, righe){
