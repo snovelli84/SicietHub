@@ -38,6 +38,18 @@ Un inventario vale **solo per il giorno in cui viene fatto**: le giacenze attese
 - Data, ora e autore di ogni conteggio sono nell'Excel.
 - A giro finito **Chiudi l'inventario**: da quel momento nessun dispositivo può più modificare le quantità (si può riaprire). Excel e CSV si possono sempre scaricare.
 
+### Commessa e varianti: la giacenza attesa è la somma
+
+Il materiale comprato per una commessa (es. `S1852`) viene spesso scaricato su una sua variante (`S1852V04`) per la quale non era mai stato caricato. Nel gestionale la commessa resta con una giacenza più alta del vero e la variante va in negativo: contando la sola `S1852` il sistema si aspetterebbe più materiale di quello che c'è.
+
+Per questo, se il report caricato contiene anche le varianti, la pagina propone (già spuntato) **Somma la commessa e le sue varianti**: per ogni articolo la giacenza attesa è la somma della commessa e di tutte le commesse il cui codice inizia con il suo. Esempio reale, articolo `HIL2346062`: `S1852` 10.900, varianti in tutto −7.500, **giacenza attesa 3.400**.
+
+- **Il report va stampato comprendendo le varianti**: *Da Commessa* `S1852`, *A Commessa* `S1852ZZ` (con `S1852/` le varianti restano fuori). Se il report contiene solo la commessa, la pagina lo ricorda.
+- Va bene sia il report riassunto (una riga per articolo e commessa) sia quello con il **dettaglio dei movimenti** (una riga per movimento): in quel caso vale il saldo dell'ultima riga di ogni commessa.
+- Nella scheda dell'articolo **Somma della commessa e delle varianti** mostra la giacenza del gestionale commessa per commessa; lo stesso dettaglio è nell'ultima colonna dell'Excel.
+- I CSV dei movimenti contengono la differenza sul totale (non hanno la commessa): su quale commessa registrare il movimento si decide nel gestionale.
+- Togliendo la spunta ogni variante resta una riga separata, con la sua commessa.
+
 ### Magazzino aziendale: il giro di fine giornata
 
 1. Dal gestionale si stampa il report **Valorizzazione a costi** (o *Analisi Andamento Giacenza*) **alla data dell'inventario** e lo si carica in **Nuovo inventario → Magazzino aziendale**. Se il report è alla data di un giorno diverso (es. giacenza al 31/10 per un inventario del 10/11) la pagina avvisa: i movimenti successivi non sono compresi e le differenze potrebbero non essere vere.
@@ -91,7 +103,7 @@ Finché `api` in `INVENTRACK_CONFIG` (all'inizio di [`inventrack.js`](inventrack
 
 Verifica: aprire `hub.siciet.it/inventrack/`, inserire nome e password, creare un inventario di prova con un report e poi eliminarlo (scheda *Esporta* → **Elimina**). "Servizio non configurato" indica che manca l'associazione `DB` o la variabile `PASSWORD`.
 
-Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo. Dalla versione 1.6 il servizio salva anche l'**unità di misura** degli articoli: finché non si ricopia il nuovo `worker.js` tutto funziona ma l'unità di misura si vede solo sul dispositivo che ha creato l'inventario.
+Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo. Dalla versione 1.6 il servizio salva anche l'**unità di misura** degli articoli e dalla 1.7 il **dettaglio per commessa** della somma con le varianti: finché non si ricopia il nuovo `worker.js` tutto funziona, ma questi due dati si vedono solo sul dispositivo che ha creato l'inventario.
 
 ## Limiti
 
@@ -103,6 +115,6 @@ Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo. 
 - La lettura dalla foto sbaglia con scritte poco contrastate, riflessi o targhette storte: il codice proposto va sempre controllato.
 - Le librerie (pdf.js per leggere il PDF, ExcelJS per l'Excel, Tesseract.js per le foto) sono caricate da `cdn.jsdelivr.net`, che deve essere raggiungibile.
 
-**Aggiornamenti** – A ogni modifica di `inventrack.js` o `report.js` aumentare il numero in `?v=…` in fondo a `index.html` e la `versione` in `INVENTRACK_CONFIG` (all'inizio di `inventrack.js`): la versione compare in fondo a ogni pagina ("SICIET InvenTrack · versione 1.5") e serve a controllare che un telefono abbia caricato la pagina aggiornata.
+**Aggiornamenti** – A ogni modifica di `inventrack.js` o `report.js` aumentare il numero in `?v=…` in fondo a `index.html` e la `versione` in `INVENTRACK_CONFIG` (all'inizio di `inventrack.js`): la versione compare in fondo a ogni pagina ("SICIET InvenTrack · versione 1.7") e serve a controllare che un telefono abbia caricato la pagina aggiornata.
 
 **Logo e icone** – In [`icons/`](icons/): marchio SICIET con la scritta INVENTRACK (font Orbitron, gradiente blu → verde come in SICIET HUB e SICIET Quality). `logo.png` è usato nell'intestazione, le altre sono le icone per la schermata Home e il browser.

@@ -9,12 +9,17 @@
  *                                (come lo restituisce pdf.js)
  *   InvReport.daTabella(righe)   lo stesso report esportato in Excel o CSV
  *                                (righe = matrice di celle)
+ *   InvReport.sommaVarianti(righe, commessa)  una riga per articolo, sommando la
+ *                                commessa e le sue varianti (S1852 + S1852V04 + …)
  *   InvReport.numero(testo)      "10.813,20" → 10813.2
  *   InvReport.chiave(cod, com)   identificativo di una riga (codice + commessa)
  *   InvReport.cerca(testi, righe) articoli che somigliano ai testi letti da una foto
  *
  * Ogni riga letta è { codice, descrizione, commessa, attesa, valore }:
  * attesa = colonna Saldo, valore = valore unitario (Totale riga / Saldo).
+ * Il report di giacenza può essere riassunto (una riga per articolo e commessa)
+ * o con il dettaglio dei movimenti (una riga per movimento, Saldo progressivo
+ * per commessa): si leggono entrambi.
  */
 (function(root){
   "use strict";
@@ -137,7 +142,7 @@
   }
 
   function rigaAnalisi(g, col){
-    var cod = [], des = [], com = [], num = {};
+    var cod = [], des = [], com = [], num = {}, movimento = false;
     g.items.sort(function(a, b){ return a.x - b.x; }).forEach(function(i){
       if(i.x < col.fineCodice) cod.push(i.s);
       else if(i.x >= col.inizioNumeri){
@@ -147,13 +152,15 @@
         col.num.forEach(function(h){ if(!migliore || Math.abs(h.destra - destra) < Math.abs(migliore.destra - destra)) migliore = h; });
         num[migliore.nome] = n;
       }
-      else if(col.commessa !== null && i.x >= col.commessa){ if(!com.length && i.x < col.commessa + 40) com.push(i.s); }
+      else if(col.commessa !== null && i.x >= col.commessa){
+        if(RE_DATA.test(pulisci(i.s))) movimento = true; // colonna DtaReg: è la riga di un movimento
+        else if(!com.length && i.x < col.commessa + 40) com.push(i.s);
+      }
       else des.push(i.s);
     });
     var codice = pulisci(cod.join(" ")), descr = pulisci(des.join(" "));
     var haNumeri = "Saldo" in num || "Entrata" in num || "Uscita" in num;
-    return { codice: codice, descr: descr, haNumeri: haNumeri, vuota: !Object.keys(num).length,
-      riga: codice && haNumeri ? riga(codice, descr, com.join(""), num.Saldo, num.Unitario, num["Totale Riga"]) : null };
+    return { codice: codice, descr: descr, commessa: com.join(""), num: num, movimento: movimento, haNumeri: haNumeri, vuota: !Object.keys(num).length };
   }
 
   function rigaValorizzazione(g, col, cat){
@@ -187,8 +194,14 @@
       riga: codice && haNumeri ? riga(codice, descr, "", num["Giacenza alla data"], null, num["Valore alla data"], um.join(" ")) : null };
   }
 
+  function descrizioneIn(articolo, testo){
+    articolo.descrizione = pulisci(articolo.descrizione + " " + testo);
+    articolo.righe.forEach(function(r){ r.descrizione = articolo.descrizione; });
+  }
+
   function daPdf(pagine){
     var righe = [], info = { tipo: "", deposito: "", commessa: "", stampatoIl: "", finoAl: "", pagine: pagine.length }, col = null, corrente = null, cat = null;
+    var articolo = null, movimenti = {};
     pagine.forEach(function(pag){
       var items = pag.items.filter(function(i){ return pulisci(i.s); });
       var c = colonne(items);
@@ -219,15 +232,69 @@
       });
       if(col.tipo === "valorizzazione") cat = colonnaCategoria(gruppi, col, cat);
       gruppi.forEach(function(g){
-        var l = col.tipo === "analisi" ? rigaAnalisi(g, col) : rigaValorizzazione(g, col, cat);
-        if(l.riga){ corrente = l.riga; righe.push(corrente); }
-        else if(!l.codice && l.descr && l.vuota && corrente){
-          // Descrizione su più righe (anche a cavallo di due pagine).
-          corrente.descrizione = pulisci(corrente.descrizione + " " + l.descr);
+        if(col.tipo !== "analisi"){
+          var v = rigaValorizzazione(g, col, cat);
+          if(v.riga){ corrente = v.riga; righe.push(corrente); }
+          else if(!v.codice && v.descr && v.vuota && corrente) corrente.descrizione = pulisci(corrente.descrizione + " " + v.descr);
+          return;
         }
+        var l = rigaAnalisi(g, col);
+        if(l.codice && l.haNumeri) articolo = { codice: l.codice, descrizione: l.descr, righe: [] };
+        else if(!l.codice && l.haNumeri && l.commessa && articolo){
+          // Report con il dettaglio dei movimenti: il codice è scritto solo sulla prima riga dell'articolo.
+          if(l.descr) descrizioneIn(articolo, l.descr);
+        }
+        else{
+          // Descrizione su più righe (anche a cavallo di due pagine). Le righe dei totali non hanno commessa.
+          if(!l.codice && l.descr && l.vuota && articolo) descrizioneIn(articolo, l.descr);
+          return;
+        }
+        var k = chiave(articolo.codice, l.commessa), gia = l.movimento ? movimenti[k] : null;
+        if(gia){
+          // Il Saldo dei movimenti è progressivo per commessa: vale quello dell'ultima riga.
+          if("Saldo" in l.num) gia.attesa = l.num.Saldo;
+          if(l.num.Entrata > 0 && l.num.Unitario) gia.valore = l.num.Unitario;
+          return;
+        }
+        var nuova = riga(articolo.codice, articolo.descrizione, l.commessa, l.num.Saldo, l.num.Unitario, l.num["Totale Riga"]);
+        articolo.righe.push(nuova);
+        righe.push(nuova);
+        if(l.movimento){ movimenti[k] = nuova; info.movimenti = true; }
       });
     });
     return { righe: unisci(righe, info), info: info };
+  }
+
+  /* ---------- Commessa e varianti ----------
+   * Il materiale comprato per la commessa (S1852) viene spesso scaricato su una
+   * sua variante (S1852V04) che non l'aveva mai caricato: la commessa resta con
+   * una giacenza più alta del vero e la variante va in negativo. In magazzino
+   * c'è la somma: per ogni articolo si sommano la commessa e tutte le commesse
+   * il cui codice inizia con il suo. In "dettaglio" resta la giacenza di ognuna.
+   */
+  function sommaVarianti(righe, commessa){
+    commessa = codicePulito(commessa);
+    var mappa = {}, out = [];
+    righe.forEach(function(r){
+      var k = codicePulito(r.codice), p = mappa[k];
+      if(!p){
+        p = mappa[k] = { riga: { codice: r.codice, descrizione: r.descrizione, commessa: commessa, attesa: 0, valore: 0 }, parti: [], valoreBase: 0, valoreAltro: 0 };
+        if(r.um) p.riga.um = r.um;
+        out.push(p.riga);
+      }
+      p.riga.attesa = arrotonda(p.riga.attesa + r.attesa, 6);
+      if(!p.riga.descrizione) p.riga.descrizione = r.descrizione;
+      p.parti.push(r);
+      if(r.valore){ if(r.commessa === commessa) p.valoreBase = r.valore; else if(!p.valoreAltro) p.valoreAltro = r.valore; }
+    });
+    Object.keys(mappa).forEach(function(k){
+      var p = mappa[k];
+      p.riga.valore = p.valoreBase || p.valoreAltro || 0;
+      if(p.parti.length > 1 || p.parti[0].commessa !== commessa){
+        p.riga.dettaglio = p.parti.map(function(r){ return r.commessa + ": " + String(r.attesa).replace(".", ","); }).join(" · ");
+      }
+    });
+    return out;
   }
 
   /* ---------- Excel / CSV ---------- */
@@ -341,7 +408,7 @@
     return out.slice(0, 6);
   }
 
-  var api = { numero: numero, dataIso: dataIso, chiave: chiave, codice: codicePulito, pulisci: pulisci, daPdf: daPdf, daTabella: daTabella, csv: csv, canon: canon, cerca: cerca };
+  var api = { numero: numero, dataIso: dataIso, chiave: chiave, codice: codicePulito, pulisci: pulisci, daPdf: daPdf, daTabella: daTabella, sommaVarianti: sommaVarianti, csv: csv, canon: canon, cerca: cerca };
   if(typeof module !== "undefined" && module.exports) module.exports = api;
   else root.InvReport = api;
 })(typeof self !== "undefined" ? self : this);
