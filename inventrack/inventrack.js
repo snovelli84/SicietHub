@@ -26,7 +26,7 @@ var INVENTRACK_CONFIG = {
 
   // Versione mostrata in fondo alla pagina: aumentarla a ogni modifica,
   // insieme al numero ?v= di inventrack.js in index.html.
-  versione: "1.8"
+  versione: "1.9"
 };
 
 (function(){
@@ -335,6 +335,7 @@ var INVENTRACK_CONFIG = {
     $("nData").value = oggi();
     $("nErr").hidden = true;
     S.nuovo = null;
+    aggiornaNuovo.firma = null;
     aggiornaNuovo();
     mostra("vNuovo");
   }
@@ -377,6 +378,7 @@ var INVENTRACK_CONFIG = {
   $("nFile").addEventListener("change", async function(){
     var f = this.files[0];
     S.nuovo = null;
+    aggiornaNuovo.firma = null;
     $("nErr").hidden = true;
     svuota($("nEsito"));
     if(!f){ aggiornaNuovo(); return; }
@@ -397,6 +399,7 @@ var INVENTRACK_CONFIG = {
       $("nErr").hidden = false;
       $("nErr").textContent = e.message || String(e);
     }
+    aggiornaNuovo.firma = null;
     aggiornaNuovo();
   });
 
@@ -409,15 +412,23 @@ var INVENTRACK_CONFIG = {
     var c = R.codice($("nCommessa").value);
     var righe = r.righe.filter(function(x){ return c && (x.commessa === c || x.commessa.indexOf(c) === 0); });
     var scartate = r.righe.length - righe.length, varianti = {};
+    var scartateElenco = r.righe.filter(function(x){ return righe.indexOf(x) < 0; }).map(function(x){ return x.codice + " — commessa " + (x.commessa || "(nessuna)") + ", giacenza " + fmt(x.attesa); });
     righe.forEach(function(x){ if(x.commessa !== c) varianti[x.commessa] = 1; });
     varianti = Object.keys(varianti).sort();
     // Con le varianti nel report, la giacenza attesa di ogni articolo è la somma di commessa e varianti.
     var sommate = varianti.length > 0 && $("nSomma").checked;
     if(sommate) righe = R.sommaVarianti(righe, c);
-    return { righe: righe, scartate: scartate, varianti: varianti, sommate: sommate };
+    return { righe: righe, scartate: scartate, scartateElenco: scartateElenco, varianti: varianti, sommate: sommate };
   }
 
   function aggiornaNuovo(){
+    // Se non è cambiato nulla il riepilogo non si ridisegna: altrimenti, uscendo da
+    // un campo, il primo tocco su un elenco andrebbe perso.
+    var firma = [tipoScelto(), $("nCommessa").value, $("nData").value, $("nSomma").checked, S.nuovo ? S.nuovo.nome + S.nuovo.righe.length : "", $("nErr").hidden].join("|");
+    if(firma === aggiornaNuovo.firma && $("nEsito").firstChild) return;
+    aggiornaNuovo.firma = firma;
+    // Gli elenchi aperti restano aperti quando il riepilogo viene ridisegnato.
+    var aperti = Array.prototype.map.call($("nEsito").querySelectorAll("details.codici"), function(d){ return d.open; });
     var tipo = tipoScelto(), r = S.nuovo, esito = svuota($("nEsito")), ok = !!r && !!tipo;
     $("commessaCampo").hidden = tipo !== "commessa";
     $("sommaCampo").hidden = true;
@@ -437,13 +448,14 @@ var INVENTRACK_CONFIG = {
         var c = R.codice($("nCommessa").value);
         if(!c){ ok = false; avvisi.push("Scrivi la commessa dell'inventario."); }
         else if(!sel.righe.length){ ok = false; avvisi.push("Il report non contiene articoli della commessa " + c + " (contiene: " + commesse.map(function(x){ return x || "nessuna commessa"; }).join(", ") + ")."); }
-        else if(sel.scartate) avvisi.push(fmt(sel.scartate) + " righe del report sono di altre commesse e non entrano in questo inventario.");
+        else if(sel.scartate) avvisi.push({ testo: fmt(sel.scartate) + " righe del report sono di altre commesse e non entrano in questo inventario.", elenco: sel.scartateElenco });
         if(c && sel.varianti.length){
           $("sommaCampo").hidden = false;
           $("sommaTesto").textContent = "Il report contiene anche " + (sel.varianti.length === 1 ? "la variante " : sel.varianti.length + " varianti: ") + (sel.varianti.length <= 6 ? sel.varianti.join(", ") : sel.varianti.slice(0, 6).join(", ") + "…") + ".";
           if(sel.sommate){
-            var negativi = sel.righe.filter(function(x){ return x.attesa < 0; }).length;
-            if(negativi) avvisi.push(fmt(negativi) + " articoli hanno giacenza attesa negativa anche sommando le varianti: forse manca qualche commessa nel report.");
+            var negativi = sel.righe.filter(function(x){ return x.attesa < 0; });
+            if(negativi.length) avvisi.push({ testo: fmt(negativi.length) + " articoli hanno giacenza attesa negativa anche sommando le varianti: nel gestionale risulta uscito più materiale di quanto ne sia entrato su questa commessa e sulle varianti (materiale caricato altrove, o un carico mancante).",
+              elenco: negativi.map(function(x){ return x.codice + " — giacenza attesa " + fmt(x.attesa) + (x.dettaglio ? "  (" + mostraParti(x.dettaglio) + ")" : ""); }) });
           }
         } else if(c && sel.righe.length && !/V\d+$/.test(c)){
           avvisi.push("Il report contiene solo la commessa " + c + ". Se la commessa ha delle varianti (" + c + "V01, " + c + "V02…) su cui è stato scaricato materiale, ristampa il report da " + c + " a " + c + "ZZ: così la giacenza attesa tiene conto anche di quegli scarichi.");
@@ -454,10 +466,24 @@ var INVENTRACK_CONFIG = {
       if(r.info.stampatoIl && data && r.info.stampatoIl !== data) avvisi.push("Il report è stato stampato il " + dataIt(r.info.stampatoIl) + ", ma la data dell'inventario è il " + dataIt(data) + ": le giacenze attese potrebbero non essere quelle giuste. Meglio ristampare il report il giorno dell'inventario.");
       if(r.info.finoAl && data && r.info.finoAl < data) avvisi.push("Il report considera i movimenti solo fino al " + dataIt(r.info.finoAl) + ", ma l'inventario è del " + dataIt(data) + ": i movimenti successivi non sono compresi e le differenze potrebbero non essere vere. Meglio ristampare il report alla data dell'inventario.");
       if(data && data !== oggi()) avvisi.push("La data dell'inventario non è oggi (" + dataIt(oggi()) + ").");
-      if(r.info.nonQuadrano && r.info.nonQuadrano.length) avvisi.push("Per " + fmt(r.info.nonQuadrano.length) + " articoli su " + fmt(r.info.controllati) + " la giacenza letta non coincide con il totale stampato dal report (entrate − uscite): " + r.info.nonQuadrano.slice(0, 8).join(", ") + (r.info.nonQuadrano.length > 8 ? "…" : "") + ". Controlla questi articoli prima di contare.");
-      if(r.info.ripetuti) avvisi.push(fmt(r.info.ripetuti) + " righe ripetevano lo stesso articolo e la stessa commessa: le quantità sono state sommate.");
-      if(avvisi.length) esito.appendChild(el("div", { class: "avviso" }, el("ul", {}, ...avvisi.map(function(a){ return el("li", { text: a }); }))));
+      if(r.info.nonQuadrano && r.info.nonQuadrano.length) avvisi.push({ testo: "Per " + fmt(r.info.nonQuadrano.length) + " articoli su " + fmt(r.info.controllati) + " la giacenza letta non coincide con il totale stampato dal report (entrate − uscite). Controlla questi articoli prima di contare.",
+        elenco: r.info.nonQuadrano.map(function(x){ return x.codice + " — letto " + fmt(x.letto) + ", totale del report " + fmt(x.totale); }) });
+      if(r.info.ripetuti) avvisi.push({ testo: fmt(r.info.ripetuti) + " righe ripetevano lo stesso articolo e la stessa commessa: le quantità sono state sommate.",
+        elenco: (r.info.ripetutiElenco || []).map(function(x){ return x.codice + " — commessa " + (x.commessa || "(nessuna)") + ", quantità della riga ripetuta " + fmt(x.quantita); }) });
+      if(avvisi.length) esito.appendChild(el("div", { class: "avviso" }, el("ul", {}, ...avvisi.map(function(a){
+        if(typeof a === "string") return el("li", { text: a });
+        // Elenco completo dei codici, da aprire e copiare.
+        var testo = a.elenco.join("\n");
+        return el("li", {}, a.testo, el("details", { class: "codici" },
+          el("summary", { text: "Vedi l'elenco (" + fmt(a.elenco.length) + ")" }),
+          el("button", { type: "button", class: "btn small", text: "Copia l'elenco", onclick: function(){
+            var b = this;
+            (navigator.clipboard ? navigator.clipboard.writeText(testo) : Promise.reject()).then(function(){ b.textContent = "Copiato ✓"; }, function(){ b.textContent = "Seleziona il testo e copialo a mano"; });
+          } }),
+          el("pre", { text: testo })));
+      }))));
     }
+    Array.prototype.forEach.call(esito.querySelectorAll("details.codici"), function(d, i){ if(aperti[i]) d.open = true; });
     if(!$("nData").value) ok = false;
     $("nCrea").disabled = !ok;
   }
