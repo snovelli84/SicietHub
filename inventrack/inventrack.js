@@ -24,19 +24,27 @@ var INVENTRACK_CONFIG = {
   // con 15 decimali e il punto come separatore decimale.
   csvDecimali: 15,
 
+  // Causali dei movimenti del gestionale (report con il dettaglio dei movimenti):
+  //   carico    ACQ-O acquisto, ACQ-C carico diretto in commessa
+  //   cantiere  I-CINST installazione (uscita) in cantiere
+  //   rientro   I-RCANT rientro da cantiere
+  causali: { carico: ["ACQ-O", "ACQ-C"], cantiere: ["I-CINST"], rientro: ["I-RCANT"] },
+
   // Versione mostrata in fondo alla pagina: aumentarla a ogni modifica,
   // insieme al numero ?v= di inventrack.js in index.html.
-  versione: "1.9"
+  versione: "2.0"
 };
 
 (function(){
   "use strict";
 
   var CONFIG = INVENTRACK_CONFIG, R = InvReport;
+  Object.assign(R.causali, CONFIG.causali || {});
   var CDN = "https://cdn.jsdelivr.net/npm/";
   var PDFJS_URL = CDN + "pdfjs-dist@3.11.174/build/pdf.min.js";
   var PDFJS_WORKER_URL = CDN + "pdfjs-dist@3.11.174/build/pdf.worker.min.js";
   var EXCELJS_URL = CDN + "exceljs@4.4.0/dist/exceljs.min.js";
+  var JSZIP_URL = CDN + "jszip@3.10.1/dist/jszip.min.js";
   var TESSERACT_URL = CDN + "tesseract.js@5.1.1/dist/tesseract.min.js";
   var TOLLERANZA = 1e-7;
 
@@ -208,7 +216,7 @@ var INVENTRACK_CONFIG = {
   /* ---------- Accesso ---------- */
 
   function mostra(vista){
-    ["vAccesso", "vHome", "vNuovo", "vInv"].forEach(function(v){ $(v).hidden = v !== vista; });
+    ["vAccesso", "vHome", "vNuovo", "vInv", "vRecuperati"].forEach(function(v){ $(v).hidden = v !== vista; });
     window.scrollTo(0, 0);
   }
   function intestazione(titolo, sotto){
@@ -257,6 +265,7 @@ var INVENTRACK_CONFIG = {
     if(!operatore() || (!inProva() && !memoria("password"))){ mostraAccesso(); return; }
     var h = location.hash.replace(/^#/, "");
     if(h === "nuovo") apriNuovo();
+    else if(h === "recuperati") apriRecuperati();
     else if(h.indexOf("i=") === 0) apriInventario(decodeURIComponent(h.slice(2)));
     else apriHome();
   }
@@ -324,6 +333,7 @@ var INVENTRACK_CONFIG = {
     });
   }
   $("nuovoBtn").addEventListener("click", function(){ location.hash = "nuovo"; });
+  $("recuperatiBtn").addEventListener("click", function(){ location.hash = "recuperati"; });
 
   /* ---------- Nuovo inventario ---------- */
 
@@ -442,7 +452,8 @@ var INVENTRACK_CONFIG = {
           commesse.filter(Boolean).length && (commesse.length <= 4 ? "commesse: " + commesse.map(function(c){ return c || "(nessuna)"; }).join(", ") : commesse.length + " commesse"),
           r.info.tipo === "valorizzazione" && "giacenza al " + dataIt(r.info.finoAl),
           r.info.stampatoIl && "stampato il " + dataIt(r.info.stampatoIl),
-          r.info.controllati && !r.info.nonQuadrano.length && "✓ " + fmt(r.info.controllati) + " articoli coincidono con i totali del report"].filter(Boolean).join(" · ") })));
+          r.info.controllati && !r.info.nonQuadrano.length && "✓ " + fmt(r.info.controllati) + " articoli coincidono con i totali del report",
+          r.info.causali && "causali dei movimenti: " + Object.keys(r.info.causali).sort().map(function(c){ return c + " (" + fmt(r.info.causali[c]) + ")"; }).join(", ")].filter(Boolean).join(" · ") })));
       var avvisi = [];
       if(tipo === "commessa"){
         var c = R.codice($("nCommessa").value);
@@ -452,11 +463,7 @@ var INVENTRACK_CONFIG = {
         if(c && sel.varianti.length){
           $("sommaCampo").hidden = false;
           $("sommaTesto").textContent = "Il report contiene anche " + (sel.varianti.length === 1 ? "la variante " : sel.varianti.length + " varianti: ") + (sel.varianti.length <= 6 ? sel.varianti.join(", ") : sel.varianti.slice(0, 6).join(", ") + "…") + ".";
-          if(sel.sommate){
-            var negativi = sel.righe.filter(function(x){ return x.attesa < 0; });
-            if(negativi.length) avvisi.push({ testo: fmt(negativi.length) + " articoli hanno giacenza attesa negativa anche sommando le varianti: nel gestionale risulta uscito più materiale di quanto ne sia entrato su questa commessa e sulle varianti (materiale caricato altrove, o un carico mancante).",
-              elenco: negativi.map(function(x){ return x.codice + " — giacenza attesa " + fmt(x.attesa) + (x.dettaglio ? "  (" + mostraParti(x.dettaglio) + ")" : ""); }) });
-          }
+          if(sel.sommate) avvisi.push("La giacenza attesa è la somma delle sole giacenze positive della commessa e delle varianti: le varianti in negativo restano in negativo e non contano, e si corregge solo la commessa " + c + ".");
         } else if(c && sel.righe.length && !/V\d+$/.test(c)){
           avvisi.push("Il report contiene solo la commessa " + c + ". Se la commessa ha delle varianti (" + c + "V01, " + c + "V02…) su cui è stato scaricato materiale, ristampa il report da " + c + " a " + c + "ZZ: così la giacenza attesa tiene conto anche di quegli scarichi.");
         }
@@ -468,6 +475,7 @@ var INVENTRACK_CONFIG = {
       if(data && data !== oggi()) avvisi.push("La data dell'inventario non è oggi (" + dataIt(oggi()) + ").");
       if(r.info.nonQuadrano && r.info.nonQuadrano.length) avvisi.push({ testo: "Per " + fmt(r.info.nonQuadrano.length) + " articoli su " + fmt(r.info.controllati) + " la giacenza letta non coincide con il totale stampato dal report (entrate − uscite). Controlla questi articoli prima di contare.",
         elenco: r.info.nonQuadrano.map(function(x){ return x.codice + " — letto " + fmt(x.letto) + ", totale del report " + fmt(x.totale); }) });
+      if(r.info.causaliSconosciute && r.info.causaliSconosciute.length) avvisi.push("Causali dei movimenti non previste: " + r.info.causaliSconosciute.map(function(c){ return c + " (" + fmt(r.info.causali[c]) + ")"; }).join(", ") + ". Contano nel saldo ma non come carichi, uscite in cantiere o rientri: se lo sono, vanno aggiunte a «causali» in inventrack.js.");
       if(r.info.ripetuti) avvisi.push({ testo: fmt(r.info.ripetuti) + " righe ripetevano lo stesso articolo e la stessa commessa: le quantità sono state sommate.",
         elenco: (r.info.ripetutiElenco || []).map(function(x){ return x.codice + " — commessa " + (x.commessa || "(nessuna)") + ", quantità della riga ripetuta " + fmt(x.quantita); }) });
       if(avvisi.length) esito.appendChild(el("div", { class: "avviso" }, el("ul", {}, ...avvisi.map(function(a){
@@ -698,13 +706,7 @@ var INVENTRACK_CONFIG = {
   }
 
   // "S1852: 10900 · S1852V04: -500" → [{ commessa, q }]
-  function leggiParti(t){
-    return String(t || "").split(" · ").map(function(x){
-      var p = x.split(": ");
-      return p.length === 2 && p[0] ? { commessa: p[0], q: Number(p[1].replace(",", ".")) } : null;
-    }).filter(function(x){ return x && isFinite(x.q); });
-  }
-  function scriviParti(parti){ return parti.map(function(x){ return x.commessa + ": " + String(x.q).replace(".", ","); }).join(" · "); }
+  var leggiParti = R.leggiParti, scriviParti = R.scriviParti;
   function mostraParti(t){ return leggiParti(t).map(function(x){ return x.commessa + ": " + fmt(x.q); }).join(" · "); }
   // Commesse (padre e varianti) presenti nell'inventario, se è stato creato sommando le varianti.
   function commesseInventario(){
@@ -851,7 +853,7 @@ var INVENTRACK_CONFIG = {
       if(r.dettaglio){
         // Giacenza del gestionale commessa per commessa: la somma è la giacenza attesa.
         box.appendChild(el("details", { class: "dettaglio" },
-          el("summary", { text: "Somma della commessa e delle varianti" }),
+          el("summary", { text: "Giacenza per commessa (contano solo le positive)" }),
           el("div", { text: mostraParti(r.dettaglio) })));
       }
     }
@@ -906,7 +908,7 @@ var INVENTRACK_CONFIG = {
       input.addEventListener("input", aggiornaParti);
       campiParti.push({ commessa: commessa, input: input });
       return el("label", { class: "parte" },
-        el("span", {}, el("b", { text: commessa }), libro === undefined ? null : el("small", { text: "gestionale " + fmt(libro) })),
+        el("span", {}, el("b", { text: commessa }), libro === undefined ? null : el("small", { text: "gestionale " + fmt(libro) + (libro < 0 ? " (negativa: non conta)" : "") })),
         input);
     }
     if(tutte.length){
@@ -927,9 +929,13 @@ var INVENTRACK_CONFIG = {
         if(scelta.options.length < 2) scelta.hidden = true;
         riga.querySelector("input").focus();
       });
-      boxParti = el("details", { class: "dettaglio dividi", open: Object.keys(gia).length > 0 },
+      // Giacenza positiva anche sulle varianti: conviene contare commessa per commessa, così ognuno resta al suo posto.
+      var positive = elenco.filter(function(k){ return k !== S.inv.commessa && libro[k] > 0; });
+      boxParti = el("details", { class: "dettaglio dividi", open: Object.keys(gia).length > 0 || positive.length > 0 },
         el("summary", { text: "Dividi per commessa (" + S.inv.commessa + " e varianti)" }),
-        el("p", { text: "Scrivi quanto c'è per ogni commessa: la giacenza reale è la somma. Lascia vuote quelle dove non c'è nulla." }),
+        el("p", { text: positive.length
+          ? "Il gestionale ha giacenza anche su " + positive.map(function(k){ return k + " (" + fmt(libro[k]) + ")"; }).join(", ") + ". Scrivi quanto c'è fisicamente su ogni commessa: la giacenza reale è la somma e ogni commessa resta al suo posto. Lascia vuote quelle dove non c'è nulla."
+          : "Scrivi quanto c'è per ogni commessa: la giacenza reale è la somma. Lascia vuote quelle dove non c'è nulla." }),
         righeParti, scelta);
     }
 
@@ -1025,6 +1031,149 @@ var INVENTRACK_CONFIG = {
   $("elencoCerca").addEventListener("input", function(){ disegnaElenco(true); });
   $("elencoAltri").addEventListener("click", function(){ S.mostrati += CONFIG.righeElenco; disegnaElenco(false); });
 
+  /* ---------- Materiale recuperato ----------
+   * Lista promemoria degli articoli presenti in magazzino, resi dal cantiere e
+   * mai gestiti da noi. Non appartiene a un inventario: resta nel tempo e si
+   * aggiorna a mano (quantità, nota) o dagli inventari di commessa. */
+  var REC = { lista: [], senzaRete: false };
+
+  async function leggiRecuperati(){
+    if(inProva()) return (await kv.get("recuperati")) || [];
+    try{
+      var l = (await api("GET", "/recuperati")).recuperati;
+      REC.senzaRete = false;
+      kv.set("recuperati", l);
+      return l;
+    }catch(e){
+      if(!e.rete) throw e;
+      REC.senzaRete = true;
+      return (await kv.get("recuperati")) || [];
+    }
+  }
+
+  // articoli: [{ codice, commessa, descrizione, um, quantita, nota }]; se codice e commessa ci sono già, la quantità si aggiorna.
+  async function aggiungiRecuperati(articoli, inventario){
+    articoli = articoli.map(function(a){
+      return { codice: R.codice(a.codice), commessa: R.codice(a.commessa), descrizione: R.pulisci(a.descrizione), um: R.codice(a.um), quantita: arrotonda(a.quantita), nota: R.pulisci(a.nota) };
+    });
+    if(inProva()){
+      var l = (await kv.get("recuperati")) || [], ora = new Date().toISOString();
+      articoli.forEach(function(a){
+        var x = l.filter(function(y){ return y.codice === a.codice && y.commessa === a.commessa; })[0];
+        if(x) Object.assign(x, { quantita: a.quantita, descrizione: a.descrizione || x.descrizione, um: a.um || x.um, nota: a.nota || x.nota, inventario: inventario || "", aggiornatoDa: operatore(), aggiornatoIl: ora });
+        else l.unshift(Object.assign({ id: "prova-" + Math.random().toString(36).slice(2), inventario: inventario || "", creatoDa: operatore(), creatoIl: ora, aggiornatoDa: operatore(), aggiornatoIl: ora }, a));
+      });
+      await kv.set("recuperati", l);
+      return;
+    }
+    for(var i = 0; i < articoli.length; i += 200) await api("POST", "/recuperati", { articoli: articoli.slice(i, i + 200), operatore: operatore(), inventario: inventario || "" });
+  }
+
+  async function modificaRecuperato(x, campi){
+    if(inProva()){
+      var l = ((await kv.get("recuperati")) || []).map(function(y){ return y.id === x.id ? Object.assign(y, campi, { aggiornatoDa: operatore(), aggiornatoIl: new Date().toISOString() }) : y; });
+      await kv.set("recuperati", l);
+      return;
+    }
+    await api("POST", "/recuperati/" + x.id, Object.assign({ operatore: operatore() }, campi));
+  }
+
+  async function eliminaRecuperato(x){
+    if(!confirm("Togliere " + x.codice + " dalla lista del materiale recuperato?")) return;
+    try{
+      if(inProva()) await kv.set("recuperati", ((await kv.get("recuperati")) || []).filter(function(y){ return y.id !== x.id; }));
+      else await api("DELETE", "/recuperati/" + x.id);
+      toast("Tolto dalla lista");
+      disegnaRecuperati(true);
+    }catch(e){ if(e.status !== 401) toast(e.message, true); }
+  }
+
+  async function apriRecuperati(){
+    S.inv = null;
+    intestazione("Materiale recuperato", "Articoli presenti in magazzino, resi dal cantiere e mai gestiti");
+    $("recCerca").value = "";
+    mostra("vRecuperati");
+    disegnaRecuperati(true);
+  }
+
+  async function disegnaRecuperati(ricarica){
+    var box = $("recLista");
+    if(ricarica){
+      svuota(box).appendChild(el("p", { class: "hint", text: "Caricamento…" }));
+      try{ REC.lista = await leggiRecuperati(); }
+      catch(e){ if(e.status === 401) return; svuota(box).appendChild(el("div", { class: "avviso errore", text: e.message })); return; }
+    }
+    $("recOffline").hidden = !REC.senzaRete;
+    var q = R.pulisci($("recCerca").value).toLowerCase(), parole = q.split(/\s+/).filter(Boolean);
+    var righe = REC.lista.filter(function(x){ var t = (x.codice + " " + x.descrizione + " " + x.nota + " " + x.commessa).toLowerCase(); return parole.every(function(w){ return t.indexOf(w) >= 0; }); });
+    svuota(box);
+    if(!righe.length){
+      box.appendChild(el("div", { class: "card" }, el("p", { class: "hint", text: REC.lista.length ? "Nessun articolo corrisponde alla ricerca." : "La lista è vuota. Si riempie dagli inventari di commessa (scheda Esporta → Materiale recuperato) o con il modulo qui sopra." })));
+      return;
+    }
+    box.appendChild(el("p", { class: "hint", text: fmt(righe.length) + (righe.length === 1 ? " articolo" : " articoli") }));
+    righe.forEach(function(x){ box.appendChild(schedaRecuperato(x)); });
+  }
+
+  function schedaRecuperato(x){
+    var card = el("div", { class: "card recuperato" });
+    function vista(){
+      accoda(svuota(card),
+        el("div", { class: "riga spazio" },
+          el("span", { class: "scheda-codice", text: x.codice }),
+          el("span", { class: "riga" }, x.commessa ? el("span", { class: "chip", text: x.commessa }) : null, el("span", { class: "chip ok", text: fmt(x.quantita) + (x.um ? " " + x.um : "") }))),
+        el("div", { text: x.descrizione || "(senza descrizione)" }),
+        x.nota ? el("div", { class: "hint", text: x.nota }) : null,
+        el("div", { class: "hint", text: "Aggiornato da " + (x.aggiornatoDa || x.creatoDa || "—") + " il " + oraIt(x.aggiornatoIl) + (x.creatoIl && x.creatoIl !== x.aggiornatoIl ? " · inserito il " + dataIt(giornoDi(x.creatoIl)) : "") }),
+        el("div", { class: "riga" },
+          el("button", { class: "btn small", type: "button", text: "✏️ Modifica", onclick: modifica }),
+          el("button", { class: "btn small pericolo", type: "button", text: "🗑 Togli dalla lista", onclick: function(){ eliminaRecuperato(x); } })));
+    }
+    function modifica(){
+      var q = el("input", { type: "text", inputmode: "decimal", value: String(x.quantita).replace(".", ","), "aria-label": "Quantità" });
+      var d = el("input", { type: "text", maxlength: "300", value: x.descrizione, "aria-label": "Descrizione" });
+      var n = el("input", { type: "text", maxlength: "300", value: x.nota, placeholder: "Nota (es. dove si trova)", "aria-label": "Nota" });
+      accoda(svuota(card),
+        el("div", { class: "riga spazio" }, el("span", { class: "scheda-codice", text: x.codice }), x.commessa ? el("span", { class: "chip", text: x.commessa }) : null),
+        el("label", { class: "field" }, el("span", { class: "flabel", text: "Quantità presente" + (x.um ? " (" + x.um + ")" : "") }), q),
+        el("label", { class: "field" }, el("span", { class: "flabel", text: "Descrizione" }), d),
+        el("label", { class: "field" }, el("span", { class: "flabel", text: "Nota" }), n),
+        el("div", { class: "riga" },
+          el("button", { class: "btn primary small", type: "button", text: "Salva", onclick: async function(){
+            var qt = quantitaScritta(q.value);
+            if(qt === null){ q.classList.add("invalid"); q.focus(); return; }
+            try{
+              var campi = { quantita: arrotonda(qt), descrizione: R.pulisci(d.value), nota: R.pulisci(n.value) };
+              await modificaRecuperato(x, campi);
+              toast("Salvato");
+              disegnaRecuperati(true);
+            }catch(e){ if(e.status !== 401) toast(e.message, true); }
+          } }),
+          el("button", { class: "btn small", type: "button", text: "Annulla", onclick: vista })));
+      q.focus();
+    }
+    vista();
+    return card;
+  }
+
+  $("recCerca").addEventListener("input", function(){ disegnaRecuperati(false); });
+  $("recForm").addEventListener("submit", async function(ev){
+    ev.preventDefault();
+    var cod = $("recCodice"), qt = quantitaScritta($("recQuantita").value);
+    cod.classList.toggle("invalid", !R.pulisci(cod.value));
+    $("recQuantita").classList.toggle("invalid", qt === null);
+    if(!R.pulisci(cod.value) || qt === null) return;
+    var btn = $("recAggiungi");
+    btn.disabled = true;
+    try{
+      await aggiungiRecuperati([{ codice: cod.value, commessa: $("recCommessa").value, descrizione: $("recDescr").value, um: "", quantita: qt, nota: $("recNota").value }], "");
+      $("recForm").reset();
+      toast("Aggiunto alla lista");
+      disegnaRecuperati(true);
+    }catch(e){ if(e.status !== 401) toast(e.message, true); }
+    finally{ btn.disabled = false; }
+  });
+
   /* ---------- Esporta ---------- */
 
   // Una riga per articolo, come finisce nell'Excel.
@@ -1104,6 +1253,30 @@ var INVENTRACK_CONFIG = {
       "Esportato il " + oraIt(new Date().toISOString()) + " da " + operatore() + (inv.note ? " · Note: " + inv.note : "")];
     foglio(wb, "Inventario", testa, righe);
     foglio(wb, "Differenze", [titolo + " – solo le differenze"].concat(testa.slice(1)), righe.filter(function(x){ return x.diff !== null && Math.abs(x.diff) > TOLLERANZA; }));
+    if(conMovimenti()){
+      var piano = pianoCorrente(nonContatiZero), wm = wb.addWorksheet("Movimenti", { views: [{ state: "frozen", ySplit: 1 }] });
+      var cm = [["Commessa", 14, "commessa"], ["Movimento", 30, "tipo"], ["Codice", 22, "codice"], ["Descrizione", 48, "descrizione"], ["U.M.", 7, "um"], ["Quantità", 13, "quantita"],
+        ["Valore unitario", 13, "valore"], ["Giacenza attesa (padre + varianti positive)", 22, "attesa"], ["Giacenza reale", 13, "reale"], ["Note", 70, "nota"]];
+      var rm = piano.righeExcel.concat(piano.recuperati.map(function(x){ return { commessa: x.commessa, tipo: "Materiale recuperato (lista promemoria)", codice: x.codice, descrizione: x.descrizione, um: x.um, quantita: x.quantita, valore: 0, attesa: 0, reale: x.quantita, nota: "articolo non presente nel report: non genera movimenti" }; }));
+      cm.forEach(function(c, j){
+        wm.getColumn(j + 1).width = c[1];
+        var cella = wm.getRow(1).getCell(j + 1);
+        cella.value = c[0];
+        cella.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cella.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF005BAA" } };
+        cella.alignment = { vertical: "middle", wrapText: true };
+      });
+      wm.getRow(1).height = 32;
+      rm.forEach(function(x, i){
+        cm.forEach(function(c, j){
+          var cella = wm.getRow(i + 2).getCell(j + 1);
+          cella.value = x[c[2]] === undefined || x[c[2]] === "" ? null : x[c[2]];
+          if(c[2] === "quantita" || c[2] === "attesa" || c[2] === "reale") cella.numFmt = "#,##0.###";
+          if(c[2] === "valore") cella.numFmt = "#,##0.00####";
+        });
+      });
+      wm.autoFilter = { from: { row: 1, column: 1 }, to: { row: rm.length + 1, column: cm.length } };
+    }
     var ws = wb.addWorksheet("Riepilogo");
     ws.getColumn(1).width = 46;
     ws.getColumn(2).width = 18;
@@ -1144,13 +1317,45 @@ var INVENTRACK_CONFIG = {
       return { codice: x.codice, quantita: tipo === "reali" ? x.reale : Math.abs(x.diff), valore: x.valore };
     });
   }
+  // Una riga per articolo: "codice" ; quantità ; valore unitario
+  function testoCsv(righe){
+    return righe.map(function(x){
+      return '"' + x.codice.replace(/"/g, '""') + '" ; ' + decimali(x.quantita) + "; " + decimali(x.valore) + "\r\n";
+    }).join("");
+  }
   function scaricaCsv(tipo, nonContatiZero){
     var righe = righeCsv(tipo, nonContatiZero);
     if(!righe.length){ toast("Nessuna riga da esportare."); return; }
-    var testo = righe.map(function(x){
-      return '"' + x.codice.replace(/"/g, '""') + '" ; ' + decimali(x.quantita) + "; " + decimali(x.valore) + "\r\n";
-    }).join("");
-    scarica(nomeFile(CSV_TIPI[tipo][1], "csv"), new Blob([testo], { type: "text/csv" }));
+    scarica(nomeFile(CSV_TIPI[tipo][1], "csv"), new Blob([testoCsv(righe)], { type: "text/csv" }));
+  }
+
+  /* ---------- Movimenti di commessa: padre e varianti ----------
+   * Con il report dei movimenti (causali) l'inventario di una commessa produce un
+   * file per ogni movimento da registrare: rientro dal cantiere, avanzi delle
+   * varianti, differenze; gli articoli trovati e non gestiti vanno nella lista
+   * "Materiale recuperato". */
+  // L'inventario di commessa con le varianti, o con il dettaglio dei movimenti, si ripartisce per commessa.
+  function conDettaglioMovimenti(){ return S.righe.some(function(r){ return typeof r.ucant === "number"; }); }
+  function conMovimenti(){
+    return !!S.inv && S.inv.tipo === "commessa" && (conDettaglioMovimenti() || S.righe.some(function(r){ return !!r.dettaglio; }));
+  }
+  function pianoCorrente(nonContatiZero){
+    var conteggi = [];
+    righeTutte().forEach(function(r){
+      var c = conteggioDi(r);
+      if(!c && !nonContatiZero) return;
+      conteggi.push({ riga: r, reale: c ? c.reale : 0, parti: c && c.parti ? c.parti : "" });
+    });
+    return R.pianoMovimenti(conteggi, S.inv.commessa, conDettaglioMovimenti());
+  }
+  function scaricaFile(f){
+    scarica(nomeFile(f.titolo, "csv"), new Blob([testoCsv(f.righe)], { type: "text/csv" }));
+  }
+  async function scaricaZip(files){
+    await caricaScript(JSZIP_URL);
+    var zip = new window.JSZip();
+    files.forEach(function(f){ zip.file(nomeFile(f.titolo, "csv"), testoCsv(f.righe)); });
+    scarica(nomeFile("movimenti", "zip"), await zip.generateAsync({ type: "blob" }));
   }
 
   async function cambiaStato(stato){
@@ -1224,20 +1429,54 @@ var INVENTRACK_CONFIG = {
       el("p", { class: "hint", text: "Tutti gli articoli con giacenza attesa, giacenza reale, differenza, valore, chi ha contato e quando; un secondo foglio con le sole differenze e un riepilogo." }),
       el("button", { class: "btn primary", type: "button", text: "⬇️ Scarica Excel", onclick: function(){ var b = this; prima(b, function(){ return scaricaExcel(zero.checked); }); } })));
     var nPiu = righeCsv("piu", zero.checked).length, nMeno = righeCsv("meno", zero.checked).length;
+    var nuovoSchema = conMovimenti();
+    if(nuovoSchema){
+      var piano = pianoCorrente(zero.checked), carta = el("div", { class: "card" },
+        el("h2", { text: "Movimenti da registrare nel gestionale" }),
+        el("p", { class: "hint", text: "Un file CSV per ogni movimento, nel solito formato: \"codice\" ; quantità ; valore unitario. Le quantità sono sempre positive; la commessa e il tipo di movimento sono nel nome del file e nella descrizione. La giacenza attesa è la somma delle sole giacenze positive di " + inv.commessa + " e delle sue varianti: si corregge solo la padre, le varianti in negativo restano com'è." }));
+      if(!piano.file.length) carta.appendChild(el("div", { class: "avviso bene", text: n.contati ? "Nessun movimento da registrare: le giacenze contate coincidono con quelle attese." : "Nessun articolo contato per ora." }));
+      piano.file.forEach(function(f){
+        var tot = f.righe.reduce(function(t, x){ return t + x.quantita; }, 0);
+        carta.appendChild(el("div", { class: "filemov" },
+          el("div", { class: "riga spazio" }, el("b", { text: f.titolo }), el("span", { class: "chip", text: fmt(f.righe.length) + (f.righe.length === 1 ? " articolo" : " articoli") + " · " + fmt(tot) + " pz" })),
+          el("div", { class: "hint", text: f.descrizione }),
+          el("button", { class: "btn primary small", type: "button", text: "⬇️ Scarica CSV", onclick: function(){ var b = this; prima(b, function(){ scaricaFile(f); }); } })));
+      });
+      if(piano.file.length > 1) carta.appendChild(el("button", { class: "btn", type: "button", text: "⬇️ Scarica tutti i file (ZIP)", onclick: function(){ var b = this; prima(b, function(){ return scaricaZip(piano.file); }); } }));
+      box.appendChild(carta);
+    }
+    if(S.inv.tipo === "commessa"){
+      var rec = (nuovoSchema ? pianoCorrente(zero.checked).recuperati : righeTutte().filter(function(r){ return r.extra && conteggioDi(r); }).map(function(r){ return { codice: r.codice, descrizione: r.descrizione, commessa: S.inv.commessa, quantita: conteggioDi(r).reale, um: r.um || "" }; }));
+      box.appendChild(el("div", { class: "card" },
+        el("h2", { text: "Materiale recuperato" }),
+        el("p", { class: "hint", text: "Articoli trovati in magazzino che non sono nel report del gestionale (recuperati dal cantiere e mai gestiti da noi). Non generano movimenti: restano in una lista promemoria, visibile e aggiornabile nel tempo." }),
+        rec.length ? el("div", { class: "voci" }, ...rec.map(function(x){ return el("div", { class: "voce nuovo" }, el("span", { class: "cod", text: x.codice }), el("span", { class: "des", text: x.descrizione || "(senza descrizione)" }), el("span", { class: "qta" }, el("span", { text: fmt(x.quantita) + (x.um ? " " + x.um : "") }))); })) : el("p", { class: "hint", text: "Nessun articolo di questo tipo in questo inventario." }),
+        el("div", { class: "riga" },
+          rec.length ? el("button", { class: "btn primary", type: "button", text: "Aggiungi alla lista (" + fmt(rec.length) + ")", onclick: function(){
+            var b = this;
+            prima(b, async function(){
+              await aggiungiRecuperati(rec.map(function(x){ return { codice: x.codice, commessa: x.commessa, descrizione: x.descrizione, um: x.um, quantita: x.quantita, nota: "da inventario " + inv.commessa + " del " + dataIt(inv.data) }; }), inv.id);
+              toast("Aggiunti alla lista Materiale recuperato");
+            });
+          } }) : null,
+          el("a", { class: "btn", href: "#recuperati", text: "📋 Apri la lista" }))));
+    }
     function bottoneCsv(tipo, quanti, primario){
       return el("button", { class: "btn" + (primario ? " primary" : ""), type: "button", disabled: !quanti, text: "⬇️ " + CSV_TIPI[tipo][0].split(" (")[0] + " (" + fmt(quanti) + (quanti === 1 ? " articolo)" : " articoli)"),
         onclick: function(){ var b = this; prima(b, function(){ scaricaCsv(tipo, zero.checked); }); } });
     }
-    box.appendChild(el("div", { class: "card" },
-      el("h2", { text: "Movimenti d'inventario per il gestionale" }),
+    var semplici = el("div", { style: "display:grid;gap:10px" },
       el("p", { class: "hint", text: "Due file CSV da importare nel gestionale, una riga per articolo: \"codice\" ; quantità ; valore unitario. Uno con le differenze in più (movimento positivo) e uno con le differenze in meno (movimento negativo), con le quantità sempre positive." }),
-      bottoneCsv("piu", nPiu, true),
-      bottoneCsv("meno", nMeno, true),
+      bottoneCsv("piu", nPiu, !nuovoSchema),
+      bottoneCsv("meno", nMeno, !nuovoSchema),
       el("button", { class: "btn", type: "button", disabled: !nPiu && !nMeno, text: "⬇️ Scarica entrambi", onclick: function(){
         var b = this;
         prima(b, async function(){ if(nPiu) scaricaCsv("piu", zero.checked); if(nPiu && nMeno) await new Promise(function(r){ setTimeout(r, 700); }); if(nMeno) scaricaCsv("meno", zero.checked); });
       } }),
-      el("button", { class: "linkbtn", type: "button", text: "Scarica invece le giacenze reali di tutti gli articoli contati", onclick: function(){ var b = this; prima(b, function(){ scaricaCsv("reali", zero.checked); }); } })));
+      el("button", { class: "linkbtn", type: "button", text: "Scarica invece le giacenze reali di tutti gli articoli contati", onclick: function(){ var b = this; prima(b, function(){ scaricaCsv("reali", zero.checked); }); } }));
+    box.appendChild(nuovoSchema
+      ? el("div", { class: "card" }, el("details", { class: "dettaglio" }, el("summary", { text: "File semplici: solo differenze in più e in meno" }), semplici))
+      : el("div", { class: "card" }, el("h2", { text: "Movimenti d'inventario per il gestionale" }), semplici));
     box.appendChild(el("div", { class: "card" },
       el("h2", { text: inv.stato === "chiuso" ? "Inventario chiuso" : "Chiudi l'inventario" }),
       el("p", { class: "hint", text: inv.stato === "chiuso"

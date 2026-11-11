@@ -9,8 +9,12 @@
  *                                (come lo restituisce pdf.js)
  *   InvReport.daTabella(righe)   lo stesso report esportato in Excel o CSV
  *                                (righe = matrice di celle)
- *   InvReport.sommaVarianti(righe, commessa)  una riga per articolo, sommando la
- *                                commessa e le sue varianti (S1852 + S1852V04 + …)
+ *   InvReport.sommaVarianti(righe, commessa)  una riga per articolo: la giacenza è
+ *                                la somma delle sole quantità positive della commessa
+ *                                e delle sue varianti (S1852 + S1852V04 + …)
+ *   InvReport.ripartisci(…)      differenze di un articolo commessa per commessa
+ *   InvReport.pianoMovimenti(…)  file CSV dei movimenti: rientro dal cantiere, avanzi
+ *                                delle varianti, differenze; e lista dei recuperati
  *   InvReport.numero(testo)      "10.813,20" → 10813.2
  *   InvReport.chiave(cod, com)   identificativo di una riga (codice + commessa)
  *   InvReport.cerca(testi, righe) articoli che somigliano ai testi letti da una foto
@@ -58,6 +62,7 @@
       info.ripetutiElenco.push({ codice: r.codice, commessa: r.commessa, quantita: r.attesa });
       var tot = p.attesa * p.valore + r.attesa * r.valore;
       p.attesa = arrotonda(p.attesa + r.attesa, 6);
+      if(typeof r.ucant === "number"){ p.ucant = arrotonda((p.ucant || 0) + r.ucant, 6); p.rcant = arrotonda((p.rcant || 0) + (r.rcant || 0), 6); }
       if(p.attesa) p.valore = arrotonda(tot / p.attesa, 6);
       if(!p.descrizione) p.descrizione = r.descrizione;
     });
@@ -144,7 +149,7 @@
   }
 
   function rigaAnalisi(g, col){
-    var cod = [], des = [], com = [], num = {}, movimento = false;
+    var cod = [], des = [], com = [], num = {}, movimento = false, causale = "";
     g.items.sort(function(a, b){ return a.x - b.x; }).forEach(function(i){
       if(i.x < col.fineCodice) cod.push(i.s);
       else if(i.x >= col.inizioNumeri){
@@ -157,12 +162,13 @@
       else if(col.commessa !== null && i.x >= col.commessa){
         if(RE_DATA.test(pulisci(i.s))) movimento = true; // colonna DtaReg: è la riga di un movimento
         else if(!com.length && i.x < col.commessa + 40) com.push(i.s);
+        else if(com.length && !causale) causale = pulisci(i.s).toUpperCase(); // colonna Causale (ACQ-O, I-CINST…)
       }
       else des.push(i.s);
     });
     var codice = pulisci(cod.join(" ")), descr = pulisci(des.join(" "));
     var haNumeri = "Saldo" in num || "Entrata" in num || "Uscita" in num;
-    return { codice: codice, descr: descr, commessa: com.join(""), num: num, movimento: movimento, haNumeri: haNumeri, vuota: !Object.keys(num).length };
+    return { codice: codice, descr: descr, commessa: com.join(""), causale: causale, num: num, movimento: movimento, haNumeri: haNumeri, vuota: !Object.keys(num).length };
   }
 
   function rigaValorizzazione(g, col, cat){
@@ -194,6 +200,21 @@
     var haNumeri = "Giacenza alla data" in num;
     return { codice: codice, descr: descr, haNumeri: haNumeri, vuota: !Object.keys(num).length,
       riga: codice && haNumeri ? riga(codice, descr, "", num["Giacenza alla data"], null, num["Valore alla data"], um.join(" ")) : null };
+  }
+
+  /* Causali dei movimenti (configurabili con InvReport.causali):
+   *   ACQ-O acquisto, ACQ-C carico diretto in commessa, I-CINST installazione
+   *   (uscita) in cantiere, I-RCANT rientro da cantiere.
+   * Per ogni riga si tengono le uscite verso il cantiere (ucant) e i rientri (rcant). */
+  var causali = { carico: ["ACQ-O", "ACQ-C"], cantiere: ["I-CINST"], rientro: ["I-RCANT"] };
+
+  function contaCausale(r, l, info){
+    var c = l.causale;
+    if(!c) return;
+    info.causali = info.causali || {};
+    info.causali[c] = (info.causali[c] || 0) + 1;
+    if(causali.cantiere.indexOf(c) >= 0) r.ucant = arrotonda(r.ucant + (l.num.Uscita || 0) - (l.num.Entrata || 0), 6);
+    else if(causali.rientro.indexOf(c) >= 0) r.rcant = arrotonda(r.rcant + (l.num.Entrata || 0) - (l.num.Uscita || 0), 6);
   }
 
   function descrizioneIn(articolo, testo){
@@ -261,18 +282,22 @@
           // Il Saldo dei movimenti è progressivo per commessa: vale quello dell'ultima riga.
           if("Saldo" in l.num) gia.attesa = l.num.Saldo;
           if(l.num.Entrata > 0 && l.num.Unitario) gia.valore = l.num.Unitario;
+          contaCausale(gia, l, info);
           return;
         }
         var nuova = riga(articolo.codice, articolo.descrizione, l.commessa, l.num.Saldo, l.num.Unitario, l.num["Totale Riga"]);
         articolo.righe.push(nuova);
         righe.push(nuova);
-        if(l.movimento){ movimenti[k] = nuova; info.movimenti = true; }
+        if(l.movimento){ movimenti[k] = nuova; info.movimenti = true; nuova.ucant = 0; nuova.rcant = 0; contaCausale(nuova, l, info); }
       });
     });
     // Controllo con i totali stampati dal report: entrate − uscite di ogni articolo
     // deve essere uguale alla somma dei saldi letti per le sue commesse.
     info.controllati = 0;
     info.nonQuadrano = [];
+    info.causaliSconosciute = Object.keys(info.causali || {}).filter(function(c){
+      return causali.carico.concat(causali.cantiere, causali.rientro).indexOf(c) < 0;
+    });
     articoli.forEach(function(a){
       if(a.totale === undefined) return;
       info.controllati++;
@@ -285,10 +310,20 @@
   /* ---------- Commessa e varianti ----------
    * Il materiale comprato per la commessa (S1852) viene spesso scaricato su una
    * sua variante (S1852V04) che non l'aveva mai caricato: la commessa resta con
-   * una giacenza più alta del vero e la variante va in negativo. In magazzino
-   * c'è la somma: per ogni articolo si sommano la commessa e tutte le commesse
-   * il cui codice inizia con il suo. In "dettaglio" resta la giacenza di ognuna.
-   */
+   * una giacenza più alta del vero e la variante va in negativo. Regola:
+   *   - la giacenza di magazzino è la SOMMA DELLE SOLE QUANTITÀ POSITIVE della
+   *     commessa e di tutte le commesse il cui codice inizia con il suo;
+   *   - le varianti in negativo restano in negativo e non contano;
+   *   - si corregge solo la commessa padre.
+   * In "dettaglio" resta il saldo di ogni commessa (anche negativo). */
+  function leggiParti(t){
+    return String(t || "").split(" · ").map(function(x){
+      var p = x.split(": ");
+      return p.length === 2 && p[0] ? { commessa: codicePulito(p[0]), q: Number(p[1].replace(",", ".")) } : null;
+    }).filter(function(x){ return x && isFinite(x.q); });
+  }
+  function scriviParti(parti){ return parti.map(function(x){ return x.commessa + ": " + String(x.q).replace(".", ","); }).join(" · "); }
+
   function sommaVarianti(righe, commessa){
     commessa = codicePulito(commessa);
     var mappa = {}, out = [];
@@ -299,7 +334,11 @@
         if(r.um) p.riga.um = r.um;
         out.push(p.riga);
       }
-      p.riga.attesa = arrotonda(p.riga.attesa + r.attesa, 6);
+      p.riga.attesa = arrotonda(p.riga.attesa + Math.max(0, r.attesa), 6);
+      if(typeof r.ucant === "number"){
+        p.riga.ucant = arrotonda((p.riga.ucant || 0) + r.ucant, 6);
+        p.riga.rcant = arrotonda((p.riga.rcant || 0) + (r.rcant || 0), 6);
+      }
       if(!p.riga.descrizione) p.riga.descrizione = r.descrizione;
       p.parti.push(r);
       if(r.valore){ if(r.commessa === commessa) p.valoreBase = r.valore; else if(!p.valoreAltro) p.valoreAltro = r.valore; }
@@ -308,10 +347,124 @@
       var p = mappa[k];
       p.riga.valore = p.valoreBase || p.valoreAltro || 0;
       if(p.parti.length > 1 || p.parti[0].commessa !== commessa){
-        p.riga.dettaglio = p.parti.map(function(r){ return r.commessa + ": " + String(r.attesa).replace(".", ","); }).join(" · ");
+        p.riga.dettaglio = scriviParti(p.parti.map(function(r){ return { commessa: r.commessa, q: r.attesa }; }));
       }
     });
     return out;
+  }
+
+  /* ---------- Differenze di un articolo, commessa per commessa ----------
+   * riga     la riga dell'inventario (con "dettaglio" se somma commessa e varianti)
+   * reale    giacenza reale totale contata
+   * parti    divisione per commessa ("S1852: 3000 · S1852V06: 380"), se inserita
+   * padre    commessa dell'inventario
+   * Senza divisione tutta la differenza è sulla padre. Con la divisione ogni
+   * commessa si confronta con la propria giacenza positiva (le commesse non
+   * indicate valgono zero: l'avanzo di una variante portato sulla padre). */
+  function ripartisci(riga, reale, parti, padre){
+    padre = codicePulito(padre);
+    var libro = leggiParti(riga.dettaglio), B = {};
+    if(!libro.length) libro = [{ commessa: padre, q: riga.attesa }];
+    libro.forEach(function(x){ B[x.commessa] = Math.max(0, x.q); });
+    if(!(padre in B)) B[padre] = 0;
+    var E = 0, d = {}, contate = leggiParti(parti);
+    Object.keys(B).forEach(function(k){ E += B[k]; });
+    if(contate.length){
+      var R = {};
+      contate.forEach(function(x){ R[x.commessa] = (R[x.commessa] || 0) + x.q; });
+      Object.keys(R).forEach(function(k){ if(!(k in B)) B[k] = 0; });
+      Object.keys(B).forEach(function(k){ d[k] = arrotonda((R[k] || 0) - B[k], 6); });
+    } else {
+      Object.keys(B).forEach(function(k){ d[k] = 0; });
+      d[padre] = arrotonda(reale - E, 6);
+    }
+    var out = { attesa: arrotonda(E, 6), padre: { differenza: d[padre], rientro: 0, carico: 0, meno: 0 }, varianti: {}, cantiere: { netto: 0, spiegato: 0, oltre: 0 } };
+    var varianti = Object.keys(B).filter(function(k){ return k !== padre; }).sort(), mancanti = 0;
+    varianti.forEach(function(k){
+      out.varianti[k] = { differenza: d[k], trasferito: 0, meno: 0, piu: 0 };
+      if(d[k] < 0) mancanti += -d[k]; else if(d[k] > 0) out.varianti[k].piu = d[k];
+    });
+    var X = d[padre];
+    if(X < 0) out.padre.meno = -X;
+    var A = X > 0 ? Math.min(X, mancanti) : 0;
+    // L'avanzo che manca dalle varianti e che la padre ha in più è stato portato sulla padre.
+    varianti.forEach(function(k){
+      if(d[k] >= 0) return;
+      var t = Math.min(-d[k], A);
+      A = arrotonda(A - t, 6);
+      out.varianti[k].trasferito = arrotonda(t, 6);
+      out.varianti[k].meno = arrotonda(-d[k] - t, 6);
+    });
+    if(X > 0){
+      out.padre.carico = arrotonda(Math.min(X, mancanti), 6);
+      out.padre.rientro = arrotonda(X - out.padre.carico, 6);
+      out.cantiere.netto = Math.max(0, arrotonda((riga.ucant || 0) - (riga.rcant || 0), 6));
+      out.cantiere.spiegato = Math.min(out.padre.rientro, out.cantiere.netto);
+      out.cantiere.oltre = arrotonda(out.padre.rientro - out.cantiere.spiegato, 6);
+    }
+    return out;
+  }
+
+  /* ---------- Movimenti da importare nel gestionale ----------
+   * conteggi: [{ riga, reale, parti, extra }] (solo gli articoli contati).
+   * Restituisce i file (uno per tipo di movimento e per commessa) e l'elenco dei
+   * "recuperati" (articoli trovati che non sono nel report: lista promemoria). */
+  function pianoMovimenti(conteggi, padre, conDettaglio){
+    padre = codicePulito(padre);
+    var file = {}, ordine = [], recuperati = [], righeExcel = [];
+    function aggiungi(id, titolo, descrizione, commessa, riga, quantita){
+      if(!(quantita > 1e-7)) return;
+      if(!file[id]){ file[id] = { id: id, titolo: titolo, descrizione: descrizione, commessa: commessa, righe: [] }; ordine.push(id); }
+      file[id].righe.push({ codice: riga.codice, quantita: arrotonda(quantita, 6), valore: riga.valore || 0, descrizione: riga.descrizione });
+    }
+    conteggi.forEach(function(c){
+      var riga = c.riga;
+      if(riga.extra){
+        if(c.reale > 1e-7) recuperati.push({ codice: riga.codice, descrizione: riga.descrizione, commessa: padre, quantita: c.reale, um: riga.um || "" });
+        return;
+      }
+      var x = ripartisci(riga, c.reale, c.parti, padre);
+      var base = { codice: riga.codice, descrizione: riga.descrizione, um: riga.um || "", valore: riga.valore || 0, attesa: x.attesa, reale: c.reale };
+      function excel(commessa, tipo, quantita, nota){ if(quantita > 1e-7) righeExcel.push(Object.assign({ commessa: commessa, tipo: tipo, quantita: arrotonda(quantita, 6), nota: nota || "" }, base)); }
+      if(x.padre.rientro > 1e-7){
+        var n = x.cantiere;
+        var nota = conDettaglio
+          ? (n.netto > 0 ? "uscite verso il cantiere non rientrate: " + n.netto + (n.oltre > 0 ? "; oltre le uscite: " + n.oltre + " (recuperato dal cantiere, articolo già gestito)" : "") : "nessuna uscita verso il cantiere da rientrare: articolo recuperato dal cantiere, già gestito")
+          : "";
+        if(conDettaglio){
+          aggiungi("rientro", "Rientro dal cantiere - " + padre, "Materiale presente in magazzino in più di quanto risulta dal gestionale: uscite verso il cantiere (I-CINST) non rientrate, oppure articoli già gestiti recuperati dal cantiere. Da registrare come rientro da cantiere (I-RCANT) sulla commessa " + padre + ".", padre, riga, x.padre.rientro);
+          excel(padre, "Rientro dal cantiere", x.padre.rientro, nota);
+        } else {
+          // Report riassunto: senza le causali non si può dire se sia un rientro dal cantiere.
+          aggiungi("piu-" + padre, "Differenza in più - " + padre, "Materiale presente in magazzino in più di quanto risulta dal gestionale sulla commessa " + padre + ": movimento positivo (carico). Il report non ha il dettaglio dei movimenti, quindi non si può verificare se è un rientro dal cantiere.", padre, riga, x.padre.rientro);
+          excel(padre, "Differenza in più", x.padre.rientro, "report senza dettaglio dei movimenti: rientro dal cantiere non verificabile");
+        }
+      }
+      if(x.padre.carico > 1e-7){
+        aggiungi("carico-avanzi", "Carico avanzi varianti - " + padre, "Avanzo di materiale acquistato per le varianti e spostato fisicamente sulla commessa " + padre + ": da caricare sulla padre (contropartita dello scarico dalle varianti).", padre, riga, x.padre.carico);
+        excel(padre, "Carico avanzi varianti", x.padre.carico, "contropartita dello scarico dalle varianti");
+      }
+      if(x.padre.meno > 1e-7){
+        aggiungi("meno-" + padre, "Differenza in meno - " + padre, "Materiale che il gestionale dà in giacenza sulla commessa " + padre + " ma che in magazzino non c'è: movimento negativo (scarico).", padre, riga, x.padre.meno);
+        excel(padre, "Differenza in meno", x.padre.meno);
+      }
+      Object.keys(x.varianti).forEach(function(v){
+        var y = x.varianti[v];
+        aggiungi("avanzo-" + v, "Scarico avanzo variante " + v, "Avanzo di materiale acquistato per la variante " + v + ", spostato fisicamente sulla padre " + padre + " e non ancora scaricato dalla variante: scarico dalla variante " + v + ".", v, riga, y.trasferito);
+        excel(v, "Scarico avanzo variante", y.trasferito, "spostato sulla padre " + padre);
+        aggiungi("meno-" + v, "Differenza in meno - " + v, "Materiale che il gestionale dà in giacenza sulla variante " + v + " ma che non c'è in magazzino: movimento negativo (scarico).", v, riga, y.meno);
+        excel(v, "Differenza in meno", y.meno);
+        aggiungi("piu-" + v, "Differenza in più - " + v, "Materiale contato sulla variante " + v + " in più del gestionale: movimento positivo (carico).", v, riga, y.piu);
+        excel(v, "Differenza in più", y.piu);
+      });
+    });
+    var primi = ["rientro", "piu-" + padre, "carico-avanzi", "meno-" + padre];
+    ordine.sort(function(a, b){
+      var ia = primi.indexOf(a), ib = primi.indexOf(b);
+      if(ia < 0) ia = 99; if(ib < 0) ib = 99;
+      return ia - ib || (a < b ? -1 : a > b ? 1 : 0);
+    });
+    return { file: ordine.map(function(id){ return file[id]; }), recuperati: recuperati, righeExcel: righeExcel };
   }
 
   /* ---------- Excel / CSV ---------- */
@@ -425,7 +578,7 @@
     return out.slice(0, 6);
   }
 
-  var api = { numero: numero, dataIso: dataIso, chiave: chiave, codice: codicePulito, pulisci: pulisci, daPdf: daPdf, daTabella: daTabella, sommaVarianti: sommaVarianti, csv: csv, canon: canon, cerca: cerca };
+  var api = { numero: numero, dataIso: dataIso, chiave: chiave, codice: codicePulito, pulisci: pulisci, daPdf: daPdf, daTabella: daTabella, sommaVarianti: sommaVarianti, ripartisci: ripartisci, pianoMovimenti: pianoMovimenti, leggiParti: leggiParti, scriviParti: scriviParti, causali: causali, csv: csv, canon: canon, cerca: cerca };
   if(typeof module !== "undefined" && module.exports) module.exports = api;
   else root.InvReport = api;
 })(typeof self !== "undefined" ? self : this);
