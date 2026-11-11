@@ -50,10 +50,12 @@
   function unisci(righe, info){
     var mappa = {}, out = [];
     info.ripetuti = 0;
+    info.ripetutiElenco = [];
     righe.forEach(function(r){
       var k = chiave(r.codice, r.commessa), p = mappa[k];
       if(!p){ mappa[k] = r; out.push(r); return; }
       info.ripetuti++;
+      info.ripetutiElenco.push({ codice: r.codice, commessa: r.commessa, quantita: r.attesa });
       var tot = p.attesa * p.valore + r.attesa * r.valore;
       p.attesa = arrotonda(p.attesa + r.attesa, 6);
       if(p.attesa) p.valore = arrotonda(tot / p.attesa, 6);
@@ -275,7 +277,7 @@
       if(a.totale === undefined) return;
       info.controllati++;
       var somma = a.righe.reduce(function(t, r){ return t + r.attesa; }, 0);
-      if(Math.abs(somma - a.totale) > 0.0001) info.nonQuadrano.push(a.codice);
+      if(Math.abs(somma - a.totale) > 0.0001) info.nonQuadrano.push({ codice: a.codice, letto: arrotonda(somma, 6), totale: a.totale });
     });
     return { righe: unisci(righe, info), info: info };
   }
