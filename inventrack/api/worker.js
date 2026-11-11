@@ -29,6 +29,13 @@
  *   POST   /inventari/<id>/conteggi       salva uno o più conteggi { conteggi: [...] }
  *   POST   /inventari/<id>/stato          { stato: "aperto" | "chiuso", operatore }
  *   DELETE /inventari/<id>                elimina l'inventario e i suoi conteggi
+ *   GET    /recuperati                    lista "Materiale recuperato" (articoli presenti in
+ *                                         magazzino, resi dal cantiere e mai gestiti)
+ *   POST   /recuperati                    { articoli: [{ codice, commessa, descrizione, um,
+ *                                         quantita, nota }], operatore, inventario }: aggiunge,
+ *                                         o aggiorna la quantità se codice e commessa ci sono già
+ *   POST   /recuperati/<id>               modifica descrizione, um, quantita, nota
+ *   DELETE /recuperati/<id>               toglie l'articolo dalla lista
  *
  * Un conteggio è { chiave, codice, commessa, descrizione, attesa, reale, nota, parti,
  * operatore, quando, extra }: reale = null vuol dire "conteggio annullato";
@@ -104,7 +111,7 @@ function rigaReport(r){
   if(!r || typeof r !== "object") throw new Errore(400, "Riga del report non valida.");
   const codice = testo(r.codice, 80).toUpperCase();
   if(!codice) throw new Errore(400, "Riga del report senza codice.");
-  return { codice, descrizione: testo(r.descrizione, 400), commessa: testo(r.commessa, 40).toUpperCase(), attesa: quantita(r.attesa), valore: quantita(r.valore === undefined ? 0 : r.valore), um: testo(r.um, 12).toUpperCase(), dettaglio: testo(r.dettaglio, 1500) };
+  return { codice, descrizione: testo(r.descrizione, 400), commessa: testo(r.commessa, 40).toUpperCase(), attesa: quantita(r.attesa), valore: quantita(r.valore === undefined ? 0 : r.valore), um: testo(r.um, 12).toUpperCase(), dettaglio: testo(r.dettaglio, 1500), ucant: quantita(r.ucant, true), rcant: quantita(r.rcant, true) };
 }
 function conteggio(c){
   if(!c || typeof c !== "object") throw new Errore(400, "Conteggio non valido.");
@@ -137,7 +144,62 @@ async function tabelle(db){
   // Colonna aggiunta dopo la prima versione: nei database già esistenti va creata.
   const colonne = await db.prepare("PRAGMA table_info(conteggi)").all();
   if(!colonne.results.some(c => c.name === "parti")) await db.prepare("ALTER TABLE conteggi ADD COLUMN parti TEXT NOT NULL DEFAULT ''").run();
+  // Lista "Materiale recuperato": articoli presenti in magazzino ma resi dal cantiere e mai
+  // gestiti; non appartiene a un inventario e resta nel tempo.
+  await db.batch([
+    db.prepare("CREATE TABLE IF NOT EXISTS recuperati (id TEXT PRIMARY KEY, codice TEXT NOT NULL, commessa TEXT NOT NULL DEFAULT '', descrizione TEXT NOT NULL DEFAULT '', um TEXT NOT NULL DEFAULT '', quantita REAL NOT NULL DEFAULT 0, nota TEXT NOT NULL DEFAULT '', inventario TEXT NOT NULL DEFAULT '', creato_da TEXT NOT NULL DEFAULT '', creato_il TEXT NOT NULL, aggiornato_da TEXT NOT NULL DEFAULT '', aggiornato_il TEXT NOT NULL)"),
+    db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS recuperati_codice ON recuperati (codice, commessa)")
+  ]);
   tabellePronte = true;
+}
+
+const CAMPI_REC = "id, codice, commessa, descrizione, um, quantita, nota, inventario, creato_da, creato_il, aggiornato_da, aggiornato_il";
+function recuperato(r){
+  return { id: r.id, codice: r.codice, commessa: r.commessa, descrizione: r.descrizione, um: r.um, quantita: r.quantita, nota: r.nota, inventario: r.inventario,
+    creatoDa: r.creato_da, creatoIl: r.creato_il, aggiornatoDa: r.aggiornato_da, aggiornatoIl: r.aggiornato_il };
+}
+async function recuperati(request, db, env, p, m){
+  if(p.length === 1 && m === "GET"){
+    const r = await db.prepare("SELECT " + CAMPI_REC + " FROM recuperati ORDER BY aggiornato_il DESC LIMIT 2000").all();
+    return json(env, 200, { recuperati: r.results.map(recuperato) });
+  }
+  const ora = new Date().toISOString();
+  if(p.length === 1 && m === "POST"){
+    // Aggiunge articoli (anche da un inventario); se codice e commessa ci sono già, aggiorna la quantità.
+    const d = await corpo(request, 400000);
+    if(!d || !Array.isArray(d.articoli) || !d.articoli.length || d.articoli.length > 500) throw new Errore(400, "Articoli non validi.");
+    const operatore = testo(d.operatore, 100), inventario = testo(d.inventario, 60);
+    const lista = d.articoli.map(a => {
+      if(!a || typeof a !== "object") throw new Errore(400, "Articolo non valido.");
+      const codice = testo(a.codice, 80).toUpperCase();
+      if(!codice) throw new Errore(400, "Articolo senza codice.");
+      return { codice, commessa: testo(a.commessa, 40).toUpperCase(), descrizione: testo(a.descrizione, 400), um: testo(a.um, 12).toUpperCase(), quantita: quantita(a.quantita), nota: testo(a.nota, 500) };
+    });
+    await db.batch(lista.map(a => db.prepare(
+      "INSERT INTO recuperati (id, codice, commessa, descrizione, um, quantita, nota, inventario, creato_da, creato_il, aggiornato_da, aggiornato_il) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?9, ?10) " +
+      "ON CONFLICT (codice, commessa) DO UPDATE SET quantita = excluded.quantita, descrizione = CASE WHEN excluded.descrizione <> '' THEN excluded.descrizione ELSE recuperati.descrizione END, " +
+      "um = CASE WHEN excluded.um <> '' THEN excluded.um ELSE recuperati.um END, nota = CASE WHEN excluded.nota <> '' THEN excluded.nota ELSE recuperati.nota END, " +
+      "inventario = excluded.inventario, aggiornato_da = excluded.aggiornato_da, aggiornato_il = excluded.aggiornato_il"
+    ).bind(crypto.randomUUID(), a.codice, a.commessa, a.descrizione, a.um, a.quantita, a.nota, inventario, operatore, ora)));
+    return json(env, 200, { ok: true, salvati: lista.length });
+  }
+  const id = p[1];
+  if(!/^[0-9a-f-]{36}$/.test(id || "")) throw new Errore(404, "Articolo non trovato.");
+  if(p.length === 2 && m === "POST"){
+    const d = await corpo(request, 5000);
+    const r = await db.prepare("SELECT " + CAMPI_REC + " FROM recuperati WHERE id = ?1").bind(id).first();
+    if(!r) throw new Errore(404, "Articolo non trovato: forse è stato eliminato.");
+    await db.prepare("UPDATE recuperati SET descrizione = ?2, um = ?3, quantita = ?4, nota = ?5, aggiornato_da = ?6, aggiornato_il = ?7 WHERE id = ?1")
+      .bind(id, d.descrizione === undefined ? r.descrizione : testo(d.descrizione, 400), d.um === undefined ? r.um : testo(d.um, 12).toUpperCase(),
+        d.quantita === undefined ? r.quantita : quantita(d.quantita), d.nota === undefined ? r.nota : testo(d.nota, 500), testo(d.operatore, 100), ora).run();
+    const n = await db.prepare("SELECT " + CAMPI_REC + " FROM recuperati WHERE id = ?1").bind(id).first();
+    return json(env, 200, { recuperato: recuperato(n) });
+  }
+  if(p.length === 2 && m === "DELETE"){
+    await db.prepare("DELETE FROM recuperati WHERE id = ?1").bind(id).run();
+    return json(env, 200, { ok: true });
+  }
+  throw new Errore(404, "Richiesta sconosciuta.");
 }
 
 const CAMPI = "id, tipo, commessa, deposito, data, stato, righe, report, note, creato_da, creato_il, chiuso_da, chiuso_il";
@@ -171,6 +233,7 @@ async function handle(request, env){
     await tabelle(db);
 
     if(p[0] === "ping" && m === "GET") return json(env, 200, { ok: true });
+    if(p[0] === "recuperati") return await recuperati(request, db, env, p, m);
     if(p[0] !== "inventari") throw new Errore(404, "Richiesta sconosciuta.");
 
     if(p.length === 1 && m === "GET"){

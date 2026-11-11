@@ -38,19 +38,43 @@ Un inventario vale **solo per il giorno in cui viene fatto**: le giacenze attese
 - Data, ora e autore di ogni conteggio sono nell'Excel.
 - A giro finito **Chiudi l'inventario**: da quel momento nessun dispositivo può più modificare le quantità (si può riaprire). Excel e CSV si possono sempre scaricare.
 
-### Commessa e varianti: la giacenza attesa è la somma
+### Commessa e varianti: la giacenza attesa
 
-Il materiale comprato per una commessa (es. `S1852`) viene spesso scaricato su una sua variante (`S1852V04`) per la quale non era mai stato caricato. Nel gestionale la commessa resta con una giacenza più alta del vero e la variante va in negativo: contando la sola `S1852` il sistema si aspetterebbe più materiale di quello che c'è.
+Il materiale comprato per una commessa (es. `S1852`) viene spesso scaricato su una sua variante (`S1852V04`) per la quale non era mai stato caricato: nel gestionale la commessa resta con una giacenza più alta del vero e la variante va in negativo.
 
-Per questo, se il report caricato contiene anche le varianti, la pagina propone (già spuntato) **Somma la commessa e le sue varianti**: per ogni articolo la giacenza attesa è la somma della commessa e di tutte le commesse il cui codice inizia con il suo. Esempio reale, articolo `HIL2346062`: `S1852` 10.900, varianti in tutto −7.500, **giacenza attesa 3.400**.
+**La regola**: la giacenza di magazzino è la **somma delle sole quantità positive** della commessa e di tutte le commesse il cui codice inizia con il suo (le varianti). Le varianti in negativo **restano in negativo e non contano**; si corregge **solo la commessa padre**. Esempio, articolo `HIL2346062`: `S1852` 10.900, `S1852V06` 400, `S1852V12` 400, varianti in negativo −8.300 → giacenza attesa **11.700**; se in magazzino ce ne sono 3.400, la differenza (−8.300) è sulla padre.
+
+In "Nuovo inventario" la spunta **Somma la commessa e le sue varianti** (già attiva quando il report contiene le varianti) fa questo calcolo. Togliendola, ogni variante resta una riga separata.
 
 - **Il report va stampato comprendendo le varianti**: *Da Commessa* `S1852`, *A Commessa* `S1852ZZ` (con `S1852/` le varianti restano fuori). Se il report contiene solo la commessa, la pagina lo ricorda.
-- Va bene sia il report riassunto (una riga per articolo e commessa) sia quello con il **dettaglio dei movimenti** (una riga per movimento): in quel caso vale il saldo dell'ultima riga di ogni commessa.
-- **Controllo automatico**: con il report dei movimenti, per ogni articolo la pagina confronta la giacenza letta con la riga *TOTALE ARTICOLO* stampata dal report (entrate − uscite). Nel riepilogo compare "✓ N articoli coincidono con i totali del report", oppure quanti articoli non tornano. Ogni avviso del riepilogo (articoli che non coincidono, giacenze negative, righe di altre commesse, righe ripetute) ha **Vedi l'elenco**, con tutti i codici e i numeri, e **Copia l'elenco**.
-- Nella scheda dell'articolo **Somma della commessa e delle varianti** mostra la giacenza del gestionale commessa per commessa; lo stesso dettaglio è nell'ultima colonna dell'Excel.
-- **Dividi per commessa**: al momento del conteggio si può scrivere solo il totale, oppure aprire *Dividi per commessa* e scrivere quanto c'è per la commessa padre e quanto per ogni variante (quelle dell'articolo sono già elencate, con la giacenza del gestionale; le altre si aggiungono dal menu). La giacenza reale è la somma e la differenza resta calcolata sul totale. La divisione è salvata con il conteggio, si vede dagli altri dispositivi ed è nella colonna *Giacenza reale per commessa* dell'Excel.
-- I CSV dei movimenti contengono la differenza sul totale (non hanno la commessa): su quale commessa registrare il movimento si decide nel gestionale.
-- Togliendo la spunta ogni variante resta una riga separata, con la sua commessa.
+- **Due tipi di report** (*Analisi Andamento Giacenza*): riassunto (una riga per articolo e commessa) oppure con il **dettaglio dei movimenti** (una riga per movimento, con la causale): in quel caso vale il saldo dell'ultima riga di ogni commessa. Solo con il dettaglio dei movimenti si hanno i **rientri dal cantiere** (vedi sotto).
+- **Controllo automatico**: con il report dei movimenti, per ogni articolo la pagina confronta la giacenza letta con la riga *TOTALE ARTICOLO* stampata dal report (entrate − uscite). Nel riepilogo compare "✓ N articoli coincidono con i totali del report", oppure quanti articoli non tornano. Ogni avviso del riepilogo (articoli che non coincidono, righe di altre commesse, righe ripetute) ha **Vedi l'elenco**, con tutti i codici e i numeri, e **Copia l'elenco**.
+- **Causali dei movimenti**: ACQ-O acquisto, ACQ-C carico diretto in commessa, **I-CINST** installazione (uscita) in cantiere, **I-RCANT** rientro da cantiere. Il riepilogo del report elenca le causali trovate e avvisa se ce ne sono altre; si cambiano in `INVENTRACK_CONFIG.causali` (inizio di `inventrack.js`).
+- Nella scheda dell'articolo *Giacenza per commessa* mostra la giacenza del gestionale commessa per commessa; lo stesso dettaglio è nell'ultima colonna dell'Excel.
+- **Dividi per commessa**: al conteggio si può scrivere solo il totale, oppure aprire *Dividi per commessa* e scrivere quanto c'è per la commessa padre e per ogni variante (quelle dell'articolo sono già elencate, con la giacenza del gestionale; le altre si aggiungono dal menu). La giacenza reale è la somma; le commesse lasciate vuote valgono zero. La divisione è salvata con il conteggio, si vede dagli altri dispositivi ed è nell'Excel (*Giacenza reale per commessa*).
+
+### Giacenza in più sulla padre: i movimenti da registrare
+
+Quando la padre ha in magazzino più di quanto risulta dal gestionale, la pagina distingue le cause e prepara un file CSV per ciascuna, nel solito formato `"codice" ; quantità ; valore unitario` (quantità sempre positive; il tipo di movimento e la commessa sono nel nome del file e nella descrizione che compare in **Esporta**, scheda *Movimenti da registrare nel gestionale*; **Scarica tutti i file (ZIP)** li scarica insieme).
+
+| Causa | Come la riconosce | File |
+|---|---|---|
+| **1. Rientro dal cantiere non registrato** (o articolo già gestito, recuperato dal cantiere) | Eccedenza sulla padre; il report mostra le uscite verso il cantiere (I-CINST) non ancora rientrate (I-RCANT). Nell'Excel la nota dice quanto è spiegato dalle uscite e quanto è *oltre* le uscite (articolo già gestito, tornato "come se fosse lo stesso") | **Rientro dal cantiere** (un solo CSV sulla padre) |
+| **2. Avanzo di una variante portato sulla padre** | Una variante ha giacenza positiva nel gestionale, ma al conteggio (*Dividi per commessa*) ha meno o zero, e la padre ha di più | **Scarico avanzo variante `S1852Vxx`** (un CSV per ogni variante) e **Carico sulla padre degli avanzi delle varianti** (contropartita sulla padre) |
+| **3. Articolo recuperato mai gestito** | Codice che non è nel report | Nessun movimento: va nella lista **Materiale recuperato** |
+
+- Le **differenze in meno** della padre restano in un file *Differenza in meno - S1852* (movimento negativo); una variante contata meno del gestionale senza che la padre abbia di più (o in più) ha i suoi file *Differenza in meno / in più - S1852Vxx*. Le varianti in negativo non generano movimenti.
+- Senza *Dividi per commessa* tutta la differenza è sulla padre (rientro se in più, differenza in meno se in meno).
+- Con il report riassunto (senza causali) restano i due file semplici, *Movimento positivo* e *Movimento negativo*, che si trovano anche, in un riquadro chiuso, negli inventari di commessa.
+- Il foglio **Movimenti** dell'Excel elenca tutte le righe di questi file, con giacenza attesa, reale e note, più gli articoli recuperati.
+
+### Materiale recuperato
+
+Lista promemoria degli articoli **presenti in magazzino, resi dal cantiere e mai gestiti da noi**: non genera movimenti e resta nel tempo, fuori dagli inventari. Si apre da **📋 Materiale recuperato** nella pagina iniziale.
+
+- Si riempie dagli inventari di commessa (*Esporta* → **Materiale recuperato** → *Aggiungi alla lista*: gli articoli contati che non sono nel report) o a mano con il modulo (codice, quantità, descrizione, commessa, nota).
+- Si aggiorna nel tempo: ✏️ **Modifica** per quantità, descrizione e nota (chi e quando ha aggiornato resta visibile), 🗑 **Togli dalla lista** quando l'articolo non c'è più o è diventato un articolo gestito. Se un inventario ricontrolla un articolo già in lista, la quantità si aggiorna al valore contato (non si duplica).
+- La lista è la stessa per tutti i dispositivi (servizio) e ha la ricerca per codice, descrizione o nota.
 
 ### Magazzino aziendale: il giro di fine giornata
 
@@ -105,7 +129,7 @@ Finché `api` in `INVENTRACK_CONFIG` (all'inizio di [`inventrack.js`](inventrack
 
 Verifica: aprire `hub.siciet.it/inventrack/`, inserire nome e password, creare un inventario di prova con un report e poi eliminarlo (scheda *Esporta* → **Elimina**). "Servizio non configurato" indica che manca l'associazione `DB` o la variabile `PASSWORD`.
 
-Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo. Dalla versione 1.6 il servizio salva anche l'**unità di misura** degli articoli dalla 1.7 il **dettaglio per commessa** della somma con le varianti e dalla 1.8 la **divisione per commessa** della giacenza reale (il servizio aggiunge da solo la colonna che serve al database esistente): finché non si ricopia il nuovo `worker.js` tutto funziona, ma questi dati si vedono solo sul dispositivo su cui sono stati inseriti.
+Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo. Dalla versione 1.6 il servizio salva anche l'**unità di misura** degli articoli dalla 1.7 il **dettaglio per commessa** della somma con le varianti e dalla 1.8 la **divisione per commessa** della giacenza reale (il servizio aggiunge da solo la colonna che serve al database esistente): finché non si ricopia il nuovo `worker.js` tutto funziona, ma questi dati si vedono solo sul dispositivo su cui sono stati inseriti. Dalla 2.0 salva anche le **uscite verso il cantiere** di ogni articolo e ospita la lista **Materiale recuperato** (il servizio crea da solo la tabella che serve): senza il nuovo `worker.js` la lista non funziona e i rientri dal cantiere si calcolano solo sul dispositivo che ha creato l'inventario.
 
 ## Limiti
 

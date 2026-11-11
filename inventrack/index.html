@@ -220,6 +220,8 @@ footer{max-width:900px;margin:0 auto;padding:0 16px calc(24px + env(safe-area-in
 .codici summary{cursor:pointer;font-weight:600;text-decoration:underline}
 .codici .btn{margin:8px 0}
 .codici pre{font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px;user-select:all;-webkit-user-select:all}
+.filemov{display:grid;gap:8px;border:1px solid var(--border);border-radius:12px;padding:12px;background:var(--field)}
+.recuperato{gap:8px}
 .dividi{border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-size:14px;color:var(--text)}
 .dividi p{color:var(--muted);font-size:13px;margin-top:6px}
 .dividi select{margin-top:8px}
@@ -278,7 +280,30 @@ input[readonly]{opacity:.75}
     <div class="avviso" id="provaAvviso" hidden><b>Modalità di prova</b>Il servizio non è ancora collegato: gli inventari restano salvati solo su questo dispositivo e non si vedono dagli altri.</div>
     <div class="avviso info" id="offlineAvviso" hidden></div>
     <button class="btn primary grande" type="button" id="nuovoBtn">➕ Nuovo inventario</button>
+    <button class="btn grande" type="button" id="recuperatiBtn">📋 Materiale recuperato</button>
     <div id="lista" style="display:grid;gap:12px"></div>
+  </section>
+
+  <!-- Materiale recuperato: lista promemoria -->
+  <section id="vRecuperati" hidden>
+    <div class="card">
+      <a href="#" class="linkbtn">‹ Tutti gli inventari</a>
+      <p class="hint">Articoli presenti in magazzino, resi dal cantiere e mai gestiti da noi. È una lista promemoria: non genera movimenti e resta nel tempo. Si riempie dagli inventari di commessa (scheda Esporta) o con il modulo qui sotto; le quantità si aggiornano a mano.</p>
+      <div class="avviso" id="recOffline" hidden>Senza connessione: si vede l'ultima copia della lista salvata su questo dispositivo.</div>
+      <input type="search" id="recCerca" autocomplete="off" placeholder="Cerca per codice, descrizione o nota">
+    </div>
+    <form class="card" id="recForm" autocomplete="off">
+      <h2>Aggiungi un articolo</h2>
+      <div class="grid">
+        <label class="field"><span class="flabel">Codice</span><input type="text" id="recCodice" class="maiuscolo" maxlength="80" autocapitalize="characters"></label>
+        <label class="field"><span class="flabel">Quantità presente</span><input type="text" id="recQuantita" inputmode="decimal"></label>
+        <label class="field largo"><span class="flabel">Descrizione (facoltativa)</span><input type="text" id="recDescr" maxlength="300"></label>
+        <label class="field"><span class="flabel">Commessa (facoltativa)</span><input type="text" id="recCommessa" class="maiuscolo" maxlength="30" placeholder="es. S1852" autocapitalize="characters"></label>
+        <label class="field"><span class="flabel">Nota (facoltativa)</span><input type="text" id="recNota" maxlength="300" placeholder="es. dove si trova"></label>
+      </div>
+      <button class="btn primary" type="submit" id="recAggiungi">Aggiungi alla lista</button>
+    </form>
+    <div id="recLista" style="display:grid;gap:12px"></div>
   </section>
 
   <!-- Nuovo inventario -->
@@ -310,7 +335,7 @@ input[readonly]{opacity:.75}
       <div class="avviso info" id="sommaCampo" hidden>
         <span id="sommaTesto"></span>
         <label class="riga"><input type="checkbox" id="nSomma" checked><span><b>Somma la commessa e le sue varianti</b></span></label>
-        <span>Il materiale comprato per la commessa viene spesso scaricato su una variante: per ogni articolo la giacenza attesa diventa la somma della commessa e delle varianti, cioè quello che c'è davvero in magazzino. Senza la spunta ogni variante resta una riga separata.</span>
+        <span>Il materiale comprato per la commessa viene spesso scaricato su una variante: per ogni articolo la giacenza attesa diventa la somma delle sole giacenze positive della commessa e delle varianti. Le varianti in negativo restano in negativo e non contano; si corregge solo la commessa. Senza la spunta ogni variante resta una riga separata.</span>
       </div>
       <label class="field"><span class="flabel">Note (facoltative)</span>
         <input type="text" id="nNote" maxlength="300"></label>
@@ -386,7 +411,7 @@ input[readonly]{opacity:.75}
 
 <div id="toast" role="status" hidden></div>
 
-<script src="report.js?v=5"></script>
-<script src="inventrack.js?v=9"></script>
+<script src="report.js?v=6"></script>
+<script src="inventrack.js?v=10"></script>
 </body>
 </html>
