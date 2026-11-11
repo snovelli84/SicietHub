@@ -431,11 +431,17 @@
         var nota = conDettaglio
           ? (n.netto > 0 ? "uscite verso il cantiere non rientrate: " + n.netto + (n.oltre > 0 ? "; oltre le uscite: " + n.oltre + " (recuperato dal cantiere, articolo già gestito)" : "") : "nessuna uscita verso il cantiere da rientrare: articolo recuperato dal cantiere, già gestito")
           : "";
-        aggiungi("rientro", "Rientro dal cantiere", "Materiale presente in magazzino in più di quanto risulta dal gestionale: uscite verso il cantiere (I-CINST) non rientrate, oppure articoli già gestiti recuperati dal cantiere. Da registrare come rientro da cantiere (I-RCANT) sulla commessa " + padre + ".", padre, riga, x.padre.rientro);
-        excel(padre, "Rientro dal cantiere", x.padre.rientro, nota);
+        if(conDettaglio){
+          aggiungi("rientro", "Rientro dal cantiere - " + padre, "Materiale presente in magazzino in più di quanto risulta dal gestionale: uscite verso il cantiere (I-CINST) non rientrate, oppure articoli già gestiti recuperati dal cantiere. Da registrare come rientro da cantiere (I-RCANT) sulla commessa " + padre + ".", padre, riga, x.padre.rientro);
+          excel(padre, "Rientro dal cantiere", x.padre.rientro, nota);
+        } else {
+          // Report riassunto: senza le causali non si può dire se sia un rientro dal cantiere.
+          aggiungi("piu-" + padre, "Differenza in più - " + padre, "Materiale presente in magazzino in più di quanto risulta dal gestionale sulla commessa " + padre + ": movimento positivo (carico). Il report non ha il dettaglio dei movimenti, quindi non si può verificare se è un rientro dal cantiere.", padre, riga, x.padre.rientro);
+          excel(padre, "Differenza in più", x.padre.rientro, "report senza dettaglio dei movimenti: rientro dal cantiere non verificabile");
+        }
       }
       if(x.padre.carico > 1e-7){
-        aggiungi("carico-avanzi", "Carico sulla padre degli avanzi delle varianti", "Avanzo di materiale acquistato per le varianti e spostato fisicamente sulla commessa " + padre + ": da caricare sulla padre (contropartita dello scarico dalle varianti).", padre, riga, x.padre.carico);
+        aggiungi("carico-avanzi", "Carico avanzi varianti - " + padre, "Avanzo di materiale acquistato per le varianti e spostato fisicamente sulla commessa " + padre + ": da caricare sulla padre (contropartita dello scarico dalle varianti).", padre, riga, x.padre.carico);
         excel(padre, "Carico avanzi varianti", x.padre.carico, "contropartita dello scarico dalle varianti");
       }
       if(x.padre.meno > 1e-7){
@@ -452,7 +458,7 @@
         excel(v, "Differenza in più", y.piu);
       });
     });
-    var primi = ["rientro", "carico-avanzi", "meno-" + padre];
+    var primi = ["rientro", "piu-" + padre, "carico-avanzi", "meno-" + padre];
     ordine.sort(function(a, b){
       var ia = primi.indexOf(a), ib = primi.indexOf(b);
       if(ia < 0) ia = 99; if(ib < 0) ib = 99;

@@ -929,9 +929,13 @@ var INVENTRACK_CONFIG = {
         if(scelta.options.length < 2) scelta.hidden = true;
         riga.querySelector("input").focus();
       });
-      boxParti = el("details", { class: "dettaglio dividi", open: Object.keys(gia).length > 0 },
+      // Giacenza positiva anche sulle varianti: conviene contare commessa per commessa, così ognuno resta al suo posto.
+      var positive = elenco.filter(function(k){ return k !== S.inv.commessa && libro[k] > 0; });
+      boxParti = el("details", { class: "dettaglio dividi", open: Object.keys(gia).length > 0 || positive.length > 0 },
         el("summary", { text: "Dividi per commessa (" + S.inv.commessa + " e varianti)" }),
-        el("p", { text: "Scrivi quanto c'è per ogni commessa: la giacenza reale è la somma. Lascia vuote quelle dove non c'è nulla." }),
+        el("p", { text: positive.length
+          ? "Il gestionale ha giacenza anche su " + positive.map(function(k){ return k + " (" + fmt(libro[k]) + ")"; }).join(", ") + ". Scrivi quanto c'è fisicamente su ogni commessa: la giacenza reale è la somma e ogni commessa resta al suo posto. Lascia vuote quelle dove non c'è nulla."
+          : "Scrivi quanto c'è per ogni commessa: la giacenza reale è la somma. Lascia vuote quelle dove non c'è nulla." }),
         righeParti, scelta);
     }
 
@@ -1330,8 +1334,10 @@ var INVENTRACK_CONFIG = {
    * file per ogni movimento da registrare: rientro dal cantiere, avanzi delle
    * varianti, differenze; gli articoli trovati e non gestiti vanno nella lista
    * "Materiale recuperato". */
+  // L'inventario di commessa con le varianti, o con il dettaglio dei movimenti, si ripartisce per commessa.
+  function conDettaglioMovimenti(){ return S.righe.some(function(r){ return typeof r.ucant === "number"; }); }
   function conMovimenti(){
-    return !!S.inv && S.inv.tipo === "commessa" && S.righe.some(function(r){ return typeof r.ucant === "number"; });
+    return !!S.inv && S.inv.tipo === "commessa" && (conDettaglioMovimenti() || S.righe.some(function(r){ return !!r.dettaglio; }));
   }
   function pianoCorrente(nonContatiZero){
     var conteggi = [];
@@ -1340,7 +1346,7 @@ var INVENTRACK_CONFIG = {
       if(!c && !nonContatiZero) return;
       conteggi.push({ riga: r, reale: c ? c.reale : 0, parti: c && c.parti ? c.parti : "" });
     });
-    return R.pianoMovimenti(conteggi, S.inv.commessa, true);
+    return R.pianoMovimenti(conteggi, S.inv.commessa, conDettaglioMovimenti());
   }
   function scaricaFile(f){
     scarica(nomeFile(f.titolo, "csv"), new Blob([testoCsv(f.righe)], { type: "text/csv" }));

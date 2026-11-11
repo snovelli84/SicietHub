@@ -65,7 +65,9 @@ Quando la padre ha in magazzino più di quanto risulta dal gestionale, la pagina
 
 - Le **differenze in meno** della padre restano in un file *Differenza in meno - S1852* (movimento negativo); una variante contata meno del gestionale senza che la padre abbia di più (o in più) ha i suoi file *Differenza in meno / in più - S1852Vxx*. Le varianti in negativo non generano movimenti.
 - Senza *Dividi per commessa* tutta la differenza è sulla padre (rientro se in più, differenza in meno se in meno).
-- Con il report riassunto (senza causali) restano i due file semplici, *Movimento positivo* e *Movimento negativo*, che si trovano anche, in un riquadro chiuso, negli inventari di commessa.
+- **Esempio**: gestionale S1852 = 3.100 e S1852V99 = 400 (totale 3.500); in magazzino S1852 = 3.200 e S1852V99 = 400 (totale 3.600). Con *Dividi per commessa* (3.200 + 400) il risultato è un solo file, *Rientro dal cantiere - S1852*, di 100 pezzi: registrato quello, il totale è 3.600 e ogni commessa coincide con quanto c'è fisicamente. Se invece le varianti sono 300 e la padre 3.300, i file sono *Scarico avanzo variante S1852V99* e *Carico avanzi varianti - S1852* di 100: il totale non cambia, ma ogni commessa torna al suo posto. Quando l'articolo ha giacenza positiva anche sulle varianti, *Dividi per commessa* si apre da solo: conviene contare commessa per commessa, perché con il solo totale tutta la differenza finisce sulla padre.
+- Con il report riassunto (senza causali) la ripartizione per commessa funziona allo stesso modo, ma la differenza in più sulla padre si chiama *Differenza in più - S1852* e non *Rientro dal cantiere*: senza i movimenti non si può verificare se è un rientro.
+- I file semplici *Movimento positivo* e *Movimento negativo* (differenza totale, senza ripartire per commessa) si trovano, in un riquadro chiuso, negli inventari di commessa con le varianti; negli altri inventari sono gli unici file.
 - Il foglio **Movimenti** dell'Excel elenca tutte le righe di questi file, con giacenza attesa, reale e note, più gli articoli recuperati.
 
 ### Materiale recuperato
