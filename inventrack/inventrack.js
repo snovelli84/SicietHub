@@ -32,7 +32,7 @@ var INVENTRACK_CONFIG = {
 
   // Versione mostrata in fondo alla pagina: aumentarla a ogni modifica,
   // insieme al numero ?v= di inventrack.js in index.html.
-  versione: "2.1"
+  versione: "2.2"
 };
 
 (function(){
@@ -336,6 +336,55 @@ var INVENTRACK_CONFIG = {
   $("nuovoBtn").addEventListener("click", function(){ location.hash = "nuovo"; });
   $("recuperatiBtn").addEventListener("click", function(){ location.hash = "recuperati"; });
 
+  /* ---------- Inventari collegati ----------
+   * Un inventario può continuare quello del giorno prima: ne eredita i conteggi
+   * (con l'indicazione di chi, quando e da quale inventario), così si sa cosa è
+   * già fatto. Confrontati con il report nuovo, i conteggi ereditati coincidono
+   * se i movimenti di ieri sono stati registrati nel gestionale. */
+  async function elencoInventari(){
+    try{ return inProva() ? ((await kv.get("lista")) || []) : (await api("GET", "/inventari")).inventari; }
+    catch(_){ return (await kv.get("lista")) || []; }
+  }
+
+  // Inventari che l'inventario "inv" può continuare: stesso tipo (e stessa commessa), più vecchi.
+  function candidatiPrecedente(lista, inv){
+    return lista.filter(function(x){
+      return x.id !== inv.id && x.tipo === inv.tipo && (inv.tipo !== "commessa" || R.codice(x.commessa) === R.codice(inv.commessa)) &&
+        (x.data < inv.data || (x.data === inv.data && x.creatoIl < (inv.creatoIl || "9"))) && (x.contati === undefined || x.contati > 0);
+    }).sort(function(a, b){ return a.data < b.data ? 1 : a.data > b.data ? -1 : a.creatoIl < b.creatoIl ? 1 : -1; });
+  }
+  function nomeInventario(x){
+    return titoloInv(x) + " del " + dataIt(x.data) + (x.contati !== undefined ? " · " + fmt(x.contati) + " contati" : "") + (x.stato === "chiuso" ? " · chiuso" : "");
+  }
+
+  // Copia nell'inventario "inv" i conteggi di "precId". righe: righe del report di "inv".
+  async function ereditaConteggi(inv, precId, righe){
+    var indice = {};
+    righe.forEach(function(r){ indice[R.chiave(r.codice, r.commessa)] = r; });
+    var prec;
+    if(inProva()){
+      var locali = ((await kv.get("cnt:" + precId)) || { conteggi: {} }).conteggi;
+      prec = Object.keys(locali).map(function(k){ return locali[k]; });
+    }
+    else prec = (await api("GET", "/inventari/" + precId + "/conteggi?da=0")).conteggi;
+    var nuovi = prec.filter(function(c){ return c.reale !== null && c.reale !== undefined; }).map(function(c){
+      var r = indice[c.chiave];
+      return { chiave: c.chiave, codice: c.codice, commessa: c.commessa, descrizione: c.descrizione || (r ? r.descrizione : ""), attesa: r ? r.attesa : 0, reale: c.reale,
+        nota: c.nota || "", parti: c.parti || "", operatore: c.operatore, quando: c.quando, extra: !r, origine: c.origine || precId };
+    });
+    if(inProva()){
+      var mappa = ((await kv.get("cnt:" + inv.id)) || { conteggi: {} }).conteggi;
+      nuovi.forEach(function(c){ var e = mappa[c.chiave]; if(!e || e.quando <= c.quando) mappa[c.chiave] = c; });
+      await kv.set("cnt:" + inv.id, { conteggi: mappa, da: 0 });
+      if(S.inv && S.inv.id === inv.id) S.conteggi = mappa;
+    } else {
+      for(var i = 0; i < nuovi.length; i += 500) await api("POST", "/inventari/" + inv.id + "/conteggi", { conteggi: nuovi.slice(i, i + 500) });
+      await api("POST", "/inventari/" + inv.id + "/precedente", { precedente: precId });
+    }
+    inv.precedente = precId;
+    return nuovi.length;
+  }
+
   /* ---------- Nuovo inventario ---------- */
 
   function tipoScelto(){ var r = document.querySelector("input[name=tipo]:checked"); return r ? r.value : ""; }
@@ -347,8 +396,10 @@ var INVENTRACK_CONFIG = {
     $("nErr").hidden = true;
     S.nuovo = null;
     aggiornaNuovo.firma = null;
+    S.elencoPrecedenti = [];
     aggiornaNuovo();
     mostra("vNuovo");
+    elencoInventari().then(function(l){ S.elencoPrecedenti = l; aggiornaContinua(); });
   }
 
   async function leggiPdf(file){
@@ -432,10 +483,27 @@ var INVENTRACK_CONFIG = {
     return { righe: righe, scartate: scartate, scartateElenco: scartateElenco, varianti: varianti, sommate: sommate };
   }
 
+  // Menu "Continua un inventario precedente": inventari dello stesso tipo (e della stessa commessa).
+  function aggiornaContinua(){
+    var tipo = tipoScelto(), campo = $("continuaCampo"), sel = $("nContinua"), scelto = sel.value;
+    var fittizio = { id: "", tipo: tipo, commessa: R.codice($("nCommessa").value), data: $("nData").value || oggi(), creatoIl: "9" };
+    var cand = tipo ? candidatiPrecedente(S.elencoPrecedenti || [], fittizio) : [];
+    if(tipo === "commessa" && !fittizio.commessa) cand = [];
+    campo.hidden = !cand.length;
+    var chiave = cand.map(function(x){ return x.id; }).join();
+    if(sel.dataset.chiave !== chiave){
+      sel.dataset.chiave = chiave;
+      svuota(sel).appendChild(el("option", { value: "", text: "No, è un inventario nuovo" }));
+      cand.forEach(function(x){ sel.appendChild(el("option", { value: x.id, text: nomeInventario(x) })); });
+      sel.value = cand.some(function(x){ return x.id === scelto; }) ? scelto : "";
+    }
+  }
+
   function aggiornaNuovo(){
+    aggiornaContinua();
     // Se non è cambiato nulla il riepilogo non si ridisegna: altrimenti, uscendo da
     // un campo, il primo tocco su un elenco andrebbe perso.
-    var firma = [tipoScelto(), $("nCommessa").value, $("nData").value, $("nSomma").checked, S.nuovo ? S.nuovo.nome + S.nuovo.righe.length : "", $("nErr").hidden].join("|");
+    var firma = [tipoScelto(), $("nCommessa").value, $("nData").value, $("nSomma").checked, $("nContinua").value, S.nuovo ? S.nuovo.nome + S.nuovo.righe.length : "", $("nErr").hidden].join("|");
     if(firma === aggiornaNuovo.firma && $("nEsito").firstChild) return;
     aggiornaNuovo.firma = firma;
     // Gli elenchi aperti restano aperti quando il riepilogo viene ridisegnato.
@@ -534,6 +602,14 @@ var INVENTRACK_CONFIG = {
       delete inv.operatore;
       await kv.set("inv:" + id, { inv: inv, righe: sel.righe });
       if(inProva()) await kv.set("lista", [inv].concat((await kv.get("lista")) || []));
+      if($("nContinua").value){
+        btn.textContent = "Ereditare i conteggi…";
+        try{
+          var ereditati = await ereditaConteggi(inv, $("nContinua").value, sel.righe);
+          await kv.set("inv:" + id, { inv: inv, righe: sel.righe });
+          toast(fmt(ereditati) + " conteggi ereditati dall'inventario precedente");
+        }catch(e){ toast("Inventario creato, ma non sono riuscito a ereditare i conteggi: " + (e.message || e) + " Riprova dalla scheda Esporta.", true); }
+      }
       location.hash = "i=" + encodeURIComponent(id);
     }catch(e){
       $("nErr").hidden = false;
@@ -617,6 +693,7 @@ var INVENTRACK_CONFIG = {
     S.righe = righe;
     S.indice = {};
     S.commesse = null;
+    S.elencoInv = null;
     S.opzioni = { zero: false, variantiComplete: false };
     righe.forEach(function(r){ S.indice[R.chiave(r.codice, r.commessa)] = r; });
     S.conteggi = cnt.conteggi;
@@ -726,7 +803,8 @@ var INVENTRACK_CONFIG = {
     var c = conteggioDi(r), st = statoRiga(r), qta = el("span", { class: "qta" });
     if(c){
       qta.append(el("span", { text: fmt(r.attesa) + " → " + conUm(c.reale, r) }),
-        st === "diff" ? el("span", { class: "chip diff", text: fmtDiff(c.reale - r.attesa) }) : el("span", { class: "chip ok", text: "✓ confermata" }));
+        st === "diff" ? el("span", { class: "chip diff", text: fmtDiff(c.reale - r.attesa) }) : el("span", { class: "chip ok", text: c.origine ? "✓ già a posto" : "✓ confermata" }),
+        c.origine ? el("span", { class: "chip", text: "contato il " + dataIt(giornoDi(c.quando)).slice(0, 5) }) : null);
     } else qta.append(el("span", { text: "attesa " + conUm(r.attesa, r) }), el("span", { class: "chip", text: "da contare" }));
     return el("button", { type: "button", class: "voce", onclick: onclick },
       el("span", { class: "cod", text: r.codice + (S.inv.tipo === "generale" && r.commessa ? "  · " + r.commessa : "") }),
@@ -864,6 +942,9 @@ var INVENTRACK_CONFIG = {
       var d = c.reale - r.attesa;
       box.appendChild(el("div", { class: "avviso " + (st === "diff" ? "errore" : "bene") },
         el("b", { text: st === "diff" ? "Già contato: giacenza reale " + fmt(c.reale) + " (differenza " + fmtDiff(d) + ")" : "Già contato: giacenza confermata" }),
+        c.origine ? el("span", { text: st === "diff"
+          ? "Conteggio ereditato dall'inventario precedente (" + dataIt(giornoDi(c.quando)) + "): non coincide con il report di oggi. Se i movimenti non sono ancora stati registrati nel gestionale compariranno di nuovo tra quelli da registrare; altrimenti ricontrolla l'articolo."
+          : "Conteggio ereditato dall'inventario precedente (" + dataIt(giornoDi(c.quando)) + "): coincide con il report di oggi, quindi è già a posto." }) : null,
         c.parti ? el("span", { text: "Per commessa: " + mostraParti(c.parti) }) : null,
         el("span", { text: [c.operatore, oraIt(c.quando), c.nota && "nota: " + c.nota].filter(Boolean).join(" · ") })));
     }
@@ -1014,13 +1095,18 @@ var INVENTRACK_CONFIG = {
 
   var FILTRI = [["tutti", "Tutti"], ["da", "Da contare"], ["ok", "Confermati"], ["diff", "Differenze"]];
   var FILTRO_VARIANTI = ["var", "Su varianti, da contare"];
-  function inFiltro(r, k){ return k === "var" ? haVarianti(r) && !conteggioDi(r) : statoRiga(r) === k; }
+  var FILTRO_EREDITATI = ["ered", "Dall'inventario precedente"];
+  function inFiltro(r, k){
+    if(k === "var") return haVarianti(r) && !conteggioDi(r);
+    if(k === "ered"){ var c = conteggioDi(r); return !!c && !!c.origine; }
+    return statoRiga(r) === k;
+  }
 
   function disegnaElenco(daCapo){
-    var tutte = righeTutte(), q = R.pulisci($("elencoCerca").value), conta = { tutti: tutte.length, da: 0, ok: 0, diff: 0, "var": 0 };
-    tutte.forEach(function(r){ conta[statoRiga(r)]++; if(conMovimenti() && inFiltro(r, "var")) conta["var"]++; });
+    var tutte = righeTutte(), q = R.pulisci($("elencoCerca").value), conta = { tutti: tutte.length, da: 0, ok: 0, diff: 0, "var": 0, ered: 0 };
+    tutte.forEach(function(r){ conta[statoRiga(r)]++; if(conMovimenti() && inFiltro(r, "var")) conta["var"]++; if(inFiltro(r, "ered")) conta.ered++; });
     var f = svuota($("filtri"));
-    (conMovimenti() ? FILTRI.concat([FILTRO_VARIANTI]) : FILTRI).forEach(function(x){
+    FILTRI.concat(conMovimenti() ? [FILTRO_VARIANTI] : [], conta.ered ? [FILTRO_EREDITATI] : []).forEach(function(x){
       f.appendChild(el("button", { type: "button", class: S.filtro === x[0] ? "attivo" : "", text: x[1] + " (" + fmt(conta[x[0]]) + ")", onclick: function(){ S.filtro = x[0]; disegnaElenco(true); } }));
     });
     var righe = q ? trova(q, tutte).map(function(t){ return t.riga; }) : tutte;
@@ -1187,12 +1273,13 @@ var INVENTRACK_CONFIG = {
       var diff = reale === null ? null : arrotonda(reale - r.attesa);
       var esito = !c ? (nonContatiZero ? "Non contato (considerato 0)" : "Non contato")
         : r.extra ? "Non presente nel report"
-        : Math.abs(diff) <= TOLLERANZA ? "Confermata" : "Differenza";
+        : Math.abs(diff) <= TOLLERANZA ? (c.origine ? "Già a posto (inventario precedente)" : "Confermata") : "Differenza";
       return {
         codice: r.codice, descrizione: r.descrizione, commessa: r.commessa, um: r.um || "", dettaglio: r.dettaglio || "", attesa: r.attesa, reale: reale, diff: diff,
         valore: r.valore, valoreDiff: diff === null ? null : Math.round(diff * r.valore * 100) / 100, esito: esito,
         operatore: c ? c.operatore : "", quando: c ? c.quando : "", nota: c ? c.nota : "", parti: c && c.parti ? c.parti : "",
-        fuoriData: !!c && giornoDi(c.quando) !== S.inv.data
+        ereditato: !!c && !!c.origine,
+        fuoriData: !!c && !c.origine && giornoDi(c.quando) !== S.inv.data
       };
     });
   }
@@ -1230,7 +1317,7 @@ var INVENTRACK_CONFIG = {
       var rg = ws.getRow(rigaTitoli + 1 + i);
       COLONNE.forEach(function(c, j){
         var cella = rg.getCell(j + 1), v = x[c[2]];
-        if(c[3] === "d"){ cella.value = v ? oraIt(v) + (x.fuoriData ? " (non nella data dell'inventario)" : "") : ""; }
+        if(c[3] === "d"){ cella.value = v ? oraIt(v) + (x.ereditato ? " (inventario precedente)" : x.fuoriData ? " (non nella data dell'inventario)" : "") : ""; }
         else cella.value = v === null || v === undefined ? null : v;
         if(c[3] === "q") cella.numFmt = "#,##0.###";
         if(c[3] === "v") cella.numFmt = "#,##0.00####";
@@ -1440,6 +1527,45 @@ var INVENTRACK_CONFIG = {
     if(inAttesa) riepilogo.appendChild(el("div", { class: "avviso errore", text: fmt(inAttesa) + " conteggi di questo dispositivo non sono ancora stati inviati: gli altri dispositivi non li vedono." }));
     if(!inProva()) riepilogo.appendChild(el("p", { class: "hint", text: "Prima di scaricare, la pagina legge i conteggi fatti dagli altri dispositivi." }));
     box.appendChild(riepilogo);
+
+    // Inventario precedente: conteggi ereditati e confronto con il report di oggi.
+    if(!S.elencoInv){
+      S.elencoInv = [];
+      elencoInventari().then(function(l){ S.elencoInv = l; if(S.tab === "esporta" && S.inv === inv) disegnaEsporta(); });
+    }
+    var ereditati = righeTutte().map(function(r){ return { r: r, c: conteggioDi(r) }; }).filter(function(x){ return x.c && x.c.origine; });
+    var candidati = candidatiPrecedente(S.elencoInv, inv);
+    if(ereditati.length || inv.precedente || candidati.length){
+      var prec = S.elencoInv.filter(function(x){ return x.id === inv.precedente; })[0];
+      var scheda = el("div", { class: "card" }, el("h2", { text: "Inventario precedente" }));
+      if(ereditati.length || inv.precedente){
+        var nonCoincidono = ereditati.filter(function(x){ return Math.abs(x.c.reale - x.r.attesa) > TOLLERANZA; });
+        scheda.appendChild(el("p", { class: "hint", text: "Questo inventario continua " + (prec ? nomeInventario(prec).split(" · ")[0] : "l'inventario precedente") + ": " + fmt(ereditati.length) + " conteggi ereditati." }));
+        if(ereditati.length) scheda.appendChild(el("div", { class: "avviso " + (nonCoincidono.length ? "" : "bene") },
+          el("b", { text: fmt(ereditati.length - nonCoincidono.length) + " coincidono con il report di oggi: già a posto" }),
+          nonCoincidono.length ? el("span", { text: fmt(nonCoincidono.length) + " non coincidono: se i movimenti di quel giorno non sono ancora stati registrati nel gestionale compaiono di nuovo tra quelli da registrare; altrimenti ricontrolla gli articoli." }) : null,
+          nonCoincidono.length ? el("details", { class: "codici" }, el("summary", { text: "Vedi l'elenco (" + fmt(nonCoincidono.length) + ")" }),
+            el("pre", { text: nonCoincidono.map(function(x){ return x.r.codice + " — contato il " + dataIt(giornoDi(x.c.quando)) + ": " + fmt(x.c.reale) + ", report di oggi: " + fmt(x.r.attesa); }).join("\n") })) : null));
+      }
+      if(!inv.precedente && candidati.length && inv.stato === "aperto"){
+        var scelta = el("select", { "aria-label": "Inventario da continuare" }, ...candidati.map(function(x){ return el("option", { value: x.id, text: nomeInventario(x) }); }));
+        scheda.append(
+          el("p", { class: "hint", text: "Collega questo inventario a uno precedente: i conteggi già fatti risultano già contati (con chi e quando), senza doverli rifare. I conteggi di oggi più recenti non vengono toccati." }),
+          scelta,
+          el("button", { class: "btn", type: "button", text: "Collega e importa i conteggi", onclick: function(){
+            var b = this;
+            prima(b, async function(){
+              var n = await ereditaConteggi(inv, scelta.value, S.righe);
+              await kv.set("inv:" + inv.id, { inv: inv, righe: S.righe });
+              S.da = 0;
+              await leggiConteggi();
+              toast(fmt(n) + " conteggi ereditati");
+              disegnaInventario();
+            });
+          } }));
+      }
+      box.appendChild(scheda);
+    }
 
     // Giro parziale: il magazziniere ha inventariato il materiale delle varianti (e la padre degli
     // articoli presenti nelle varianti). Ciò che non ha trovato sulle varianti non c'è più.
