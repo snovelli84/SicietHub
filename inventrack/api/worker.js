@@ -27,6 +27,7 @@
  *   GET    /inventari/<id>/report         tutte le righe del report
  *   GET    /inventari/<id>/conteggi?da=n  conteggi modificati dopo il momento n → { conteggi, ora, inventario }
  *   POST   /inventari/<id>/conteggi       salva uno o più conteggi { conteggi: [...] }
+ *   POST   /inventari/<id>/precedente     { precedente } collega l'inventario a quello che continua
  *   POST   /inventari/<id>/stato          { stato: "aperto" | "chiuso", operatore }
  *   DELETE /inventari/<id>                elimina l'inventario e i suoi conteggi
  *   GET    /recuperati                    lista "Materiale recuperato" (articoli presenti in
@@ -124,6 +125,7 @@ function conteggio(c){
     reale: quantita(c.reale, true),
     nota: testo(c.nota, 500),
     parti: testo(c.parti, 1500),
+    origine: testo(c.origine, 60),
     operatore: testo(c.operatore, 100),
     quando: momento(c.quando),
     extra: c.extra ? 1 : 0
@@ -144,6 +146,11 @@ async function tabelle(db){
   // Colonna aggiunta dopo la prima versione: nei database già esistenti va creata.
   const colonne = await db.prepare("PRAGMA table_info(conteggi)").all();
   if(!colonne.results.some(c => c.name === "parti")) await db.prepare("ALTER TABLE conteggi ADD COLUMN parti TEXT NOT NULL DEFAULT ''").run();
+  // Inventari collegati: "origine" è l'inventario da cui un conteggio è stato ereditato,
+  // "precedente" l'inventario che un altro continua.
+  if(!colonne.results.some(c => c.name === "origine")) await db.prepare("ALTER TABLE conteggi ADD COLUMN origine TEXT NOT NULL DEFAULT ''").run();
+  const colInv = await db.prepare("PRAGMA table_info(inventari)").all();
+  if(!colInv.results.some(c => c.name === "precedente")) await db.prepare("ALTER TABLE inventari ADD COLUMN precedente TEXT NOT NULL DEFAULT ''").run();
   // Lista "Materiale recuperato": articoli presenti in magazzino ma resi dal cantiere e mai
   // gestiti; non appartiene a un inventario e resta nel tempo.
   await db.batch([
@@ -202,13 +209,13 @@ async function recuperati(request, db, env, p, m){
   throw new Errore(404, "Richiesta sconosciuta.");
 }
 
-const CAMPI = "id, tipo, commessa, deposito, data, stato, righe, report, note, creato_da, creato_il, chiuso_da, chiuso_il";
+const CAMPI = "id, tipo, commessa, deposito, data, stato, righe, report, note, creato_da, creato_il, chiuso_da, chiuso_il, precedente";
 function inventario(r){
   let report = {};
   try{ report = JSON.parse(r.report || "{}"); }catch(_){}
   const o = {
     id: r.id, tipo: r.tipo, commessa: r.commessa, deposito: r.deposito, data: r.data, stato: r.stato, righe: r.righe,
-    report, note: r.note, creatoDa: r.creato_da, creatoIl: r.creato_il, chiusoDa: r.chiuso_da, chiusoIl: r.chiuso_il
+    report, note: r.note, creatoDa: r.creato_da, creatoIl: r.creato_il, chiusoDa: r.chiuso_da, chiusoIl: r.chiuso_il, precedente: r.precedente || ""
   };
   if(r.contati !== undefined){ o.contati = r.contati; o.differenze = r.differenze; o.extra = r.extra; }
   return o;
@@ -296,7 +303,7 @@ async function handle(request, env){
     if(azione === "conteggi" && m === "GET"){
       const inv = await leggi(db, id);
       const da = Number(url.searchParams.get("da")) || 0, ora = Date.now();
-      const r = await db.prepare("SELECT chiave, codice, commessa, descrizione, attesa, reale, nota, parti, operatore, quando, extra, agg FROM conteggi WHERE inventario = ?1 AND agg >= ?2 ORDER BY agg").bind(id, da).all();
+      const r = await db.prepare("SELECT chiave, codice, commessa, descrizione, attesa, reale, nota, parti, origine, operatore, quando, extra, agg FROM conteggi WHERE inventario = ?1 AND agg >= ?2 ORDER BY agg").bind(id, da).all();
       return json(env, 200, { conteggi: r.results.map(c => Object.assign(c, { extra: !!c.extra })), ora, inventario: inventario(inv) });
     }
 
@@ -308,14 +315,27 @@ async function handle(request, env){
       const lista = d.conteggi.map(conteggio);
       // Un'unica istruzione per tutti i conteggi; tra due conteggi dello stesso articolo vale il più recente.
       await db.prepare(
-        "INSERT INTO conteggi (inventario, chiave, codice, commessa, descrizione, attesa, reale, nota, parti, operatore, quando, extra, agg) " +
+        "INSERT INTO conteggi (inventario, chiave, codice, commessa, descrizione, attesa, reale, nota, parti, origine, operatore, quando, extra, agg) " +
         "SELECT ?1, json_extract(value, '$.chiave'), json_extract(value, '$.codice'), json_extract(value, '$.commessa'), json_extract(value, '$.descrizione'), " +
-        "json_extract(value, '$.attesa'), json_extract(value, '$.reale'), json_extract(value, '$.nota'), json_extract(value, '$.parti'), json_extract(value, '$.operatore'), json_extract(value, '$.quando'), json_extract(value, '$.extra'), ?3 " +
+        "json_extract(value, '$.attesa'), json_extract(value, '$.reale'), json_extract(value, '$.nota'), json_extract(value, '$.parti'), json_extract(value, '$.origine'), json_extract(value, '$.operatore'), json_extract(value, '$.quando'), json_extract(value, '$.extra'), ?3 " +
         "FROM json_each(?2) WHERE true " +
-        "ON CONFLICT (inventario, chiave) DO UPDATE SET descrizione = excluded.descrizione, attesa = excluded.attesa, reale = excluded.reale, nota = excluded.nota, parti = excluded.parti, " +
+        "ON CONFLICT (inventario, chiave) DO UPDATE SET descrizione = excluded.descrizione, attesa = excluded.attesa, reale = excluded.reale, nota = excluded.nota, parti = excluded.parti, origine = excluded.origine, " +
         "operatore = excluded.operatore, quando = excluded.quando, extra = excluded.extra, agg = excluded.agg WHERE excluded.quando >= conteggi.quando"
       ).bind(id, JSON.stringify(lista), Date.now()).run();
       return json(env, 200, { ok: true, salvati: lista.length });
+    }
+
+    if(azione === "precedente" && m === "POST"){
+      // Collega l'inventario a quello che continua (i conteggi si ereditano con POST /conteggi e "origine").
+      await leggi(db, id);
+      const d = await corpo(request, 2000);
+      const prec = testo(d.precedente, 60);
+      if(prec){
+        if(prec === id) throw new Errore(400, "Un inventario non può continuare se stesso.");
+        await leggi(db, prec);
+      }
+      await db.prepare("UPDATE inventari SET precedente = ?2 WHERE id = ?1").bind(id, prec).run();
+      return json(env, 200, { inventario: inventario(await leggi(db, id)) });
     }
 
     if(azione === "stato" && m === "POST"){

@@ -332,6 +332,10 @@ input[readonly]{opacity:.75}
         <span class="hint">Il PDF stampato dal gestionale: <i>Analisi Andamento Giacenza</i> (per commessa) oppure <i>Valorizzazione a costi</i> (magazzino aziendale). In alternativa lo stesso report esportato in Excel (.xlsx) o CSV, con le colonne Articolo, Descrizione e Saldo (o Giacenza alla data).</span>
       </div>
       <div id="nEsito" style="display:grid;gap:10px"></div>
+      <label class="field" id="continuaCampo" hidden><span class="flabel">Continua un inventario precedente</span>
+        <select id="nContinua"><option value="">No, è un inventario nuovo</option></select>
+        <span class="hint">Gli articoli già contati nell'inventario scelto risultano già contati (con chi e quando), senza doverli rifare. Confrontati con il report di oggi coincidono se i movimenti di ieri sono già stati registrati nel gestionale; quelli che non coincidono vengono segnalati.</span>
+      </label>
       <div class="avviso info" id="sommaCampo" hidden>
         <span id="sommaTesto"></span>
         <label class="riga"><input type="checkbox" id="nSomma" checked><span><b>Somma la commessa e le sue varianti</b></span></label>
@@ -411,7 +415,7 @@ input[readonly]{opacity:.75}
 
 <div id="toast" role="status" hidden></div>
 
-<script src="report.js?v=6"></script>
-<script src="inventrack.js?v=10"></script>
+<script src="report.js?v=7"></script>
+<script src="inventrack.js?v=13"></script>
 </body>
 </html>

@@ -409,8 +409,9 @@
    * conteggi: [{ riga, reale, parti, extra }] (solo gli articoli contati).
    * Restituisce i file (uno per tipo di movimento e per commessa) e l'elenco dei
    * "recuperati" (articoli trovati che non sono nel report: lista promemoria). */
-  function pianoMovimenti(conteggi, padre, conDettaglio){
+  function pianoMovimenti(conteggi, padre, conDettaglio, opzioni){
     padre = codicePulito(padre);
+    opzioni = opzioni || {};
     var file = {}, ordine = [], recuperati = [], righeExcel = [];
     function aggiungi(id, titolo, descrizione, commessa, riga, quantita){
       if(!(quantita > 1e-7)) return;
@@ -458,13 +459,28 @@
         excel(v, "Differenza in più", y.piu);
       });
     });
+    // Varianti inventariate per intero: ciò che il gestionale dà in giacenza sulle varianti e che
+    // non è stato trovato (articolo non contato) non c'è più, e si scarica dalla variante.
+    // La padre di questi articoli non è stata contata e non si tocca: va solo verificata.
+    var daVerificare = [];
+    (opzioni.nonContate || []).forEach(function(riga){
+      var libro = leggiParti(riga.dettaglio), azzerate = [], padreQ = 0;
+      libro.forEach(function(x){ if(x.commessa === padre) padreQ = Math.max(0, x.q); });
+      libro.forEach(function(x){
+        if(x.commessa === padre || !(x.q > 1e-7)) return;
+        aggiungi("meno-" + x.commessa, "Differenza in meno - " + x.commessa, "Materiale che il gestionale dà in giacenza sulla variante " + x.commessa + " ma che non c'è in magazzino: movimento negativo (scarico).", x.commessa, riga, x.q);
+        righeExcel.push({ commessa: x.commessa, tipo: "Differenza in meno", quantita: arrotonda(x.q, 6), nota: "articolo non trovato in magazzino (varianti inventariate per intero)", codice: riga.codice, descrizione: riga.descrizione, um: riga.um || "", valore: riga.valore || 0, attesa: riga.attesa, reale: null });
+        azzerate.push(x.commessa + ": " + String(x.q).replace(".", ","));
+      });
+      if(azzerate.length) daVerificare.push({ codice: riga.codice, descrizione: riga.descrizione, um: riga.um || "", azzerate: azzerate.join(" · "), padre: padreQ });
+    });
     var primi = ["rientro", "piu-" + padre, "carico-avanzi", "meno-" + padre];
     ordine.sort(function(a, b){
       var ia = primi.indexOf(a), ib = primi.indexOf(b);
       if(ia < 0) ia = 99; if(ib < 0) ib = 99;
       return ia - ib || (a < b ? -1 : a > b ? 1 : 0);
     });
-    return { file: ordine.map(function(id){ return file[id]; }), recuperati: recuperati, righeExcel: righeExcel };
+    return { file: ordine.map(function(id){ return file[id]; }), recuperati: recuperati, righeExcel: righeExcel, daVerificare: daVerificare };
   }
 
   /* ---------- Excel / CSV ---------- */

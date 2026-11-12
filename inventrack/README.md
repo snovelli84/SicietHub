@@ -70,6 +70,26 @@ Quando la padre ha in magazzino più di quanto risulta dal gestionale, la pagina
 - I file semplici *Movimento positivo* e *Movimento negativo* (differenza totale, senza ripartire per commessa) si trovano, in un riquadro chiuso, negli inventari di commessa con le varianti; negli altri inventari sono gli unici file.
 - Il foglio **Movimenti** dell'Excel elenca tutte le righe di questi file, con giacenza attesa, reale e note, più gli articoli recuperati.
 
+### Continuare l'inventario del giorno prima
+
+Un inventario può durare più giorni: ogni giorno si carica il report aggiornato (dopo aver registrato nel gestionale i movimenti del giorno prima) e si crea un nuovo inventario che **continua il precedente**.
+
+- In **Nuovo inventario**, dopo aver caricato il report, compare **Continua un inventario precedente** (se esiste un inventario dello stesso tipo e, per le commesse, della stessa commessa). Scegliendolo, i conteggi già fatti vengono **ereditati**: gli articoli risultano già contati, con chi e quando li ha contati, e non vanno rifatti. L'inventario si può anche collegare dopo, da **Esporta → Inventario precedente → Collega e importa i conteggi** (i conteggi più recenti già inseriti non vengono sovrascritti).
+- Ogni conteggio ereditato è **confrontato con il report di oggi**: se i movimenti di ieri sono stati registrati, la giacenza attesa coincide e l'articolo è **già a posto** (nessun nuovo movimento); se non coincide, l'articolo è segnalato (scheda e **Vedi l'elenco** in Esporta) e la differenza compare di nuovo tra i movimenti da registrare: se i movimenti non erano ancora stati registrati è quello che serve, altrimenti l'articolo va ricontrollato.
+- Nell'**Elenco** il filtro **Dall'inventario precedente** mostra i conteggi ereditati; nelle schede e nell'Excel sono indicati come "inventario precedente" (e non come conteggi fuori data). Riaprendo un articolo e salvandolo di nuovo, il conteggio diventa di oggi.
+- Si possono concatenare più giorni: l'inventario di domani continua quello di oggi, che a sua volta ha ereditato quello di ieri.
+- La validità resta legata alla data: i conteggi ereditati valgono se tra il conteggio e il report nuovo non ci sono stati altri movimenti sugli stessi articoli; per questo il confronto con il report di oggi è il controllo da guardare.
+
+### Giro parziale: varianti inventariate per intero
+
+Può capitare che il magazziniere conti **tutto il materiale delle varianti presente in magazzino** (per esempio solo `S1852V26` e `S1852V28` hanno ancora qualcosa) e, degli articoli presenti nelle varianti, anche la padre; gli altri articoli della padre non vengono contati e non vanno toccati.
+
+- Gli articoli non contati **non generano movimenti** (come sempre) e la padre di quelli non contati resta com'è. Nell'*Elenco* il filtro **Su varianti, da contare** mostra gli articoli che hanno giacenza positiva su una variante e non sono ancora stati contati: servono a finire il giro.
+- In **Esporta**, la scheda **Varianti inventariate per intero?** riassume, per ogni variante, quanti articoli con giacenza nel gestionale non sono stati trovati. Spuntando *Sì, le varianti sono state inventariate per intero* la giacenza che il gestionale dà sulle varianti per quegli articoli viene **scaricata dalle varianti**: finisce nel file *Differenza in meno - S1852Vxx* di ogni variante, con la nota "articolo non trovato in magazzino" nel foglio *Movimenti* dell'Excel. Le varianti dove non c'è più nulla si azzerano da sole, perché nessun articolo è stato contato lì. Da spuntare **a giro finito**.
+- Gli articoli non trovati né sulle varianti né sulla padre sono elencati in **da verificare** (e nel foglio *Da verificare* dell'Excel): le varianti sono azzerate, ma la giacenza della padre non è stata contata e non si tocca. Se l'articolo manca anche sulla padre, va contato a zero.
+- Gli articoli contati solo sul totale, senza *Dividi per commessa*, lasciano le varianti com'è nel gestionale: la scheda lo segnala.
+- Le scelte della scheda *Esporta* (articoli non contati a zero, varianti inventariate per intero) restano finché si resta nell'inventario.
+
 ### Materiale recuperato
 
 Lista promemoria degli articoli **presenti in magazzino, resi dal cantiere e mai gestiti da noi**: non genera movimenti e resta nel tempo, fuori dagli inventari. Si apre da **📋 Materiale recuperato** nella pagina iniziale.
@@ -131,7 +151,7 @@ Finché `api` in `INVENTRACK_CONFIG` (all'inizio di [`inventrack.js`](inventrack
 
 Verifica: aprire `hub.siciet.it/inventrack/`, inserire nome e password, creare un inventario di prova con un report e poi eliminarlo (scheda *Esporta* → **Elimina**). "Servizio non configurato" indica che manca l'associazione `DB` o la variabile `PASSWORD`.
 
-Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo. Dalla versione 1.6 il servizio salva anche l'**unità di misura** degli articoli dalla 1.7 il **dettaglio per commessa** della somma con le varianti e dalla 1.8 la **divisione per commessa** della giacenza reale (il servizio aggiunge da solo la colonna che serve al database esistente): finché non si ricopia il nuovo `worker.js` tutto funziona, ma questi dati si vedono solo sul dispositivo su cui sono stati inseriti. Dalla 2.0 salva anche le **uscite verso il cantiere** di ogni articolo e ospita la lista **Materiale recuperato** (il servizio crea da solo la tabella che serve): senza il nuovo `worker.js` la lista non funziona e i rientri dal cantiere si calcolano solo sul dispositivo che ha creato l'inventario.
+Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo. Dalla versione 1.6 il servizio salva anche l'**unità di misura** degli articoli dalla 1.7 il **dettaglio per commessa** della somma con le varianti e dalla 1.8 la **divisione per commessa** della giacenza reale (il servizio aggiunge da solo la colonna che serve al database esistente): finché non si ricopia il nuovo `worker.js` tutto funziona, ma questi dati si vedono solo sul dispositivo su cui sono stati inseriti. Dalla 2.0 salva anche le **uscite verso il cantiere** di ogni articolo e ospita la lista **Materiale recuperato** (il servizio crea da solo la tabella che serve): senza il nuovo `worker.js` la lista non funziona e i rientri dal cantiere si calcolano solo sul dispositivo che ha creato l'inventario. Dalla 2.2 salva anche il **collegamento tra inventari** e l'origine dei conteggi ereditati (il servizio aggiunge da solo le colonne al database esistente): senza il nuovo `worker.js` la scelta *Continua un inventario precedente* non viene salvata.
 
 ## Limiti
 
