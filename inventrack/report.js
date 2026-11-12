@@ -203,10 +203,12 @@
   }
 
   /* Causali dei movimenti (configurabili con InvReport.causali):
-   *   ACQ-O acquisto, ACQ-C carico diretto in commessa, I-CINST installazione
-   *   (uscita) in cantiere, I-RCANT rientro da cantiere.
+   *   ACQ-O acquisto, ACQ-C carico diretto in commessa, CAR-COM carico su commessa,
+   *   CAR-MAG carico a magazzino generale (servono a disimpegnare un articolo da una
+   *   commessa e riservarlo a un'altra), I-CINST installazione (uscita) in cantiere,
+   *   I-RCANT rientro da cantiere.
    * Per ogni riga si tengono le uscite verso il cantiere (ucant) e i rientri (rcant). */
-  var causali = { carico: ["ACQ-O", "ACQ-C"], cantiere: ["I-CINST"], rientro: ["I-RCANT"] };
+  var causali = { carico: ["ACQ-O", "ACQ-C", "CAR-COM", "CAR-MAG"], cantiere: ["I-CINST"], rientro: ["I-RCANT"] };
 
   function contaCausale(r, l, info){
     var c = l.causale;

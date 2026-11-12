@@ -25,14 +25,15 @@ var INVENTRACK_CONFIG = {
   csvDecimali: 15,
 
   // Causali dei movimenti del gestionale (report con il dettaglio dei movimenti):
-  //   carico    ACQ-O acquisto, ACQ-C carico diretto in commessa
+  //   carico    ACQ-O acquisto, ACQ-C carico diretto in commessa, CAR-COM carico su commessa,
+  //             CAR-MAG carico a magazzino generale (disimpegno da una commessa e riserva per un'altra)
   //   cantiere  I-CINST installazione (uscita) in cantiere
   //   rientro   I-RCANT rientro da cantiere
-  causali: { carico: ["ACQ-O", "ACQ-C"], cantiere: ["I-CINST"], rientro: ["I-RCANT"] },
+  causali: { carico: ["ACQ-O", "ACQ-C", "CAR-COM", "CAR-MAG"], cantiere: ["I-CINST"], rientro: ["I-RCANT"] },
 
   // Versione mostrata in fondo alla pagina: aumentarla a ogni modifica,
   // insieme al numero ?v= di inventrack.js in index.html.
-  versione: "2.2"
+  versione: "2.3"
 };
 
 (function(){
