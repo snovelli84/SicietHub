@@ -32,7 +32,7 @@ var INVENTRACK_CONFIG = {
 
   // Versione mostrata in fondo alla pagina: aumentarla a ogni modifica,
   // insieme al numero ?v= di inventrack.js in index.html.
-  versione: "2.0"
+  versione: "2.1"
 };
 
 (function(){
@@ -206,6 +206,7 @@ var INVENTRACK_CONFIG = {
     scheda: null,     // riga aperta nella scheda Conta
     ultimi: [],       // chiavi degli ultimi conteggi fatti qui
     fuoriData: {},    // inventari non di oggi su cui si è scelto di continuare
+    opzioni: { zero: false, variantiComplete: false }, // scelte della scheda Esporta
     nuovo: null,      // report letto nel modulo "Nuovo inventario"
     invio: false,
     senzaRete: false
@@ -616,6 +617,7 @@ var INVENTRACK_CONFIG = {
     S.righe = righe;
     S.indice = {};
     S.commesse = null;
+    S.opzioni = { zero: false, variantiComplete: false };
     righe.forEach(function(r){ S.indice[R.chiave(r.codice, r.commessa)] = r; });
     S.conteggi = cnt.conteggi;
     S.da = cnt.da;
@@ -1011,16 +1013,18 @@ var INVENTRACK_CONFIG = {
   /* ---------- Elenco ---------- */
 
   var FILTRI = [["tutti", "Tutti"], ["da", "Da contare"], ["ok", "Confermati"], ["diff", "Differenze"]];
+  var FILTRO_VARIANTI = ["var", "Su varianti, da contare"];
+  function inFiltro(r, k){ return k === "var" ? haVarianti(r) && !conteggioDi(r) : statoRiga(r) === k; }
 
   function disegnaElenco(daCapo){
-    var tutte = righeTutte(), q = R.pulisci($("elencoCerca").value), conta = { tutti: tutte.length, da: 0, ok: 0, diff: 0 };
-    tutte.forEach(function(r){ conta[statoRiga(r)]++; });
+    var tutte = righeTutte(), q = R.pulisci($("elencoCerca").value), conta = { tutti: tutte.length, da: 0, ok: 0, diff: 0, "var": 0 };
+    tutte.forEach(function(r){ conta[statoRiga(r)]++; if(conMovimenti() && inFiltro(r, "var")) conta["var"]++; });
     var f = svuota($("filtri"));
-    FILTRI.forEach(function(x){
+    (conMovimenti() ? FILTRI.concat([FILTRO_VARIANTI]) : FILTRI).forEach(function(x){
       f.appendChild(el("button", { type: "button", class: S.filtro === x[0] ? "attivo" : "", text: x[1] + " (" + fmt(conta[x[0]]) + ")", onclick: function(){ S.filtro = x[0]; disegnaElenco(true); } }));
     });
     var righe = q ? trova(q, tutte).map(function(t){ return t.riga; }) : tutte;
-    if(S.filtro !== "tutti") righe = righe.filter(function(r){ return statoRiga(r) === S.filtro; });
+    if(S.filtro !== "tutti") righe = righe.filter(function(r){ return inFiltro(r, S.filtro); });
     if(daCapo || !S.mostrati) S.mostrati = CONFIG.righeElenco;
     var box = svuota($("elenco"));
     righe.slice(0, S.mostrati).forEach(function(r){ box.appendChild(voce(r, function(){ apriScheda(r); })); });
@@ -1277,6 +1281,19 @@ var INVENTRACK_CONFIG = {
       });
       wm.autoFilter = { from: { row: 1, column: 1 }, to: { row: rm.length + 1, column: cm.length } };
     }
+    if(conMovimenti() && pianoCorrente(nonContatiZero).daVerificare.length){
+      var dv = pianoCorrente(nonContatiZero).daVerificare, wv = wb.addWorksheet("Da verificare", { views: [{ state: "frozen", ySplit: 1 }] });
+      [["Codice", 22], ["Descrizione", 48], ["U.M.", 7], ["Varianti azzerate (giacenza del gestionale)", 50], ["Giacenza padre nel gestionale (non contata)", 24]].forEach(function(c, j){
+        wv.getColumn(j + 1).width = c[1];
+        var cella = wv.getRow(1).getCell(j + 1);
+        cella.value = c[0];
+        cella.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cella.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF005BAA" } };
+        cella.alignment = { vertical: "middle", wrapText: true };
+      });
+      wv.getRow(1).height = 32;
+      dv.forEach(function(x, i){ wv.getRow(i + 2).values = [x.codice, x.descrizione, x.um, x.azzerate, x.padre]; });
+    }
     var ws = wb.addWorksheet("Riepilogo");
     ws.getColumn(1).width = 46;
     ws.getColumn(2).width = 18;
@@ -1339,14 +1356,18 @@ var INVENTRACK_CONFIG = {
   function conMovimenti(){
     return !!S.inv && S.inv.tipo === "commessa" && (conDettaglioMovimenti() || S.righe.some(function(r){ return !!r.dettaglio; }));
   }
+  // Articoli con giacenza positiva su almeno una variante.
+  function haVarianti(r){
+    return !r.extra && leggiParti(r.dettaglio).some(function(x){ return x.commessa !== S.inv.commessa && x.q > TOLLERANZA; });
+  }
   function pianoCorrente(nonContatiZero){
-    var conteggi = [];
+    var conteggi = [], nonContate = [];
     righeTutte().forEach(function(r){
       var c = conteggioDi(r);
-      if(!c && !nonContatiZero) return;
+      if(!c && !nonContatiZero){ if(haVarianti(r)) nonContate.push(r); return; }
       conteggi.push({ riga: r, reale: c ? c.reale : 0, parti: c && c.parti ? c.parti : "" });
     });
-    return R.pianoMovimenti(conteggi, S.inv.commessa, conDettaglioMovimenti());
+    return R.pianoMovimenti(conteggi, S.inv.commessa, conDettaglioMovimenti(), { nonContate: S.opzioni.variantiComplete ? nonContate : [] });
   }
   function scaricaFile(f){
     scarica(nomeFile(f.titolo, "csv"), new Blob([testoCsv(f.righe)], { type: "text/csv" }));
@@ -1400,6 +1421,8 @@ var INVENTRACK_CONFIG = {
   function disegnaEsporta(){
     var box = svuota($("tEsporta")), inv = S.inv, n = numeri(), inAttesa = S.coda.filter(function(x){ return x.inv === inv.id; }).length;
     var zero = el("input", { type: "checkbox", id: "eZero" });
+    zero.checked = S.opzioni.zero && n.da > 0;
+    zero.addEventListener("change", function(){ S.opzioni.zero = zero.checked; disegnaEsporta(); });
     function riga(a, b){ return el("tr", {}, el("td", { text: a }), el("td", { text: b })); }
     var riepilogo = el("div", { class: "card" },
       el("h2", { text: "Riepilogo" }),
@@ -1418,6 +1441,35 @@ var INVENTRACK_CONFIG = {
     if(!inProva()) riepilogo.appendChild(el("p", { class: "hint", text: "Prima di scaricare, la pagina legge i conteggi fatti dagli altri dispositivi." }));
     box.appendChild(riepilogo);
 
+    // Giro parziale: il magazziniere ha inventariato il materiale delle varianti (e la padre degli
+    // articoli presenti nelle varianti). Ciò che non ha trovato sulle varianti non c'è più.
+    if(conMovimenti()){
+      var tutteLeRighe = righeTutte();
+      var nonTrovate = tutteLeRighe.filter(function(r){ return haVarianti(r) && !conteggioDi(r); });
+      var soloTotale = tutteLeRighe.filter(function(r){ var c = conteggioDi(r); return c && !c.parti && haVarianti(r); });
+      if(nonTrovate.length || soloTotale.length || S.opzioni.variantiComplete){
+        var perVariante = {};
+        nonTrovate.forEach(function(r){
+          leggiParti(r.dettaglio).forEach(function(x){
+            if(x.commessa === S.inv.commessa || !(x.q > TOLLERANZA)) return;
+            var o = perVariante[x.commessa] = perVariante[x.commessa] || { n: 0, q: 0 };
+            o.n++;
+            o.q += x.q;
+          });
+        });
+        var casella = el("input", { type: "checkbox", id: "eVarianti" });
+        casella.checked = S.opzioni.variantiComplete;
+        casella.addEventListener("change", function(){ S.opzioni.variantiComplete = casella.checked; disegnaEsporta(); });
+        var scheda = el("div", { class: "card" },
+          el("h2", { text: "Varianti inventariate per intero?" }),
+          el("p", { class: "hint", text: "Se il magazziniere ha contato tutto il materiale delle varianti presente in magazzino, ciò che non ha trovato non c'è più. Spuntando qui sotto, la giacenza che il gestionale dà sulle varianti per gli articoli non contati viene scaricata dalle varianti (anche per le varianti dove non c'è più nulla). La padre di quegli articoli non viene toccata." }),
+          nonTrovate.length ? el("table", { class: "riepilogo" }, ...Object.keys(perVariante).sort().map(function(v){ return riga(v, fmt(perVariante[v].n) + (perVariante[v].n === 1 ? " articolo · " : " articoli · ") + fmt(perVariante[v].q) + " pz"); })) : el("p", { class: "hint", text: "Nessun articolo con giacenza sulle varianti è rimasto da contare." }),
+          el("label", { class: "riga" }, casella, el("span", { text: "Sì, le varianti sono state inventariate per intero" })));
+        if(soloTotale.length) scheda.appendChild(el("div", { class: "avviso", text: fmt(soloTotale.length) + " articoli con giacenza sulle varianti sono stati contati solo sul totale, senza dividere per commessa: le varianti restano come nel gestionale. Per sistemarle apri l'articolo e usa Dividi per commessa." }));
+        box.appendChild(scheda);
+      }
+    }
+
     async function prima(btn, fn){
       btn.disabled = true;
       try{ await sincronizza(); await fn(); }
@@ -1435,6 +1487,13 @@ var INVENTRACK_CONFIG = {
         el("h2", { text: "Movimenti da registrare nel gestionale" }),
         el("p", { class: "hint", text: "Un file CSV per ogni movimento, nel solito formato: \"codice\" ; quantità ; valore unitario. Le quantità sono sempre positive; la commessa e il tipo di movimento sono nel nome del file e nella descrizione. La giacenza attesa è la somma delle sole giacenze positive di " + inv.commessa + " e delle sue varianti: si corregge solo la padre, le varianti in negativo restano com'è." }));
       if(!piano.file.length) carta.appendChild(el("div", { class: "avviso bene", text: n.contati ? "Nessun movimento da registrare: le giacenze contate coincidono con quelle attese." : "Nessun articolo contato per ora." }));
+      if(piano.daVerificare.length){
+        var testoDv = piano.daVerificare.map(function(x){ return x.codice + " — varianti azzerate (" + mostraParti(x.azzerate) + "), giacenza padre nel gestionale " + fmt(x.padre) + (x.um ? " " + x.um : ""); }).join("\n");
+        carta.appendChild(el("div", { class: "avviso" },
+          el("b", { text: fmt(piano.daVerificare.length) + " articoli non trovati né sulle varianti né sulla padre: da verificare" }),
+          el("span", { text: "Le varianti sono state azzerate; la giacenza della padre non è stata contata e non si tocca. Se l'articolo manca anche sulla padre, contalo a zero." }),
+          el("details", { class: "codici" }, el("summary", { text: "Vedi l'elenco (" + fmt(piano.daVerificare.length) + ")" }), el("pre", { text: testoDv }))));
+      }
       piano.file.forEach(function(f){
         var tot = f.righe.reduce(function(t, x){ return t + x.quantita; }, 0);
         carta.appendChild(el("div", { class: "filemov" },

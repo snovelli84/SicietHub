@@ -70,6 +70,16 @@ Quando la padre ha in magazzino più di quanto risulta dal gestionale, la pagina
 - I file semplici *Movimento positivo* e *Movimento negativo* (differenza totale, senza ripartire per commessa) si trovano, in un riquadro chiuso, negli inventari di commessa con le varianti; negli altri inventari sono gli unici file.
 - Il foglio **Movimenti** dell'Excel elenca tutte le righe di questi file, con giacenza attesa, reale e note, più gli articoli recuperati.
 
+### Giro parziale: varianti inventariate per intero
+
+Può capitare che il magazziniere conti **tutto il materiale delle varianti presente in magazzino** (per esempio solo `S1852V26` e `S1852V28` hanno ancora qualcosa) e, degli articoli presenti nelle varianti, anche la padre; gli altri articoli della padre non vengono contati e non vanno toccati.
+
+- Gli articoli non contati **non generano movimenti** (come sempre) e la padre di quelli non contati resta com'è. Nell'*Elenco* il filtro **Su varianti, da contare** mostra gli articoli che hanno giacenza positiva su una variante e non sono ancora stati contati: servono a finire il giro.
+- In **Esporta**, la scheda **Varianti inventariate per intero?** riassume, per ogni variante, quanti articoli con giacenza nel gestionale non sono stati trovati. Spuntando *Sì, le varianti sono state inventariate per intero* la giacenza che il gestionale dà sulle varianti per quegli articoli viene **scaricata dalle varianti**: finisce nel file *Differenza in meno - S1852Vxx* di ogni variante, con la nota "articolo non trovato in magazzino" nel foglio *Movimenti* dell'Excel. Le varianti dove non c'è più nulla si azzerano da sole, perché nessun articolo è stato contato lì. Da spuntare **a giro finito**.
+- Gli articoli non trovati né sulle varianti né sulla padre sono elencati in **da verificare** (e nel foglio *Da verificare* dell'Excel): le varianti sono azzerate, ma la giacenza della padre non è stata contata e non si tocca. Se l'articolo manca anche sulla padre, va contato a zero.
+- Gli articoli contati solo sul totale, senza *Dividi per commessa*, lasciano le varianti com'è nel gestionale: la scheda lo segnala.
+- Le scelte della scheda *Esporta* (articoli non contati a zero, varianti inventariate per intero) restano finché si resta nell'inventario.
+
 ### Materiale recuperato
 
 Lista promemoria degli articoli **presenti in magazzino, resi dal cantiere e mai gestiti da noi**: non genera movimenti e resta nel tempo, fuori dagli inventari. Si apre da **📋 Materiale recuperato** nella pagina iniziale.
