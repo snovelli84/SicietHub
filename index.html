@@ -283,6 +283,7 @@ footer{text-align:center;padding:24px 16px calc(24px + env(safe-area-inset-botto
     platform = eff === "pc" ? "desktop" : (realPlatform === "desktop" ? "anteprima" : realPlatform);
     // Da PC non si mostrano le app solo per smartphone, e viceversa.
     apps = (window.SICIET_APPS || []).filter(function(a){
+      if(a.nascosta) return false;
       if(a.soloMobile && eff === "pc") return false;
       if(a.soloDesktop && eff !== "pc") return false;
       return true;

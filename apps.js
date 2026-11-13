@@ -39,6 +39,7 @@
  *   desktop.name    (opzionale) nome del programma desktop, se diverso da "name"
  *   desktop.preferWeb (opzionale) true per aprire prima la versione web: in sede
  *                   il programma desktop resta disponibile come pulsante
+ *   nascosta     (opzionale) true per togliere temporaneamente l'app dal portale.
  *   soloMobile   (opzionale) true per le app pensate solo per lo smartphone:
  *                da PC non vengono mostrate.
  *   soloDesktop  (opzionale) true per le app che esistono solo sul PC:
@@ -103,6 +104,9 @@ window.SICIET_APPS = [
     emoji: "🗓️",
     // Pagina di questo portale: si apre nella stessa scheda.
     web: "richieste.html",
+    // Nascosta per ora: togliere questa riga per farla ricomparire nel portale.
+    // Il modulo resta raggiungibile a hub.siciet.it/richieste.html.
+    nascosta: true,
     verified: true
   },
   {
