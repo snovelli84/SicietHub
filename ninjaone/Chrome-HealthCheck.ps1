@@ -218,7 +218,8 @@ foreach ($p in $profiles) {
     $extFree = @($ext.Keys | Where-Object { $forcedIds -notcontains $_ })
     if ($extFree.Count -gt $ExtWarn) { Add-Issue 'WARN' "$tag $($extFree.Count) estensioni oltre a quelle forzate da GPO ($($ext.Count) totali)" }
     if ($approved.Count -gt 0) {
-        $unk = @($ext.Keys | Where-Object { $approved -notcontains $_ })
+        # Le estensioni forzate da GPO sono considerate approvate
+        $unk = @($ext.Keys | Where-Object { $approved -notcontains $_ -and $forcedIds -notcontains $_ })
         if ($unk.Count -gt 0) {
             $list = ($unk | ForEach-Object { "$($ext[$_]) [$_]" }) -join '; '
             Add-Issue 'WARN' "$tag estensioni non approvate: $list"

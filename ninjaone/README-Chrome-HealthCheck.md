@@ -13,7 +13,7 @@ Permessi: **Automazione = Lettura/Scrittura**, Script = Lettura/Scrittura.
 | `chromehealthsummary` | Testo | Prime 3 anomalie |
 | `chromehealthdetails` | Testo multilinea | Report completo |
 | `chromehealthlastrun` | Testo | Data ultimo controllo |
-| `chromerammb` | Intero | RAM privata usata da Chrome al momento del controllo |
+| `chromerammb` | Intero | RAM di Chrome (working set privato, come Gestione attivita') al momento del controllo |
 | `chromeextmax` | Intero | Numero massimo di estensioni per utente |
 
 Se un campo manca, lo script continua e stampa solo `[info] campo ... non impostato`.
@@ -28,8 +28,9 @@ Amministrazione > Libreria > Automazione > Nuovo script:
 - Timeout: 600 s (la scansione delle cartelle profilo puo' richiedere qualche minuto sui PC con profili grandi)
 
 Parametri opzionali (tutti con un valore predefinito):
-- `-ApprovedExtensionIds "nngceckbapebfimnlniiiahkandclblb,mlomiejdfkolichcflejclcbmpeaniij,fcoeoabgfenejglbffodgkkbkcdhcgfn"`
-  (Bitwarden, Ghostery, Claude: aggiungi le altre approvate)
+- `-ApprovedExtensionIds "fcoeoabgfenejglbffodgkkbkcdhcgfn"`
+  (elenca solo le estensioni approvate ma NON forzate da GPO, ad esempio Claude: quelle del forcelist,
+  come Bitwarden e Ghostery, sono considerate approvate in automatico)
 - `-MinRamGB 8 -ChromeRamWarnMB 3000 -ChromeRamCritMB 5000 -ExtWarn 8 -MinFreeDiskGB 20`
 - `-FailOnIssue` per far risultare lo script "fallito" se lo stato non e' OK
 
@@ -60,11 +61,13 @@ Una singola esecuzione e' poco affidabile: valuta 2-3 rilevazioni in giorni dive
 | Profilo / cache Chrome | >= 2000 MB / >= 1500 MB | WARN |
 | Numero profili Chrome | > 3 | WARN |
 | Estensioni per utente (escluse quelle forzate da GPO) | > 8 | WARN |
-| Estensioni non approvate | se `-ApprovedExtensionIds` e' valorizzato | WARN |
+| Estensioni non approvate (escluse quelle forzate da GPO) | se `-ApprovedExtensionIds` e' valorizzato | WARN |
 | Profilo roaming, AppData ridiretto o dati Chrome su rete | - | CRIT |
 | Policy UserDataDir/DiskCacheDir su rete | - | CRIT |
 | Policy mancanti: HighEfficiencyModeEnabled, BackgroundModeEnabled, StartupBoostEnabled | - | INFO |
 | Voci duplicate in ExtensionInstallForcelist | - | INFO |
+| Uptime non affidabile (Avvio rapido attivo) | uptime > 14 giorni | INFO |
+| Chrome installato per singolo utente (non da MSI aziendale) | - | INFO |
 
 Le segnalazioni INFO non cambiano lo stato complessivo.
 
