@@ -52,14 +52,14 @@ Una singola esecuzione e' poco affidabile: valuta 2-3 rilevazioni in giorni dive
 | RAM installata | <= 4 GB critico, < 8 GB avviso | CRIT / WARN |
 | Disco di sistema HDD | - | WARN |
 | Spazio libero | < 20 GB | WARN |
-| Uptime | > 14 giorni | WARN |
+| Uptime | > 14 giorni (solo INFO se Avvio rapido e' attivo, perche' il dato non e' affidabile) | WARN / INFO |
 | Chrome non aggiornato | > 60 giorni | WARN |
-| RAM privata Chrome | >= 3000 MB avviso, >= 5000 MB critico | WARN / CRIT |
+| RAM Chrome (working set privato, come Gestione attivita') | >= 3000 MB avviso, >= 5000 MB critico | WARN / CRIT |
 | Processi Chrome | > 60 | WARN |
 | RAM libera | < 10% con Chrome in uso | WARN |
 | Profilo / cache Chrome | >= 2000 MB / >= 1500 MB | WARN |
 | Numero profili Chrome | > 3 | WARN |
-| Estensioni per utente | > 8 | WARN |
+| Estensioni per utente (escluse quelle forzate da GPO) | > 8 | WARN |
 | Estensioni non approvate | se `-ApprovedExtensionIds` e' valorizzato | WARN |
 | Profilo roaming, AppData ridiretto o dati Chrome su rete | - | CRIT |
 | Policy UserDataDir/DiskCacheDir su rete | - | CRIT |
@@ -67,3 +67,8 @@ Una singola esecuzione e' poco affidabile: valuta 2-3 rilevazioni in giorni dive
 | Voci duplicate in ExtensionInstallForcelist | - | INFO |
 
 Le segnalazioni INFO non cambiano lo stato complessivo.
+
+## Limiti noti
+- "Local AppData ridiretto" si legge da `HKEY_USERS\<SID>`, che esiste solo per gli utenti con sessione attiva: per gli altri il controllo non rileva nulla.
+  Il controllo sul percorso del profilo Chrome (unita' di rete) e sul profilo roaming vale invece per tutti.
+- Le soglie di RAM Chrome vanno tarate dopo le prime 2-3 rilevazioni sulla flotta.

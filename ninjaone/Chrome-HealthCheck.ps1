@@ -100,18 +100,33 @@ try {
     if ($pd.MediaType) { $diskType = [string]$pd.MediaType }
 } catch { }
 
-if ($ramGB -le 4) { Add-Issue 'CRIT' "RAM installata $ramGB GB (insufficiente per Chrome)" }
-elseif ($ramGB -lt $MinRamGB) { Add-Issue 'WARN' "RAM installata $ramGB GB (minimo consigliato $MinRamGB GB)" }
+# TotalPhysicalMemory esclude la RAM riservata a GPU integrata/hardware (8 GB fisici ~ 7,4-7,9 GB): si confronta il valore arrotondato per eccesso
+$ramCmp = [math]::Ceiling($cs.TotalPhysicalMemory / 1GB)
+if ($ramCmp -le 4) { Add-Issue 'CRIT' "RAM installata $ramGB GB (insufficiente per Chrome)" }
+elseif ($ramCmp -lt $MinRamGB) { Add-Issue 'WARN' "RAM installata $ramGB GB (minimo consigliato $MinRamGB GB)" }
 if ($diskType -eq 'HDD') { Add-Issue 'WARN' 'Disco di sistema meccanico (HDD)' }
 if ($freeDiskGB -lt $MinFreeDiskGB) { Add-Issue 'WARN' "Spazio libero su $sysDrive solo $freeDiskGB GB" }
-if ($uptimeDays -gt $UptimeWarnDays) { Add-Issue 'WARN' "PC acceso senza riavvio da $uptimeDays giorni" }
+# Con Avvio rapido (HiberbootEnabled=1) "Arresta" non azzera LastBootUpTime: l'uptime non e' affidabile
+$fastStartup = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power' -ErrorAction SilentlyContinue).HiberbootEnabled -eq 1
+if ($uptimeDays -gt $UptimeWarnDays) {
+    if ($fastStartup) { Add-Issue 'INFO' "Uptime $uptimeDays gg non affidabile (Avvio rapido attivo): verificare riavvii reali" }
+    else { Add-Issue 'WARN' "PC acceso senza riavvio da $uptimeDays giorni" }
+}
 
 # ---------------------------------------------------------------- Chrome installato
 $chromeExe = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe") |
     Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+$perUserInstall = $false
+if (-not $chromeExe) {
+    # Installazione per singolo utente (%LOCALAPPDATA%\Google\Chrome\Application)
+    $chromeExe = Get-CimInstance Win32_UserProfile | Where-Object { -not $_.Special -and $_.LocalPath } |
+        ForEach-Object { Join-Path $_.LocalPath 'AppData\Local\Google\Chrome\Application\chrome.exe' } |
+        Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    if ($chromeExe) { $perUserInstall = $true; Add-Issue 'INFO' 'Chrome installato per singolo utente (non gestito dal MSI aziendale)' }
+}
 
 if (-not $chromeExe) {
-    Write-Host 'Chrome non installato a livello macchina: nessun controllo eseguito.'
+    Write-Host 'Chrome non installato: nessun controllo eseguito.'
     Set-NF 'chromehealthstatus' 'N/A'
     Set-NF 'chromehealthsummary' 'Chrome non installato'
     Set-NF 'chromehealthlastrun' (Get-Date -Format 'yyyy-MM-dd HH:mm')
@@ -131,9 +146,13 @@ $cp = @(Get-Process -Name chrome -ErrorAction SilentlyContinue)
 $chromeProcs = $cp.Count
 $chromeMB = 0
 if ($chromeProcs -gt 0) {
-    $chromeMB = [math]::Round((($cp | Measure-Object PrivateMemorySize64 -Sum).Sum) / 1MB, 0)
-    if ($chromeMB -ge $ChromeRamCritMB) { Add-Issue 'CRIT' "Chrome usa $chromeMB MB di RAM privata ($chromeProcs processi)" }
-    elseif ($chromeMB -ge $ChromeRamWarnMB) { Add-Issue 'WARN' "Chrome usa $chromeMB MB di RAM privata ($chromeProcs processi)" }
+    # Working set PRIVATO (stesso dato di Gestione attivita'): RAM fisica realmente usata, senza le pagine condivise.
+    # PrivateMemorySize64 (committed) e WorkingSet64 sommato sui processi sovrastimano. Fallback su WorkingSet64.
+    $wsp = Get-CimInstance Win32_PerfFormattedData_PerfProc_Process -Filter "Name LIKE 'chrome%'" -ErrorAction SilentlyContinue
+    if ($wsp) { $chromeMB = [math]::Round((($wsp | Measure-Object WorkingSetPrivate -Sum).Sum) / 1MB, 0) }
+    else { $chromeMB = [math]::Round((($cp | Measure-Object WorkingSet64 -Sum).Sum) / 1MB, 0) }
+    if ($chromeMB -ge $ChromeRamCritMB) { Add-Issue 'CRIT' "Chrome usa $chromeMB MB di RAM ($chromeProcs processi)" }
+    elseif ($chromeMB -ge $ChromeRamWarnMB) { Add-Issue 'WARN' "Chrome usa $chromeMB MB di RAM ($chromeProcs processi)" }
     if ($chromeProcs -gt $ChromeProcWarn) { Add-Issue 'WARN' "Chrome ha $chromeProcs processi attivi" }
     if ($freeRamPct -lt 10) { Add-Issue 'WARN' "RAM libera al $freeRamPct% con Chrome in uso" }
 }
@@ -154,8 +173,10 @@ if ($pol -and (($pol.UserDataDir -like '\\*') -or ($pol.DiskCacheDir -like '\\*'
     Add-Issue 'CRIT' 'Policy UserDataDir/DiskCacheDir punta a un percorso di rete'
 }
 $fl = Get-Item -Path "$polKey\ExtensionInstallForcelist" -ErrorAction SilentlyContinue
+$forcedIds = @()
 if ($fl) {
     $vals = @($fl.GetValueNames() | ForEach-Object { $fl.GetValue($_) })
+    $forcedIds = @($vals | ForEach-Object { ($_ -split ';')[0] } | Sort-Object -Unique)
     $dups = @($vals | Group-Object | Where-Object { $_.Count -gt 1 })
     if ($dups.Count -gt 0) { Add-Issue 'INFO' "ExtensionInstallForcelist con $($vals.Count) voci ma $($dups.Count) duplicate (GPO ripetuta?)" }
 }
@@ -193,7 +214,9 @@ foreach ($p in $profiles) {
     if ($profMB -ge $ProfileWarnMB) { Add-Issue 'WARN' "$tag profilo Chrome da $profMB MB" }
     if ($cacheMB -ge $CacheWarnMB) { Add-Issue 'WARN' "$tag cache Chrome da $cacheMB MB" }
     if ($pdirs.Count -gt 3) { Add-Issue 'WARN' "$tag $($pdirs.Count) profili Chrome" }
-    if ($ext.Count -gt $ExtWarn) { Add-Issue 'WARN' "$tag $($ext.Count) estensioni installate" }
+    # Il limite considera solo le estensioni NON forzate da GPO
+    $extFree = @($ext.Keys | Where-Object { $forcedIds -notcontains $_ })
+    if ($extFree.Count -gt $ExtWarn) { Add-Issue 'WARN' "$tag $($extFree.Count) estensioni oltre a quelle forzate da GPO ($($ext.Count) totali)" }
     if ($approved.Count -gt 0) {
         $unk = @($ext.Keys | Where-Object { $approved -notcontains $_ })
         if ($unk.Count -gt 0) {
@@ -227,7 +250,7 @@ $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine('')
 [void]$sb.AppendLine("Sistema : RAM $ramGB GB (libera $freeRamGB GB, $freeRamPct%) | Disco $sysDrive $diskType, libero $freeDiskGB GB | Uptime $uptimeDays gg")
 $ageTxt = if ($null -ne $chromeAgeDays) { ", aggiornato $chromeAgeDays gg fa" } else { '' }
-[void]$sb.AppendLine("Chrome  : versione $chromeVer$ageTxt | processi $chromeProcs | RAM privata $chromeMB MB")
+[void]$sb.AppendLine("Chrome  : versione $chromeVer$ageTxt | processi $chromeProcs | RAM (working set privato) $chromeMB MB")
 if ($chromeProcs -eq 0) { [void]$sb.AppendLine('          (Chrome non e'' in esecuzione: dati di memoria non significativi)') }
 [void]$sb.AppendLine('')
 if ($issues.Count -gt 0) {
