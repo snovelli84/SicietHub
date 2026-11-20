@@ -1,0 +1,69 @@
+# Chrome Health Check per NinjaOne
+
+Script: `Chrome-HealthCheck.ps1` (solo lettura, non modifica nulla sul PC).
+
+## 1. Campi personalizzati da creare (Amministrazione > Dispositivi > Campi personalizzati globali)
+
+Il nome tecnico deve essere esattamente questo (minuscolo, senza spazi).
+Permessi: **Automazione = Lettura/Scrittura**, Script = Lettura/Scrittura.
+
+| Nome tecnico | Tipo | Uso |
+|---|---|---|
+| `chromehealthstatus` | Testo (o Menu a tendina: OK, ATTENZIONE, CRITICO, N/A) | Stato complessivo |
+| `chromehealthsummary` | Testo | Prime 3 anomalie |
+| `chromehealthdetails` | Testo multilinea | Report completo |
+| `chromehealthlastrun` | Testo | Data ultimo controllo |
+| `chromerammb` | Intero | RAM privata usata da Chrome al momento del controllo |
+| `chromeextmax` | Intero | Numero massimo di estensioni per utente |
+
+Se un campo manca, lo script continua e stampa solo `[info] campo ... non impostato`.
+
+## 2. Creare lo script
+
+Amministrazione > Libreria > Automazione > Nuovo script:
+- Lingua: **PowerShell**
+- Sistema operativo: **Windows**
+- Architettura: tutte
+- Esegui come: **Sistema**
+- Timeout: 600 s (la scansione delle cartelle profilo puo' richiedere qualche minuto sui PC con profili grandi)
+
+Parametri opzionali (tutti con un valore predefinito):
+- `-ApprovedExtensionIds "nngceckbapebfimnlniiiahkandclblb,mlomiejdfkolichcflejclcbmpeaniij,fcoeoabgfenejglbffodgkkbkcdhcgfn"`
+  (Bitwarden, Ghostery, Claude: aggiungi le altre approvate)
+- `-MinRamGB 8 -ChromeRamWarnMB 3000 -ChromeRamCritMB 5000 -ExtWarn 8 -MinFreeDiskGB 20`
+- `-FailOnIssue` per far risultare lo script "fallito" se lo stato non e' OK
+
+## 3. Schedulazione
+
+Criteri o Automazione pianificata su tutti i PC Windows, **in orario di lavoro** (es. martedi' e giovedi' alle 11:00),
+perche' la memoria di Chrome e' un'istantanea: a Chrome chiuso il dato non e' valido (il report lo segnala).
+Una singola esecuzione e' poco affidabile: valuta 2-3 rilevazioni in giorni diversi.
+
+## 4. Lettura dei risultati
+
+- Nell'elenco dispositivi aggiungi le colonne `chromehealthstatus`, `chromehealthsummary`, `chromerammb`
+  oppure crea un filtro: `chromehealthstatus` = CRITICO / ATTENZIONE.
+- Facoltativo: condizione di avviso su `chromehealthstatus` = CRITICO.
+
+## 5. Cosa controlla
+
+| Controllo | Soglia predefinita | Gravita' |
+|---|---|---|
+| RAM installata | <= 4 GB critico, < 8 GB avviso | CRIT / WARN |
+| Disco di sistema HDD | - | WARN |
+| Spazio libero | < 20 GB | WARN |
+| Uptime | > 14 giorni | WARN |
+| Chrome non aggiornato | > 60 giorni | WARN |
+| RAM privata Chrome | >= 3000 MB avviso, >= 5000 MB critico | WARN / CRIT |
+| Processi Chrome | > 60 | WARN |
+| RAM libera | < 10% con Chrome in uso | WARN |
+| Profilo / cache Chrome | >= 2000 MB / >= 1500 MB | WARN |
+| Numero profili Chrome | > 3 | WARN |
+| Estensioni per utente | > 8 | WARN |
+| Estensioni non approvate | se `-ApprovedExtensionIds` e' valorizzato | WARN |
+| Profilo roaming, AppData ridiretto o dati Chrome su rete | - | CRIT |
+| Policy UserDataDir/DiskCacheDir su rete | - | CRIT |
+| Policy mancanti: HighEfficiencyModeEnabled, BackgroundModeEnabled, StartupBoostEnabled | - | INFO |
+| Voci duplicate in ExtensionInstallForcelist | - | INFO |
+
+Le segnalazioni INFO non cambiano lo stato complessivo.
