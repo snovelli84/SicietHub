@@ -58,26 +58,50 @@ th{color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--car
 select{padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text)}
 ul.note{padding-left:18px;font-size:.88rem}ul.note li{margin:5px 0}
 .muted{color:var(--muted);font-size:.8rem}
-#load{max-width:560px;margin:60px auto;text-align:center}
-#load .drop{border:2px dashed var(--border);border-radius:14px;padding:34px 16px;margin:18px 0;background:var(--card)}
 .tag{display:inline-block;background:var(--chip);border-radius:6px;padding:1px 7px;font-size:.75rem;margin-left:4px}
+.boxc{max-width:460px;margin:50px auto;padding:0 16px;display:flex;flex-direction:column;gap:12px}
+.drop{border:2px dashed var(--border);border-radius:14px;padding:30px 16px;background:var(--card);text-align:center}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:.78rem;color:var(--muted)}
+label.f input{padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:.95rem;width:100%}
+.frm{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-top:10px}
+details.ins{margin-bottom:12px}details.ins>summary{cursor:pointer;font-weight:700;font-size:.95rem}
+details.ins td{padding:4px 6px;border:0}
+a.tag{text-decoration:none;color:var(--text)}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--brand);color:#fff;padding:10px 18px;border-radius:999px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
+#toast.on{opacity:1}
+@media print{header,nav,.tools .btn,#stato{display:none!important}body{background:#fff}.card{box-shadow:none}input.sv{border:0;background:none}}
 </style>
 </head>
 <body>
 <header>
   <img src="icons/icon-192.png" alt="">
-  <h1>SICIET Energia <small id="agg"></small></h1>
-  <button class="btn" id="btnLoad" hidden>Carica altro file</button>
+  <h1>SICIET Energia <small id="agg"></small><br><small id="stato" hidden></small></h1>
+  <button class="btn" id="btnLoad" hidden>Importa file</button>
+  <button class="btn" id="btnExp" hidden>Esporta</button>
   <button class="btn" id="btnForget" hidden>Rimuovi dati</button>
+  <input type="file" id="file2" accept=".json,application/json" hidden>
 </header>
 
+<div id="login" hidden>
+  <form id="loginForm" class="boxc">
+    <h2>Accesso</h2>
+    <label class="f"><span>Nome e cognome</span><input id="nome" autocomplete="name" required></label>
+    <label class="f"><span>Password</span><input id="pwd" type="password" autocomplete="current-password" required></label>
+    <p id="loginErr" class="alert err" style="margin:0"></p>
+    <button class="btn primary" type="submit">Entra</button>
+    <p class="muted">Il nome compare accanto ai dati che inserisci. Nome e password restano su questo dispositivo.</p>
+  </form>
+</div>
+
 <div id="load" hidden>
+  <div class="boxc">
   <h2>Carica i dati</h2>
   <div class="drop">
     <p>Seleziona il file <b>siciet_dashboard_data.json</b> generato dal progetto "Analisi Energetica".</p><br>
     <input type="file" id="file" accept=".json,application/json">
   </div>
-  <p class="muted">I dati restano solo su questo dispositivo (memoria del browser): non vengono inviati né pubblicati. Per aggiornarli basta caricare un nuovo file.</p>
+  <p class="muted">Il file è il punto di partenza; da qui in poi i nuovi mesi si inseriscono dalla pagina (<b>＋ Inserisci mese</b>). Se la pagina è collegata al servizio di archivio, i dati vengono salvati lì e tutti i dispositivi li vedono; altrimenti restano solo su questo dispositivo.</p>
+  </div>
 </div>
 
 <div id="app" hidden>
@@ -88,7 +112,6 @@ ul.note{padding-left:18px;font-size:.88rem}ul.note li{margin:5px 0}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 "use strict";
-const KEY="siciet_energia_data_v1";
 const MESI=["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"];
 const NF=(n,d=0)=>n==null||isNaN(n)?"n.d.":Number(n).toLocaleString("it-IT",{minimumFractionDigits:d,maximumFractionDigits:d,useGrouping:"always"});
 const EUR=(n,d=0)=>n==null||isNaN(n)?"n.d.":NF(n,d)+" €";
@@ -99,37 +122,166 @@ const SCADENZE=[
   {txt:"Offerta gas «Anno Sicuro Gas» (0,70 €/Smc materia prima)",data:"2026-11-30"},
   {txt:"Condizioni contratto elettrico (prezzo fisso F1/F2/F3)",data:"2027-01-31"}
 ];
-const TABS=[["pan","Panoramica"],["el","Elettricità"],["gas","Gas"],["carb","Carburanti"],["fv","Fotovoltaico"],["flotta","Flotta"],["dati","Dati"],["note","Note e dubbi"]];
-let D=null,tab="pan",charts=[];
+const TABS=[["pan","Panoramica"],["el","Elettricità"],["gas","Gas"],["carb","Carburanti"],["fv","Fotovoltaico"],["flotta","Flotta"],["mon","Monitoraggio"],["ins","＋ Inserisci mese"],["dati","Dati"],["note","Note e dubbi"]];
 
-/* ---------- caricamento ---------- */
-function setData(obj,save){
-  if(!obj||!Array.isArray(obj.mensili)) throw new Error("File non valido: manca l'elenco «mensili».");
-  D=obj;
-  if(save){try{localStorage.setItem(KEY,JSON.stringify(obj))}catch(e){alert("Dati caricati ma non salvabili su questo dispositivo.")}}
-  show();
+/* ---------- archivio e sincronizzazione ---------- */
+var ENERGIA_CONFIG={
+  // Indirizzo del servizio (Cloudflare Worker, vedi api/worker.js), es.
+  // "https://siciet-energia.<nome-account>.workers.dev/api".
+  // Finché è vuoto la pagina funziona IN LOCALE: i dati restano solo sul dispositivo.
+  api:"",
+  // Ogni quanti secondi si inviano le modifiche in attesa e si leggono quelle degli altri.
+  secondi:30
+};
+const CFG=ENERGIA_CONFIG;
+const KEY="siciet_energia_data_v1",KP="siciet_energia_pwd",KN="siciet_energia_nome",KQ="siciet_energia_coda";
+const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+const ARR={mensile:"mensili",el:"elettrico_dettaglio",gas:"gas_dettaglio",fv:"fv",km:"km_mensili",scheda:"monitoraggio"};
+const KEYOF={mensile:r=>`${r.anno}|${r.mese}|${r.vettore}`,el:r=>`${r.anno}|${r.mese}`,gas:r=>`${r.anno}|${r.mese}`,fv:r=>`${r.anno}|${r.mese}`,km:r=>`${r.anno}|${r.mese}`,scheda:r=>`${r.pos}|${r.anno}`};
+const BASE=["siti","flotta","carburanti_per_mezzo_mese","note"];
+function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
+function norm(o){const v=vuoto(),d=Object.assign({},o);for(const k in v)if(d[k]==null)d[k]=v[k];return d}
+function applyVoce(v){
+  if(v.tipo==="base"){if(!v.dati)return false;const a=JSON.stringify(D[v.chiave]);D[v.chiave]=v.dati.v;return a!==JSON.stringify(v.dati.v)}
+  const a=ARR[v.tipo];if(!a)return false;
+  const f=KEYOF[v.tipo],arr=D[a],i=arr.findIndex(r=>f(r)===v.chiave);
+  if(v.dati===null){if(i>=0){arr.splice(i,1);return true}return false}
+  if(i>=0){if(JSON.stringify(arr[i])===JSON.stringify(v.dati))return false;arr[i]=v.dati}else arr.push(v.dati);
+  return true;
+}
+function sortD(){["mensili","fv","elettrico_dettaglio","gas_dettaglio","km_mensili"].forEach(a=>D[a].sort((x,y)=>x.anno-y.anno||x.mese-y.mese||String(x.vettore||"").localeCompare(String(y.vettore||""))))}
+function vociDa(o){
+  const out=[];
+  for(const t in ARR)(o[ARR[t]]||[]).forEach(r=>out.push({tipo:t,chiave:KEYOF[t](r),dati:r}));
+  BASE.forEach(k=>{if(o[k]!=null)out.push({tipo:"base",chiave:k,dati:{v:o[k]}})});
+  return out;
+}
+let D=null,tab="pan",charts=[],ultimo=0,timer=null,coda=[],stato="";
+try{coda=JSON.parse(ls.get(KQ)||"[]")}catch(e){}
+const operatore=()=>ls.get(KN)||"";
+async function api(path,method,body){
+  const h={"X-Password":ls.get(KP)||""};if(body!==undefined)h["Content-Type"]="application/json";
+  let res;try{res=await fetch(CFG.api+path,{method,headers:h,body:body===undefined?undefined:JSON.stringify(body)})}
+  catch(e){const er=new Error("Nessuna connessione al servizio.");er.rete=true;throw er}
+  let j={};try{j=await res.json()}catch(e){}
+  if(res.status===401){ls.del(KP);const er=new Error(j.error||"Password non corretta.");er.auth=true;throw er}
+  if(!res.ok)throw new Error(j.error||"Errore del servizio ("+res.status+").");
+  return j;
+}
+function mostraStato(){
+  const s=document.getElementById("stato");if(!s)return;
+  s.textContent=!CFG.api?"Modalità locale: dati solo su questo dispositivo":coda.length?"⏳ "+coda.length+" modifiche da inviare":stato||"✓ Sincronizzato";
+}
+async function svuotaCoda(){
+  while(coda.length){
+    const parte=coda.slice(0,500);
+    await api("/dati","POST",{voci:parte,operatore:operatore()});
+    coda=coda.slice(parte.length);ls.set(KQ,JSON.stringify(coda));
+  }
+}
+function salvaLocale(){if(!ls.set(KEY,JSON.stringify(D)))alert("Non c'è spazio per salvare i dati su questo dispositivo: scarica una copia con «Esporta».")}
+function saveVoci(list){
+  if(!D)D=vuoto();
+  list.forEach(applyVoce);sortD();
+  if(CFG.api){
+    const k=v=>v.tipo+"|"+v.chiave,nuove=new Set(list.map(k));
+    coda=coda.filter(v=>!nuove.has(k(v))).concat(list);ls.set(KQ,JSON.stringify(coda));
+    mostraStato();
+    svuotaCoda().then(mostraStato).catch(e=>{stato=e.auth?"":"⚠ "+e.message;mostraStato();if(e.auth)avvia()});
+  }else salvaLocale();
+}
+async function sincronizza(){
+  if(!CFG.api||!D)return;
+  try{
+    await svuotaCoda();
+    const j=await api("/dati?da="+ultimo,"GET");
+    let cambiato=false;j.voci.forEach(v=>{if(applyVoce(v))cambiato=true});
+    ultimo=Math.max(0,j.ora-5000);stato="";sortD();mostraStato();
+    if(cambiato&&tab!=="ins")render();else if(cambiato)aggiornaMancanti();
+  }catch(e){
+    if(e.auth){clearInterval(timer);avvia()}else{stato="⚠ "+e.message;mostraStato()}
+  }
+}
+function schermata(x){
+  ["load","login","app"].forEach(id=>document.getElementById(id).hidden=id!==x);
+  const on=x==="app";
+  ["btnLoad","btnExp","btnForget"].forEach(id=>document.getElementById(id).hidden=!on);
+  document.getElementById("stato").hidden=!on;
+}
+async function avvia(){
+  clearInterval(timer);
+  if(!CFG.api){
+    try{const s=ls.get(KEY);if(s)D=norm(JSON.parse(s))}catch(e){}
+    if(D)sortD();
+    show();return;
+  }
+  if(!ls.get(KP)||!operatore()){mostraAccesso();return}
+  try{
+    const j=await api("/dati?da=0","GET");
+    D=vuoto();j.voci.forEach(applyVoce);sortD();ultimo=Math.max(0,j.ora-5000);
+    if(coda.length)coda.forEach(applyVoce);
+    show();
+    timer=setInterval(sincronizza,Math.max(10,CFG.secondi||30)*1000);
+  }catch(e){
+    if(e.auth)mostraAccesso(e.message);
+    else{mostraAccesso();document.getElementById("loginErr").textContent=e.message}
+  }
+}
+function mostraAccesso(msg){
+  schermata("login");
+  document.getElementById("nome").value=operatore();
+  document.getElementById("loginErr").textContent=msg||"";
 }
 function show(){
-  document.getElementById("load").hidden=!!D;
-  document.getElementById("app").hidden=!D;
-  document.getElementById("btnLoad").hidden=!D;
-  document.getElementById("btnForget").hidden=!D;
-  if(!D) return;
+  if(!D||!D.mensili.length){schermata("load");return}
+  schermata("app");
   const last=D.mensili.reduce((a,m)=>Math.max(a,m.anno*12+m.mese),0);
   document.getElementById("agg").textContent="· dati fino a "+MESI[(last-1)%12]+" "+Math.floor((last-1)/12);
-  buildTabs();render();
+  mostraStato();buildTabs();render();
+}
+function importa(obj){
+  if(!obj||!Array.isArray(obj.mensili))throw new Error("File non valido: manca l'elenco «mensili».");
+  const o=norm(obj);
+  if(CFG.api){
+    if(D&&D.mensili.length&&!confirm("I dati del file sostituiranno quelli già presenti per gli stessi mesi. Continuare?"))return;
+    saveVoci(vociDa(o));
+  }else{
+    if(D&&D.mensili.length&&!confirm("I dati del file sostituiranno tutti quelli salvati su questo dispositivo. Continuare?"))return;
+    D=o;sortD();salvaLocale();
+  }
+  show();
 }
 document.getElementById("file").addEventListener("change",e=>{
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
-  r.onload=()=>{try{setData(JSON.parse(r.result),true)}catch(err){alert(err.message)}};
+  r.onload=()=>{try{importa(JSON.parse(r.result))}catch(err){alert(err.message)}};
   r.readAsText(f);e.target.value="";
 });
-document.getElementById("btnLoad").onclick=()=>{D=null;show()};
-document.getElementById("btnForget").onclick=()=>{
-  if(confirm("Rimuovere i dati salvati su questo dispositivo?")){try{localStorage.removeItem(KEY)}catch(e){}D=null;show()}
+document.getElementById("btnLoad").onclick=()=>document.getElementById("file2").click();
+document.getElementById("file2").addEventListener("change",e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{try{importa(JSON.parse(r.result))}catch(err){alert(err.message)}};
+  r.readAsText(f);e.target.value="";
+});
+document.getElementById("btnExp").onclick=()=>{
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(D)],{type:"application/json"}));
+  a.download="siciet_dashboard_data.json";a.click();
 };
-try{const s=localStorage.getItem(KEY);if(s)D=JSON.parse(s)}catch(e){}
+document.getElementById("btnForget").onclick=()=>{
+  if(CFG.api){
+    if(coda.length&&!confirm("Ci sono modifiche non ancora inviate: se esci andranno perse. Uscire?"))return;
+    ls.del(KP);ls.del(KQ);coda=[];D=null;avvia();
+  }else if(confirm("Rimuovere i dati salvati su questo dispositivo? Se non hai una copia (Esporta) andranno persi.")){ls.del(KEY);D=null;show()}
+};
+document.getElementById("btnForget").textContent=CFG.api?"Esci":"Rimuovi dati";
+document.getElementById("loginForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const n=document.getElementById("nome").value.trim(),p=document.getElementById("pwd").value;
+  if(!n||!p)return;
+  ls.set(KN,n);ls.set(KP,p);document.getElementById("pwd").value="";
+  avvia();
+});
 function buildTabs(){
   const n=document.getElementById("tabs");
   n.innerHTML=TABS.map(([k,t])=>`<button data-k="${k}" class="${k===tab?"on":""}">${t}</button>`).join("");
@@ -215,7 +367,7 @@ function dPan(){
 }
 function vEl(){
   return`<div class="grid wide">${box("e1","Prelievo mensile per anno (kWh)")}${box("e2","Fasce F1/F2/F3 (kWh)")}${box("e3","Potenza fatturata (kW)","Linea tratteggiata: 30 kW disponibili")}${box("e4","Costo annuo (€)")}${box("e5","Costo medio €/kWh")}${box("e6","Energia reattiva e cos φ")}</div>
-  <p class="muted" style="margin-top:10px">Contratto: Enel Energia, prezzo fisso a fasce, ${esc((D.siti[0].punti_fornitura.find(p=>p.tipo==="elettrico")||{}).codice||"")}. Superficie ${NF(D.siti[0].superficie_mq)} m².</p>`;
+  <p class="muted" style="margin-top:10px">Contratto: Enel Energia, prezzo fisso a fasce, ${esc((((D.siti[0]||{}).punti_fornitura||[]).find(p=>p.tipo==="elettrico")||{}).codice||"")}. Superficie ${NF((D.siti[0]||{}).superficie_mq)} m².</p>`;
 }
 function dEl(){
   yearLines("e1","elettrico","kWh");
@@ -300,15 +452,222 @@ function vNote(){
   const siti=D.siti.map(s=>`<li><b>${esc(s.nome)}</b> — ${esc(s.indirizzo)}${(s.punti_fornitura||[]).map(p=>`<br><span class="muted">${esc(p.tipo)}: ${esc(p.codice||"")} · ${esc(p.fornitore||"")}</span>`).join("")}</li>`).join("");
   return L("Analisi e azioni",n.analisi)+L("Dubbi e dati incoerenti",n.dubbi)+L("Convenzioni",n.convenzioni)+`<div class="card"><h2>Siti e forniture</h2><ul class="note">${siti}</ul></div>`;
 }
-const VIEWS={pan:[vPan,dPan],el:[vEl,dEl],gas:[vGas,dGas],carb:[vCarb,dCarb],fv:[vFv,dFv],flotta:[vFlotta,()=>{}],dati:[vDati,dDati],note:[vNote,()=>{}]};
+/* ---------- monitoraggio indicatori (scheda All. MGE) ---------- */
+const IND=[
+  {pos:1,nome:"Consumo combustibili – Benzina",ogg:"Consumi: litri consumati ogni 100 km (l/km)×100",um:"l/100 km",dec:2,peggio:"su"},
+  {pos:2,nome:"Consumo combustibili – Gasolio",ogg:"Consumi: litri consumati ogni 100 km (l/km)×100",um:"l/100 km",dec:2,peggio:"su"},
+  {pos:3,nome:"Utilizzo macchina elettrica",ogg:"Incremento dell'utilizzo dell'auto elettrica rispetto alle vetture a carburante: (km elettrica / km totali vetture)×100",um:"%",dec:2,peggio:"giu"},
+  {pos:4,nome:"Produzione da FV",ogg:"Rendimento (Prp > 0,8): effetto complessivo delle perdite sulla potenza generata in c.a. (irraggiamento, inverter, guasti); rapporto tra potenza in c.a. e potenza producibile in c.a. rapportata a irraggiamento e temperatura",um:"Prp",dec:3,soglia:0.8}
+];
+const OBIETTIVI=[
+  "1, 2 – Indicatori del corretto utilizzo del mezzo (stile di guida) e dello stato di manutenzione generale.",
+  "3 – Indicatore di un processo di sensibilizzazione rispetto all'utilizzo di mezzi alternativi (meno impattanti dal punto di vista ambientale ed energetico).",
+  "4 – Indicatore dell'efficienza degli impianti fotovoltaici."
+];
+function calcInd(pos,y,m){
+  const ok=r=>r.anno===y&&(!m||r.mese===m);
+  if(pos===1||pos===2){
+    const f=pos===1?"benzina":"gasolio";let l=0,k=0,n=0;
+    D.km_mensili.filter(ok).forEach(r=>{const km=r["km_"+f];if(km>0){const q=rows(f).find(x=>x.anno===r.anno&&x.mese===r.mese);if(q&&q.quantita!=null){l+=q.quantita;k+=km;n++}}});
+    return n?{v:l/k*100,n}:null;
+  }
+  if(pos===3){
+    let e=0,t=0,n=0;
+    D.km_mensili.filter(ok).forEach(r=>{const tot=(r.km_benzina||0)+(r.km_gasolio||0)+(r.km_elettrico||0);if(tot>0){e+=r.km_elettrico||0;t+=tot;n++}});
+    return n?{v:e/t*100,n}:null;
+  }
+  const fr=D.fv.filter(r=>ok(r)&&r.prp!=null);if(!fr.length)return null;
+  const w=fr.filter(r=>r.producibile_kwh>0&&r.produzione_kwh!=null);
+  const v=w.length===fr.length?w.reduce((s,r)=>s+r.produzione_kwh,0)/w.reduce((s,r)=>s+r.producibile_kwh,0):fr.reduce((s,r)=>s+r.prp,0)/fr.length;
+  return{v,n:fr.length};
+}
+const schedaVal=(pos,y)=>{const r=D.monitoraggio.find(x=>x.pos===pos&&x.anno===y);return r?r.valore:null};
+const num2=(n,d)=>n==null?"":String(Number(n.toFixed(d))).replace(".",",");
+function parseNum(t){
+  t=String(t==null?"":t).trim().replace(/\s/g,"");if(t==="")return null;
+  if(t.includes(","))t=t.replace(/\./g,"").replace(",",".");
+  else if(/^-?\d{1,3}(\.\d{3})+$/.test(t))t=t.replace(/\./g,"");// 3.012 = tremiladodici (decimali con la virgola)
+  const n=Number(t);if(!isFinite(n))throw new Error("Numero non valido: «"+t+"»");return n;
+}
+function vMon(){
+  const cy=Math.max(new Date().getFullYear(),...D.mensili.map(m=>m.anno)),ys=[];
+  for(let y=2024;y<=cy;y++)ys.push(y);
+  const body=IND.map(ind=>ys.map((y,i)=>{
+    const c=calcInd(ind.pos,y),sv=schedaVal(ind.pos,y),ris=c?c.v:sv;
+    const prev=i?(calcInd(ind.pos,y-1)||{}).v??schedaVal(ind.pos,y-1):null;
+    let st="";
+    if(ris!=null&&ind.soglia)st=ris>=ind.soglia?'<span class="down">✓ oltre la soglia</span>':'<span class="up">⚠ sotto la soglia '+num2(ind.soglia,1)+'</span>';
+    else if(ris!=null&&prev!=null&&prev!==0){const p=pct(ris,prev);st=`<span class="${(ind.peggio==="su"?p>0:p<0)?"up":"down"}">${p>0?"▲":"▼"} ${NF(Math.abs(p),1)}% vs ${y-1}</span>`}
+    return`<tr>${i===0?`<td rowspan="${ys.length}" class="l"><b>${ind.pos}</b></td><td rowspan="${ys.length}" class="l" style="white-space:normal;min-width:240px"><b>${ind.nome}</b><br><span class="muted">${ind.ogg}</span></td>`:""}
+    <td>${y}</td>
+    <td><input class="sv" data-pos="${ind.pos}" data-y="${y}" inputmode="decimal" value="${num2(sv,ind.dec)}" placeholder="–" style="width:80px;text-align:right"></td>
+    <td>${c?num2(c.v,ind.dec)+' <span class="muted">('+c.n+(c.n===1?" mese":" mesi")+')</span>':'<span class="muted">–</span>'}</td>
+    <td><b>${ris!=null?num2(ris,ind.dec):"n.d."}</b> <span class="muted">${ind.um}</span></td><td class="l">${st}</td></tr>`}).join("")).join("");
+  const haKm=D.km_mensili.length>0,haFv=D.fv.some(r=>r.prp!=null);
+  return`<div class="tools"><button class="btn" id="stampa">Stampa la scheda</button><span class="muted">Scheda «All. MGE – Monitoraggio indicatori energetici ${cy}» (Rev. 00 del 10.07.2025)</span></div>
+  <div class="card"><div class="scroll"><table><thead><tr><th class="l">Pos.</th><th class="l">Indicatore</th><th>Anno</th><th>Valore della scheda</th><th>Calcolato dai dati mensili</th><th>Risultato</th><th class="l">Esito</th></tr></thead><tbody>${body}</tbody></table></div>
+  <p class="muted" style="margin-top:8px">Il <b>risultato</b> è il valore calcolato dai dati mensili, se ci sono; altrimenti quello della scheda. I valori della scheda si possono scrivere o correggere nella colonna omonima (si salvano da soli). I km e i dati del fotovoltaico si inseriscono ogni mese in <b>＋ Inserisci mese</b>.</p></div>
+  ${haKm||haFv?`<div class="grid wide" style="margin-top:14px">${box("m1","Consumo per 100 km, per mese (l/100 km)")}${box("m2","Km dell'auto elettrica sul totale (%)")}${box("m3","Rendimento FV (Prp)","Linea tratteggiata: soglia 0,8")}</div>`:`<div class="alert warn" style="margin-top:14px">Non ci sono ancora km mensili né rendimento FV: i grafici compariranno dopo i primi inserimenti.</div>`}
+  <div class="card" style="margin-top:14px"><h2>Specifica obiettivi</h2><ul class="note">${OBIETTIVI.map(o=>`<li>${o}</li>`).join("")}</ul></div>
+  <div class="card" style="margin-top:14px"><h2>Firma del responsabile del monitoraggio</h2><div style="height:48px;border-bottom:1px solid var(--border)"></div></div>`;
+}
+function dMon(){
+  document.getElementById("stampa").onclick=()=>window.print();
+  document.querySelectorAll("input.sv").forEach(i=>i.onchange=()=>{
+    const pos=+i.dataset.pos,y=+i.dataset.y;
+    try{const v=parseNum(i.value);saveVoci([{tipo:"scheda",chiave:pos+"|"+y,dati:v==null?null:{pos,anno:y,valore:v}}]);render()}
+    catch(e){alert(e.message);render()}
+  });
+  const c=COL();
+  const ks=D.km_mensili.map(r=>[r.anno,r.mese]).slice(-24),lab=([y,m])=>MESI[m-1]+" "+String(y).slice(2);
+  if(document.getElementById("m1")){
+    const s=(pos)=>ks.map(([y,m])=>{const x=calcInd(pos,y,m);return x?x.v:null});
+    chart("m1",{type:"line",data:{labels:ks.map(lab),datasets:[{label:"Gasolio",data:s(2),borderColor:c[0],backgroundColor:c[0],spanGaps:true},{label:"Benzina",data:s(1),borderColor:c[1],backgroundColor:c[1],spanGaps:true}]},options:{scales:{x:{ticks:{maxTicksLimit:10}}}}});
+    chart("m2",{type:"bar",data:{labels:ks.map(lab),datasets:[{label:"% km elettrica",data:s(3),backgroundColor:c[2]}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:10}},y:{beginAtZero:true}}}});
+    const fr=D.fv.filter(r=>r.prp!=null).slice(-24);
+    chart("m3",{type:"line",data:{labels:fr.map(r=>MESI[r.mese-1]+" "+String(r.anno).slice(2)),datasets:[{label:"Prp",data:fr.map(r=>r.prp),borderColor:c[2],backgroundColor:c[2],tension:.2},{label:"Soglia 0,8",data:fr.map(()=>.8),borderColor:c[1],borderDash:[6,4],pointRadius:0}]},options:{scales:{y:{min:0,max:1}}}});
+  }
+}
+
+/* ---------- inserimento mensile ---------- */
+let insA=null,insM=null;
+function mesePrec(){const n=new Date();let y=n.getFullYear(),m=n.getMonth();if(m===0){y--;m=12}return{y,m}}
+const S1_DEF="S1 Sede Orbetello (Via Puglia 6)",S2_DEF="S2 Flotta automezzi";
+const sitoDi=(vet,def)=>{const r=D.mensili.find(x=>vet.includes(x.vettore));return r?r.sito:def};
+const trova=(arr,A,M)=>D[arr].find(r=>r.anno===A&&r.mese===M)||null;
+const trovaV=(v,A,M)=>D.mensili.find(r=>r.anno===A&&r.mese===M&&r.vettore===v)||null;
+const fld=(id,lab,v,o={})=>`<label class="f"><span>${lab}</span><input id="${id}" data-lab="${lab}" inputmode="${o.t?"text":"decimal"}" value="${esc(v==null?"":(o.t?v:num2(v,6)))}" ${o.ph?`placeholder="${o.ph}"`:""} autocomplete="off"></label>`;
+function vIns(){
+  if(insA==null){const p=mesePrec();insA=p.y;insM=p.m}
+  const cy=new Date().getFullYear(),ya=[];for(let y=Math.min(cy,insA)-0;y>=2021;y--)ya.push(y);
+  const A=insA,M=insM,el=trova("elettrico_dettaglio",A,M)||{},eM=trovaV("elettrico",A,M)||{},gd=trova("gas_dettaglio",A,M)||{},gM=trovaV("gas",A,M)||{},fv=trova("fv",A,M)||{},km=trova("km_mensili",A,M)||{};
+  const carb=["gasolio","benzina","HVO","AdBlue"].map(f=>{const r=trovaV(f,A,M)||{};return`<tr><td class="l"><b>${f}</b></td><td>${fld("c_"+f+"_q","litri",r.quantita)}</td><td>${fld("c_"+f+"_c","€ imponibile",r.costo)}</td><td>${fld("c_"+f+"_i","€ IVA incl.",r.costo_iva)}</td><td>${fld("c_"+f+"_n","note",r.note,{t:1})}</td></tr>`}).join("");
+  return`<div class="card" style="margin-bottom:14px"><h2>Mese da inserire o correggere</h2>
+  <div class="tools"><select id="iA">${ya.map(y=>`<option ${y===A?"selected":""}>${y}</option>`).join("")}</select><select id="iM">${MESI.map((n,i)=>`<option value="${i+1}" ${i+1===M?"selected":""}>${n}</option>`).join("")}</select><span class="muted">Se il mese ha già dei dati compaiono nei campi: puoi correggerli.</span></div>
+  <div id="miss"></div></div>
+  <details class="card ins" open><summary>⚡ Elettricità</summary><div class="frm">
+    ${fld("e_kwh","Prelievo kWh",eM.quantita)}${fld("e_F1","F1 kWh",el.F1)}${fld("e_F2","F2 kWh",el.F2)}${fld("e_F3","F3 kWh",el.F3)}
+    ${fld("e_kvarh","Reattiva kVArh",el.kvarh)}${fld("e_kw","Potenza fatturata kW",el.kw_fatturata)}${fld("e_cosfi","cos φ",el.cosfi)}
+    ${fld("e_c","€ imponibile",eM.costo)}${fld("e_ci","€ IVA inclusa",eM.costo_iva)}${fld("e_fatt","N. fattura",el.fattura,{t:1})}${fld("e_note","Note",eM.note,{t:1})}
+  </div></details>
+  <details class="card ins" open><summary>🔥 Gas</summary><div class="frm">
+    ${fld("g_smc","Consumo Smc",gM.quantita)}${fld("g_c","€ imponibile",gM.costo)}${fld("g_ci","€ IVA inclusa",gM.costo_iva)}${fld("g_iva","Aliquote IVA",gd.iva_aliquote,{t:1,ph:"es. 22%"})}${fld("g_fatt","N. fattura",gd.fattura,{t:1})}${fld("g_note","Note",gM.note,{t:1})}
+  </div></details>
+  <details class="card ins" open><summary>⛽ Carburanti (flotta)</summary><div class="scroll" style="max-height:none"><table><tbody>${carb}</tbody></table></div></details>
+  <details class="card ins" open><summary>☀️ Fotovoltaico</summary><div class="frm">
+    ${fld("f_prod","Produzione kWh",fv.produzione_kwh)}${fld("f_imm","Immissione in rete kWh",fv.immissione_kwh)}${fld("f_auto","Autoconsumo kWh",fv.autoconsumo_kwh)}
+    ${fld("f_prodb","Producibile kWh",fv.producibile_kwh)}${fld("f_prp","Rendimento Prp",fv.prp)}${fld("f_kwp","Potenza kWp",fv.kwp||kwpDef())}${fld("f_note","Note",fv.note,{t:1})}
+  </div><p class="muted" style="margin-top:6px">Autoconsumo = produzione − immissione, e Prp = produzione / producibile, se lasciati vuoti. Il prelievo è quello dell'elettricità.</p></details>
+  <details class="card ins" open><summary>🚗 Km dei mezzi (per la scheda di monitoraggio)</summary><div class="frm">
+    ${fld("k_ben","Km vetture a benzina",km.km_benzina)}${fld("k_gas","Km vetture a gasolio",km.km_gasolio)}${fld("k_el","Km auto elettrica",km.km_elettrico)}${fld("k_note","Note",km.note,{t:1})}
+  </div></details>
+  <div class="tools" style="margin-top:12px"><button class="btn primary" id="salva">Salva il mese</button><span class="muted">Un riquadro svuotato del tutto elimina i dati del mese (chiede conferma).</span></div>`;
+}
+const kwpDef=()=>(D.fv.slice().reverse().find(r=>r.kwp)||{}).kwp||null;
+function aggiornaMancanti(){
+  const el=document.getElementById("miss");if(!el)return;
+  const mp=mesePrec(),fino=insA<mp.y?12:insA===mp.y?mp.m:0,out=[];
+  [["elettrico","Elettricità"],["gas","Gas"],["gasolio","Gasolio"]].forEach(([v,n])=>{
+    const m=[];for(let i=1;i<=fino;i++)if(!trovaV(v,insA,i))m.push(i);
+    if(m.length)out.push(`<div style="margin:4px 0"><b>${n}</b> senza dati nel ${insA}: ${m.map(i=>`<a href="#" data-m="${i}" class="tag">${MESI[i-1]}</a>`).join(" ")}</div>`);
+  });
+  el.innerHTML=out.length?out.join(""):`<div class="muted">✓ Elettricità, gas e gasolio hanno dati per tutti i mesi del ${insA} fino a ${fino?MESI[fino-1]:"—"}.</div>`;
+}
+function dIns(){
+  const A=()=>+document.getElementById("iA").value,M=()=>+document.getElementById("iM").value;
+  document.getElementById("iA").onchange=()=>{insA=A();render()};
+  document.getElementById("iM").onchange=()=>{insM=M();render()};
+  document.getElementById("miss").onclick=e=>{const m=e.target.dataset.m;if(m){e.preventDefault();insM=+m;render()}};
+  aggiornaMancanti();
+  document.getElementById("salva").onclick=salvaMese;
+}
+const round=(n,d)=>Number(n.toFixed(d));
+function fvMerge(A,M,patch){
+  const old=trova("fv",A,M)||{anno:A,mese:M,kwp:kwpDef(),produzione_kwh:null,autoconsumo_kwh:null,immissione_kwh:null,prelievo_kwh:null,consumo_totale_kwh:null,copertura_fv_pct:null,note:""};
+  const r=Object.assign({},old,patch);r.consumo_totale_kwh=null;r.copertura_fv_pct=null;
+  if(r.autoconsumo_kwh==null&&r.produzione_kwh!=null&&r.immissione_kwh!=null)r.autoconsumo_kwh=Math.max(0,r.produzione_kwh-r.immissione_kwh);
+  if(r.autoconsumo_kwh!=null&&r.prelievo_kwh!=null){r.consumo_totale_kwh=r.prelievo_kwh+r.autoconsumo_kwh;r.copertura_fv_pct=r.consumo_totale_kwh?round(r.autoconsumo_kwh/r.consumo_totale_kwh*100,1):null}
+  if(r.prp==null&&r.produzione_kwh!=null&&r.producibile_kwh>0)r.prp=round(r.produzione_kwh/r.producibile_kwh,3);
+  return r;
+}
+function toast(t){
+  let d=document.getElementById("toast");if(!d){d=document.createElement("div");d.id="toast";document.body.appendChild(d)}
+  d.textContent=t;d.className="on";clearTimeout(d._t);d._t=setTimeout(()=>d.className="",2800);
+}
+function salvaMese(){
+  const A=insA,M=insM,voci=[],elim=[],q=id=>document.getElementById(id);
+  const num=id=>{try{return parseNum(q(id).value)}catch(e){q(id).focus();throw new Error(q(id).dataset.lab+": "+e.message)}};
+  const txt=id=>q(id).value.trim();
+  const any=o=>Object.values(o).some(v=>v!==null&&v!=="");
+  try{
+    /* elettricità */
+    const e={kwh:num("e_kwh"),F1:num("e_F1"),F2:num("e_F2"),F3:num("e_F3"),kvarh:num("e_kvarh"),kw:num("e_kw"),cosfi:num("e_cosfi"),c:num("e_c"),ci:num("e_ci"),fatt:txt("e_fatt"),note:txt("e_note")};
+    if(any(e)){
+      const fs=e.F1!=null&&e.F2!=null&&e.F3!=null?e.F1+e.F2+e.F3:null;
+      if(e.kwh==null&&fs!=null)e.kwh=fs;
+      if(e.kwh==null)throw new Error("Elettricità: indica i kWh prelevati nel mese.");
+      if(fs!=null&&Math.abs(fs-e.kwh)>1&&!confirm(`Elettricità: F1+F2+F3 = ${NF(fs)} kWh ma il prelievo è ${NF(e.kwh)} kWh. Salvare lo stesso?`))return;
+      if(e.cosfi!=null&&(e.cosfi<=0||e.cosfi>1))throw new Error("cos φ deve essere tra 0 e 1.");
+      const s=sitoDi(["elettrico"],S1_DEF),sd=(trova("elettrico_dettaglio",A,M)||{}).sito||s.replace(/^S1 /,"");
+      voci.push({tipo:"mensile",chiave:`${A}|${M}|elettrico`,dati:{anno:A,mese:M,sito:s,vettore:"elettrico",quantita:e.kwh,um:"kWh",costo:e.c,costo_iva:e.ci,note:e.note}});
+      voci.push({tipo:"el",chiave:`${A}|${M}`,dati:{anno:A,mese:M,sito:sd,F1:e.F1,F2:e.F2,F3:e.F3,kwh:e.kwh,kvarh:e.kvarh,kw_fatturata:e.kw,cosfi:e.cosfi,costo_imponibile:e.c,costo_iva_inclusa:e.ci,fonte:"inserimento manuale",fattura:e.fatt,note:e.note}});
+      voci.push({tipo:"fv",chiave:`${A}|${M}`,dati:fvMerge(A,M,{prelievo_kwh:e.kwh})});
+    }else if(trovaV("elettrico",A,M)||trova("elettrico_dettaglio",A,M)){
+      elim.push("Elettricità");voci.push({tipo:"mensile",chiave:`${A}|${M}|elettrico`,dati:null},{tipo:"el",chiave:`${A}|${M}`,dati:null});
+    }
+    /* gas */
+    const g={smc:num("g_smc"),c:num("g_c"),ci:num("g_ci"),iva:txt("g_iva"),fatt:txt("g_fatt"),note:txt("g_note")};
+    if(any(g)){
+      if(g.smc==null)throw new Error("Gas: indica i consumi in Smc.");
+      const s=sitoDi(["gas"],S1_DEF),sd=(trova("gas_dettaglio",A,M)||{}).sito||s.replace(/^S1 /,"");
+      voci.push({tipo:"mensile",chiave:`${A}|${M}|gas`,dati:{anno:A,mese:M,sito:s,vettore:"gas",quantita:g.smc,um:"Smc",costo:g.c,costo_iva:g.ci,note:g.note}});
+      voci.push({tipo:"gas",chiave:`${A}|${M}`,dati:{anno:A,mese:M,sito:sd,smc:g.smc,costo_imponibile:g.c,costo_iva_inclusa:g.ci,iva_aliquote:g.iva,fonte:"inserimento manuale",fattura:g.fatt,note:g.note}});
+    }else if(trovaV("gas",A,M)||trova("gas_dettaglio",A,M)){
+      elim.push("Gas");voci.push({tipo:"mensile",chiave:`${A}|${M}|gas`,dati:null},{tipo:"gas",chiave:`${A}|${M}`,dati:null});
+    }
+    /* carburanti */
+    ["gasolio","benzina","HVO","AdBlue"].forEach(f=>{
+      const c={q:num(`c_${f}_q`),c:num(`c_${f}_c`),i:num(`c_${f}_i`),n:txt(`c_${f}_n`)};
+      if(any(c)){
+        if(c.q==null)throw new Error(`${f}: indica i litri.`);
+        voci.push({tipo:"mensile",chiave:`${A}|${M}|${f}`,dati:{anno:A,mese:M,sito:sitoDi(["gasolio","benzina","HVO","AdBlue"],S2_DEF),vettore:f,quantita:c.q,um:"litri",costo:c.c,costo_iva:c.i,note:c.n}});
+      }else if(trovaV(f,A,M)){elim.push(f);voci.push({tipo:"mensile",chiave:`${A}|${M}|${f}`,dati:null})}
+    });
+    /* fotovoltaico */
+    const v={produzione_kwh:num("f_prod"),immissione_kwh:num("f_imm"),autoconsumo_kwh:num("f_auto"),producibile_kwh:num("f_prodb"),prp:num("f_prp"),kwp:num("f_kwp"),note:txt("f_note")};
+    const oldFv=trova("fv",A,M),hadFv=oldFv&&["produzione_kwh","immissione_kwh","autoconsumo_kwh","producibile_kwh","prp"].some(k=>oldFv[k]!=null);
+    if(v.prp!=null&&(v.prp<=0||v.prp>1.5))throw new Error("Prp deve essere un numero tra 0 e 1,5.");
+    if(v.produzione_kwh!=null||v.immissione_kwh!=null||v.autoconsumo_kwh!=null||v.producibile_kwh!=null||v.prp!=null||hadFv){
+      const i=voci.findIndex(x=>x.tipo==="fv"&&x.chiave===`${A}|${M}`);
+      const base=i>=0?voci[i].dati:null;
+      const patch=Object.assign({},v);if(v.kwp==null)delete patch.kwp;
+      if(base){// il prelievo appena salvato non va perso
+        patch.prelievo_kwh=base.prelievo_kwh;
+      }
+      const r=fvMerge(A,M,patch);
+      if(i>=0)voci[i].dati=r;else voci.push({tipo:"fv",chiave:`${A}|${M}`,dati:r});
+    }
+    /* km */
+    const k={km_benzina:num("k_ben"),km_gasolio:num("k_gas"),km_elettrico:num("k_el"),note:txt("k_note")};
+    if(any(k))voci.push({tipo:"km",chiave:`${A}|${M}`,dati:Object.assign({anno:A,mese:M},k)});
+    else if(trova("km_mensili",A,M)){elim.push("Km dei mezzi");voci.push({tipo:"km",chiave:`${A}|${M}`,dati:null})}
+    if(!voci.length){toast("Non c'è niente da salvare.");return}
+    if(elim.length&&!confirm(`Verranno eliminati i dati di ${MESI[M-1]} ${A}: ${elim.join(", ")}. Continuare?`))return;
+    saveVoci(voci);
+    toast(`Salvato ${MESI[M-1]} ${A}`);
+    render();
+  }catch(err){alert(err.message)}
+}
+
+const VIEWS={pan:[vPan,dPan],el:[vEl,dEl],gas:[vGas,dGas],carb:[vCarb,dCarb],fv:[vFv,dFv],flotta:[vFlotta,()=>{}],mon:[vMon,dMon],ins:[vIns,dIns],dati:[vDati,dDati],note:[vNote,()=>{}]};
 function render(){
   charts.forEach(c=>c.destroy());charts=[];
   const [v,d]=VIEWS[tab];
   document.getElementById("view").innerHTML=v();
   try{d()}catch(e){console.error(e)}
 }
-matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>D&&render());
-show();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>D&&D.mensili.length&&render());
+avvia();
 </script>
 </body>
 </html>
