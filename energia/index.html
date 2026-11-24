@@ -125,26 +125,26 @@ const SCADENZE=[
   {txt:"Offerta gas «Anno Sicuro Gas» (0,70 €/Smc materia prima)",data:"2026-11-30"},
   {txt:"Condizioni contratto elettrico (prezzo fisso F1/F2/F3)",data:"2027-01-31"}
 ];
-const TABS=[["pan","Panoramica"],["el","Elettricità"],["gas","Gas"],["carb","Carburanti"],["fv","Fotovoltaico"],["flotta","Flotta"],["mon","Monitoraggio"],["ins","＋ Inserisci mese"],["dati","Dati"],["note","Note e dubbi"]];
+const TABS=[["pan","Panoramica"],["el","Elettricità"],["gas","Gas"],["acq","Acqua"],["carb","Carburanti"],["fv","Fotovoltaico"],["flotta","Flotta"],["mon","Monitoraggio"],["ins","＋ Inserisci mese"],["dati","Dati"],["note","Note e dubbi"]];
 
 /* ---------- archivio e sincronizzazione ---------- */
 var ENERGIA_CONFIG={
   // Indirizzo del servizio (Cloudflare Worker, vedi api/worker.js), es.
   // "https://siciet-energia.<nome-account>.workers.dev/api".
   // Finché è vuoto la pagina funziona IN LOCALE: i dati restano solo sul dispositivo.
-  api:"",
+  api:"https://siciet-energia.amministrazione-c44.workers.dev/api",
   // Ogni quanti secondi si inviano le modifiche in attesa e si leggono quelle degli altri.
   secondi:30
 };
 const CFG=ENERGIA_CONFIG;
 // Versione della pagina: va aumentata a ogni modifica, così in fondo si vede quale è in uso.
-const VERSIONE="1.2",DATA_VERSIONE="24/11/2026";
+const VERSIONE="1.3",DATA_VERSIONE="24/11/2026";
 const KEY="siciet_energia_data_v1",KP="siciet_energia_pwd",KN="siciet_energia_nome",KQ="siciet_energia_coda";
 const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
-const ARR={mensile:"mensili",el:"elettrico_dettaglio",gas:"gas_dettaglio",fv:"fv",fv30:"fv30",km:"km_mensili",scheda:"monitoraggio"};
-const KEYOF={mensile:r=>`${r.anno}|${r.mese}|${r.vettore}`,el:r=>`${r.anno}|${r.mese}`,gas:r=>`${r.anno}|${r.mese}`,fv:r=>`${r.anno}|${r.mese}`,fv30:r=>`${r.anno}|${r.mese}`,km:r=>`${r.anno}|${r.mese}`,scheda:r=>`${r.pos}|${r.anno}`};
+const ARR={mensile:"mensili",el:"elettrico_dettaglio",gas:"gas_dettaglio",fv:"fv",fv30:"fv30",acqua:"acqua_fatture",km:"km_mensili",scheda:"monitoraggio"};
+const KEYOF={mensile:r=>`${r.anno}|${r.mese}|${r.vettore}`,el:r=>`${r.anno}|${r.mese}`,gas:r=>`${r.anno}|${r.mese}`,fv:r=>`${r.anno}|${r.mese}`,fv30:r=>`${r.anno}|${r.mese}`,acqua:r=>r.numero,km:r=>`${r.anno}|${r.mese}`,scheda:r=>`${r.pos}|${r.anno}`};
 const BASE=["siti","flotta","carburanti_per_mezzo_mese","note","fv_storico","fv_simulazione"];
-function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],fv30:[],fv_storico:[],fv_simulazione:{},flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
+function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],fv30:[],acqua_fatture:[],fv_storico:[],fv_simulazione:{},flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
 function norm(o){const v=vuoto(),d=Object.assign({},o);for(const k in v)if(d[k]==null)d[k]=v[k];return d}
 function applyVoce(v){
   if(v.tipo==="base"){if(!v.dati)return false;const a=JSON.stringify(D[v.chiave]);D[v.chiave]=v.dati.v;return a!==JSON.stringify(v.dati.v)}
@@ -154,7 +154,7 @@ function applyVoce(v){
   if(i>=0){if(JSON.stringify(arr[i])===JSON.stringify(v.dati))return false;arr[i]=v.dati}else arr.push(v.dati);
   return true;
 }
-function sortD(){["mensili","fv","fv30","elettrico_dettaglio","gas_dettaglio","km_mensili"].forEach(a=>D[a].sort((x,y)=>x.anno-y.anno||x.mese-y.mese||String(x.vettore||"").localeCompare(String(y.vettore||""))))}
+function sortD(){D.acqua_fatture.sort((x,y)=>x.dal.localeCompare(y.dal));["mensili","fv","fv30","elettrico_dettaglio","gas_dettaglio","km_mensili"].forEach(a=>D[a].sort((x,y)=>x.anno-y.anno||x.mese-y.mese||String(x.vettore||"").localeCompare(String(y.vettore||""))))}
 function vociDa(o){
   const out=[];
   for(const t in ARR)(o[ARR[t]]||[]).forEach(r=>out.push({tipo:t,chiave:KEYOF[t](r),dati:r}));
@@ -366,7 +366,7 @@ function vPan(){
   });
   const el=lastMonth("elettrico"),elOver=D.elettrico_dettaglio.filter(r=>r.kw_fatturata>30&&r.anno>=el.y-1).length;
   return h.join("")+`
-  <div class="grid">${kpi("Elettricità","elettrico","kWh")}${kpi("Gas","gas","Smc")}${kpi("Gasolio","gasolio","litri")}${kpi("Benzina","benzina","litri")}</div>
+  <div class="grid">${kpi("Elettricità","elettrico","kWh")}${kpi("Gas","gas","Smc")}${kpi("Gasolio","gasolio","litri")}${kpi("Benzina","benzina","litri")}${aqKpi()}</div>
   ${elOver?`<div class="alert warn" style="margin-top:12px">Potenza fatturata oltre i 30 kW disponibili in <b>${elOver}</b> mesi dal ${el.y-1}: verificare adeguamento potenza o penali.</div>`:""}
   <h2 class="sec">Consumi annui</h2>
   <div class="grid wide">${box("c1","Elettricità (kWh/anno)")}${box("c2","Gas (Smc/anno)")}${box("c3","Gasolio (litri/anno)")}${box("c4","Costo medio unitario (€)","Elettricità €/kWh e gas €/Smc, solo mesi con costo noto")}</div>
@@ -511,6 +511,194 @@ function vNote(){
   const siti=D.siti.map(s=>`<li><b>${esc(s.nome)}</b> — ${esc(s.indirizzo)}${(s.punti_fornitura||[]).map(p=>`<br><span class="muted">${esc(p.tipo)}: ${esc(p.codice||"")} · ${esc(p.fornitore||"")}</span>`).join("")}</li>`).join("");
   return L("Analisi e azioni",n.analisi)+L("Dubbi e dati incoerenti",n.dubbi)+L("Convenzioni",n.convenzioni)+`<div class="card"><h2>Siti e forniture</h2><ul class="note">${siti}</ul></div>`;
 }
+/* ---------- acqua ---------- */
+const AQ_UTENZA_ATTESA=()=>((D.acqua_fatture[D.acqua_fatture.length-1]||{}).utenza||"");
+const gg=s=>Date.UTC(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10))/864e5;
+const itd=s=>s?s.slice(8,10)+"/"+s.slice(5,7)+"/"+s.slice(0,4):"";
+const itdc=s=>s?s.slice(8,10)+"/"+s.slice(5,7)+"/"+s.slice(2,4):"";
+const addGg=(s,n)=>new Date((gg(s)+n)*864e5).toISOString().slice(0,10);
+function segmentiAcqua(){
+  const out=[];
+  D.acqua_fatture.forEach(f=>{
+    const r=(f.letture||[]).filter(l=>l.al>=f.dal),s=r.reduce((a,l)=>a+l.mc,0);
+    const lista=r.length&&Math.abs(s-f.mc)<=1?r.map(l=>({dal:l.dal,al:l.al,mc:l.mc})):[{dal:f.dal,al:f.al,mc:f.mc}];
+    lista.forEach(l=>out.push({dal:l.dal,al:l.al,mc:l.mc,stima:f.tipo==="acconto",fattura:f.numero,gg:gg(l.al)-gg(l.dal)+1}));
+  });
+  out.forEach(x=>x.gio=x.mc/x.gg);
+  out.sort((a,b)=>a.dal.localeCompare(b.dal));
+  const g=out.filter(x=>!x.stima).map(x=>x.gio).sort((a,b)=>a-b);
+  const mediana=g.length?g[Math.floor(g.length/2)]:0;
+  out.forEach(x=>x.anomalo=!x.stima&&mediana>0&&x.gio>mediana*2.5&&x.mc>=30);
+  return{seg:out,mediana};
+}
+function aqPerAnno(seg){
+  const a={};
+  seg.forEach(x=>{const d0=gg(x.dal);for(let i=0;i<x.gg;i++){const y=new Date((d0+i)*864e5).getUTCFullYear();a[y]=(a[y]||0)+x.gio}});
+  return a;
+}
+function aqFinestra(seg,fine,giorni){
+  let t=0;seg.forEach(x=>{const d0=gg(x.dal);for(let i=0;i<x.gg;i++){const d=d0+i;if(d<=fine&&d>fine-giorni)t+=x.gio}});return t;
+}
+function aqKpi(){
+  if(!D.acqua_fatture.length)return"";
+  const {seg}=segmentiAcqua(),f=D.acqua_fatture[D.acqua_fatture.length-1],fine=gg(seg[seg.length-1].al);
+  const c=aqFinestra(seg,fine,365),p=seg[0]&&gg(seg[0].dal)<=fine-365*2+1?aqFinestra(seg,fine-365,365):null;
+  return`<div class="card kpi"><h3>Acqua</h3><div class="v">${NF(c)} <small style="font-size:.9rem">m³</small></div><div class="s">ultimi 12 mesi al ${itd(seg[seg.length-1].al)} ${p?delta(pct(c,p))+" vs i 12 mesi prima":""}</div></div>`;
+}
+function vAcq(){
+  const fs=D.acqua_fatture;
+  const forma=`<details class="card ins" ${fs.length?"":"open"} id="aqForm"><summary>＋ Aggiungi fatture dell'acqua</summary>
+    <div class="tools" style="margin-top:10px"><label class="btn primary" style="cursor:pointer">Leggi fatture PDF<input type="file" id="aqPdf" accept="application/pdf" multiple hidden></label><span class="muted">Scegli una o più fatture dell'Acquedotto del Fiora: la lettura avviene nel browser, i file non vengono inviati; vedrai un'anteprima prima di salvare.</span></div>
+    <div id="aqAnt"></div>
+    <details style="margin-top:10px"><summary class="muted" style="cursor:pointer">Oppure inserisci i dati a mano</summary><div class="frm">
+      ${fld("a_num","N. fattura","",{t:1})}<label class="f"><span>Emessa il</span><input id="a_em" type="date" data-lab="Emessa il"></label>
+      <label class="f"><span>Periodo dal</span><input id="a_dal" type="date" data-lab="Periodo dal"></label><label class="f"><span>Periodo al</span><input id="a_al" type="date" data-lab="Periodo al"></label>
+      <label class="f"><span>Tipo</span><select id="a_tipo"><option value="saldo">A saldo</option><option value="acconto">In acconto (stimato)</option></select></label>
+      ${fld("a_mc","Consumo del periodo m³","")}${fld("a_imp","€ imponibile","")}${fld("a_iva","€ IVA","")}${fld("a_tot","€ totale fattura","")}${fld("a_note","Note","",{t:1})}
+    </div><div class="tools" style="margin-top:10px"><button class="btn primary" id="a_salva">Salva la fattura</button></div></details></details>`;
+  if(!fs.length)return forma+`<div class="alert warn" style="margin-top:12px">Non ci sono ancora fatture dell'acqua.</div>`;
+  const {seg,mediana}=segmentiAcqua(),ult=seg[seg.length-1],lf=fs[fs.length-1];
+  const an=seg.filter(x=>x.anomalo).map(x=>`<div class="alert err"><b>Consumo anomalo dal ${itd(x.dal)} al ${itd(x.al)}</b>: ${NF(x.gio,1)} m³ al giorno (${NF(x.mc)} m³ in ${x.gg} giorni), ${NF(x.gio/mediana,1)} volte la mediana di ${NF(mediana,1)} m³ al giorno. Controllare l'impianto: può essere una perdita.</div>`).join("");
+  const cr=fs.filter(f=>f.totale<0).map(f=>`<div class="alert warn">La fattura <b>${f.numero}</b> del ${itd(f.emessa)} è di <b>credito</b> (${EUR(f.imponibile,2)} imponibile): conguaglio che applica la tariffa depenalizzata, compatibile con una perdita occulta riconosciuta.</div>`).join("");
+  const vecchia=(Date.now()/864e5-gg(lf.al))>120?`<div class="alert warn">L'ultima fattura dell'acqua copre fino al ${itd(lf.al)}: ne manca una?</div>`:"";
+  const k=(t,v,u,s)=>`<div class="card kpi"><h3>${t}</h3><div class="v">${v} <small style="font-size:.9rem">${u}</small></div><div class="s">${s}</div></div>`;
+  const fine=gg(ult.al),c12=aqFinestra(seg,fine,365);
+  const righe=fs.slice().reverse().map(f=>`<tr><td class="l">${esc(f.numero)}</td><td>${itd(f.emessa)}</td><td>${itd(f.dal)} – ${itd(f.al)}</td><td class="l">${f.tipo==="acconto"?"acconto":"saldo"}</td><td>${NF(f.mc)}</td><td>${NF(f.imponibile,2)}</td><td>${NF(f.iva,2)}</td><td>${NF(f.totale,2)}</td><td class="l" style="white-space:normal;min-width:180px;color:var(--muted)">${esc(f.note||"")}</td><td><button class="btn aqE" data-n="${esc(f.numero)}" title="Correggi">✎</button> <button class="btn aqX" data-n="${esc(f.numero)}" title="Elimina">🗑</button></td></tr>`).join("");
+  return vecchia+an+cr+`<div class="grid">
+    ${k("Ultimi 12 mesi",NF(c12),"m³","fino al "+itd(ult.al))}
+    ${k("Ultimo periodo",NF(ult.gio,2),"m³ al giorno",itd(ult.dal)+" – "+itd(ult.al)+" · mediana "+NF(mediana,2))}
+    ${k("Ultima fattura",NF(lf.imponibile,2),"€ imponibile",itd(lf.emessa)+" · "+NF(lf.mc)+" m³")}
+  </div>
+  <div class="grid wide" style="margin-top:14px">${box("q1","Consumo al giorno per periodo di lettura (m³)","Linea tratteggiata: mediana. Barre rosse: consumo anomalo; grigie: stima in acconto")}${box("q2","Consumo annuo (m³)","Ripartito sui giorni di ogni periodo; l'ultimo anno è parziale")}
+  ${box("q3","Importo imponibile di ogni fattura (€)","Per data di emissione; il credito di conguaglio compare in negativo")}${box("q4","Costo medio per m³ (€ imponibile)","Fatture emesse nell'anno / consumo di quelle fatture, con quota fissa e depurazione. Il 2026 è basso perché comprende il credito di marzo, che riguarda i consumi del 2025")}</div>
+  <div class="card" style="margin-top:14px"><h2>Fatture (${fs.length})</h2><div class="scroll"><table><thead><tr><th class="l">Numero</th><th>Emessa</th><th>Periodo</th><th class="l">Tipo</th><th>m³</th><th>€ imponibile</th><th>€ IVA</th><th>€ totale</th><th class="l">Note</th><th></th></tr></thead><tbody>${righe}</tbody></table></div></div>
+  ${forma}`;
+}
+function dAcq(){
+  document.getElementById("aqPdf").onchange=e=>leggiFattureAcqua([...e.target.files]).then(()=>e.target.value="");
+  document.getElementById("a_salva").onclick=salvaFatturaManuale;
+  document.querySelectorAll(".aqX").forEach(b=>b.onclick=()=>{const n=b.dataset.n;if(confirm("Eliminare la fattura "+n+"?")){saveVoci([{tipo:"acqua",chiave:n,dati:null}]);render()}});
+  document.querySelectorAll(".aqE").forEach(b=>b.onclick=()=>{
+    const f=D.acqua_fatture.find(x=>x.numero===b.dataset.n);if(!f)return;
+    const set=(id,v)=>document.getElementById(id).value=v==null?"":v;
+    const det=document.querySelector("#aqForm");det.open=true;det.querySelector("details").open=true;
+    set("a_num",f.numero);set("a_em",f.emessa);set("a_dal",f.dal);set("a_al",f.al);set("a_tipo",f.tipo);set("a_mc",num2(f.mc,3));set("a_imp",num2(f.imponibile,2));set("a_iva",num2(f.iva,2));set("a_tot",num2(f.totale,2));set("a_note",f.note);
+    det.scrollIntoView({behavior:"smooth"});
+  });
+  if(!D.acqua_fatture.length)return;
+  const c=COL(),{seg,mediana}=segmentiAcqua();
+  chart("q1",{type:"bar",data:{labels:seg.map(x=>itdc(x.dal)+" → "+itdc(x.al)),datasets:[{label:"m³ al giorno",data:seg.map(x=>x.gio),backgroundColor:seg.map(x=>x.anomalo?cv("--err"):x.stima?c[4]:c[0]),order:2},{type:"line",label:"Mediana",data:seg.map(()=>mediana),borderColor:c[1],borderDash:[6,4],pointRadius:0,order:1}]},options:{scales:{x:{ticks:{maxTicksLimit:10}},y:{beginAtZero:true,title:{display:true,text:"m³ al giorno"}}}}});
+  const pa=aqPerAnno(seg),ys=Object.keys(pa).map(Number).sort(),ult=seg[seg.length-1],yl=+ult.al.slice(0,4),primo=seg[0].dal;
+  const parz=y=>(y===yl&&ult.al<y+"-12-31")||(y===+primo.slice(0,4)&&primo>y+"-01-01");
+  chart("q2",{type:"bar",data:{labels:ys.map(y=>parz(y)?y+" (parz.)":y),datasets:[{label:"m³",data:ys.map(y=>pa[y]),backgroundColor:ys.map(y=>parz(y)?c[4]:c[0])}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,title:{display:true,text:"m³"}}}}});
+  const fs=D.acqua_fatture;
+  chart("q3",{type:"bar",data:{labels:fs.map(f=>MESI[+f.emessa.slice(5,7)-1]+" "+f.emessa.slice(2,4)),datasets:[{label:"€ imponibile",data:fs.map(f=>f.imponibile),backgroundColor:fs.map(f=>f.imponibile<0?c[2]:c[0])}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:12}},y:{title:{display:true,text:"€"}}}}});
+  const ya=[...new Set(fs.map(f=>+f.emessa.slice(0,4)))].sort();
+  chart("q4",{type:"line",data:{labels:ya,datasets:[{label:"€/m³",data:ya.map(y=>{const r=fs.filter(f=>+f.emessa.slice(0,4)===y),m=r.reduce((s,f)=>s+f.mc,0);return m?r.reduce((s,f)=>s+f.imponibile,0)/m:null}),borderColor:c[1],backgroundColor:c[1],tension:.2}]},options:{plugins:{legend:{display:false}},scales:{y:{title:{display:true,text:"€/m³ (IVA esclusa)"}}}}});
+}
+function datiFatturaManuale(){
+  const q=id=>document.getElementById(id),n=id=>parseNum(q(id).value),f={
+    numero:q("a_num").value.trim(),emessa:q("a_em").value,dal:q("a_dal").value,al:q("a_al").value,tipo:q("a_tipo").value,
+    mc:n("a_mc"),imponibile:n("a_imp"),iva:n("a_iva"),totale:n("a_tot"),note:q("a_note").value.trim()};
+  if(!f.numero||!f.emessa||!f.dal||!f.al)throw new Error("Indica numero fattura, data di emissione e periodo.");
+  if(f.dal>f.al)throw new Error("Il periodo è al contrario: «dal» è dopo «al».");
+  if(f.mc==null||f.imponibile==null||f.totale==null)throw new Error("Indica consumo, imponibile e totale.");
+  if(f.iva==null)f.iva=round(f.totale-f.imponibile,2);
+  if(Math.abs(f.imponibile+f.iva-f.totale)>0.05)throw new Error("Imponibile + IVA non fa il totale della fattura.");
+  const old=D.acqua_fatture.find(x=>x.numero===f.numero)||{};
+  return Object.assign({extra:null,utenza:old.utenza||AQ_UTENZA_ATTESA(),contatore:old.contatore||"",letture:old.letture||[]},old,f);
+}
+function salvaFatturaManuale(){
+  try{
+    const f=datiFatturaManuale(),ex=D.acqua_fatture.find(x=>x.numero===f.numero);
+    if(ex&&!confirm("La fattura "+f.numero+" c'è già: sostituirla?"))return;
+    saveVoci([{tipo:"acqua",chiave:f.numero,dati:f}]);toast("Fattura "+f.numero+" salvata");render();
+  }catch(e){alert(e.message)}
+}
+/* lettura dei PDF dell'Acquedotto del Fiora */
+function caricaPdfJs(){
+  return new Promise((ok,ko)=>{
+    if(window.pdfjsLib)return ok();
+    const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js";
+    s.onload=()=>{pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";ok()};
+    s.onerror=()=>ko(new Error("Impossibile caricare il lettore PDF: serve la connessione a Internet."));
+    document.head.appendChild(s);
+  });
+}
+async function testoPdf(file){
+  await caricaPdfJs();
+  const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;let out="";
+  const righeDi=items=>{
+    const righe=[];
+    items.sort((a,b)=>b.y-a.y).forEach(i=>{
+      let best=null,d=3.5;righe.forEach(r=>{const dd=Math.abs(r.y-i.y);if(dd<=d){d=dd;best=r}});
+      if(best)best.it.push(i);else righe.push({y:i.y,it:[i]});
+    });
+    return righe.sort((a,b)=>b.y-a.y).map(r=>r.it.sort((a,b)=>a.x-b.x).map(i=>i.s).join(" "));
+  };
+  for(let p=1;p<=pdf.numPages;p++){
+    const pg=await pdf.getPage(p),w=pg.view[2],c=await pg.getTextContent();
+    const it=c.items.filter(i=>i.str.trim()).map(i=>({s:i.str,x:i.transform[4],y:i.transform[5]}));
+    // la prima pagina ha due colonne (dati e riepilogo): si leggono separate, le altre sono tabelle a tutta larghezza
+    const parti=p===1?[it.filter(i=>i.x<w*0.52),it.filter(i=>i.x>=w*0.52)]:[it];
+    parti.forEach(x=>{out+=righeDi(x).join("\n")+"\n"});
+    out+="\n";
+  }
+  return out;
+}
+function parseAcqua(testo){
+  const t=testo.replace(/−/g,"-").replace(/\s+/g," "),D2="(\\d\\d/\\d\\d/\\d{4})";
+  const iso=s=>s.split("/").reverse().join("-"),nm=s=>s==null?null:parseFloat(s.replace(/\./g,"").replace(",","."));
+  const g=re=>{const m=t.match(re);return m?m[1]:null};
+  const avvisi=[],f={};
+  f.numero=g(/Numero Fattura (\d{8,})/);
+  const em=g(new RegExp("Emessa il "+D2)),pr=t.match(new RegExp("Periodo di riferimento "+D2+" - "+D2));
+  if(!f.numero||!em||!pr)throw new Error("Non sembra una fattura dell'Acquedotto del Fiora (mancano numero, data o periodo).");
+  f.emessa=iso(em);f.dal=iso(pr[1]);f.al=iso(pr[2]);
+  f.tipo=/PER CONSUMO STIMATO IN ACCONTO/.test(t)?"acconto":"saldo";
+  const imp=nm(g(/Totale imponibile (-?[\d.]+,\d\d)/)),iva=nm(g(/Totale IVA (-?[\d.]+,\d\d)/)),tot=nm(g(/TOTALE FATTURA (-?[\d.]+,\d\d)/));
+  if(imp==null||iva==null||tot==null)throw new Error("Fattura "+f.numero+": non trovo imponibile, IVA o totale.");
+  f.imponibile=imp;f.iva=iva;f.totale=tot;
+  if(Math.abs(imp+iva-tot)>0.02)avvisi.push("imponibile + IVA non fa il totale della fattura");
+  const mcf=g(/Consumo fatturato (-?\d+) ?mc/),acc=g(/acconto già fatturati nelle bollette precedenti (-?\d+) mc/);
+  if(mcf==null)throw new Error("Fattura "+f.numero+": non trovo il consumo fatturato.");
+  f.mc_fatturato=+mcf;const a=acc?+acc:0;f.mc=f.mc_fatturato+a;
+  const ex=g(/Addebiti Accrediti extra Fattura (-?[\d.]+,\d\d)/);f.extra=ex?nm(ex):null;
+  f.utenza=g(/CODICE UTENZA: (\d+)/)||"";f.contatore=g(/Matricola Contatore: (\d+)/)||"";
+  f.letture=[];const re=new RegExp(D2+" "+D2+" ((?:Lettura|Autolettura|Stima)[A-Za-zà ]*?) ([\\d.]+) ([\\d.]+) (\\d+) (-?\\d+)(?= )","g");let m;
+  while((m=re.exec(t))){const l={dal:iso(m[1]),al:iso(m[2]),tipo:m[3].trim(),da:+m[4].replace(/\./g,""),a:+m[5].replace(/\./g,""),mc:+m[7]};if(!f.letture.some(x=>x.dal===l.dal&&x.al===l.al&&x.mc===l.mc))f.letture.push(l)}
+  const note=[];
+  if(f.tipo==="acconto")note.push("fattura in acconto su consumo stimato");
+  if(a)note.push(`conguaglio: consumo fatturato ${mcf} m³ meno ${-a} m³ già fatturati in acconto`);
+  if(/rateizzat/i.test(t))note.push("bolletta rateizzata");
+  if(tot<0)note.push("fattura di credito (conguaglio con tariffa depenalizzata)");
+  if(f.extra)note.push(`addebiti/accrediti extra fattura ${(f.extra>0?"+":"")+NF(f.extra,2)} € (rata o compensazione, non è un costo di consumo)`);
+  f.note=note.join("; ");
+  const ut=AQ_UTENZA_ATTESA();
+  if(ut&&f.utenza&&f.utenza!==ut)avvisi.push(`codice utenza ${f.utenza} diverso da quello delle altre fatture (${ut})`);
+  const gh=gg(f.al)-gg(f.dal)+1,gio=f.mc/gh;
+  if(gh>0&&gio>3&&f.mc>=30)avvisi.push(`consumo alto: ${NF(gio,1)} m³ al giorno`);
+  return{fattura:f,avvisi};
+}
+let aqCoda=[];
+async function leggiFattureAcqua(files){
+  const el=document.getElementById("aqAnt");el.innerHTML='<p class="muted">Lettura in corso…</p>';
+  const ris=[],err=[];
+  for(const file of files){
+    try{const r=parseAcqua(await testoPdf(file));r.file=file.name;ris.push(r)}catch(e){err.push(`<div class="alert err"><b>${esc(file.name)}</b>: ${esc(e.message)}</div>`)}
+  }
+  const visti=new Set();
+  ris.forEach(r=>{const ex=D.acqua_fatture.find(x=>x.numero===r.fattura.numero);
+    r.stato=visti.has(r.fattura.numero)?"doppia":!ex?"nuova":JSON.stringify(ex)===JSON.stringify(r.fattura)||(ex.imponibile===r.fattura.imponibile&&ex.totale===r.fattura.totale&&ex.mc===r.fattura.mc)?"già presente":"diversa";
+    visti.add(r.fattura.numero)});
+  aqCoda=ris.filter(r=>r.stato==="nuova"||r.stato==="diversa");
+  const lab={nuova:'<span class="down">nuova</span>',"già presente":'<span class="muted">già presente</span>',diversa:'<span class="up">già presente, con dati diversi (sostituisce)</span>',doppia:'<span class="muted">file ripetuto (ignorata)</span>'};
+  el.innerHTML=err.join("")+(ris.length?`<div class="scroll" style="max-height:none;margin-top:10px"><table><thead><tr><th class="l">File</th><th class="l">Fattura</th><th>Periodo</th><th>m³</th><th>€ imponibile</th><th>€ totale</th><th class="l">Esito</th></tr></thead><tbody>${ris.sort((a,b)=>a.fattura.dal.localeCompare(b.fattura.dal)).map(r=>`<tr><td class="l" style="white-space:normal">${esc(r.file)}</td><td class="l">${r.fattura.numero}<br><span class="muted">${itd(r.fattura.emessa)}</span></td><td>${itd(r.fattura.dal)} – ${itd(r.fattura.al)}</td><td>${NF(r.fattura.mc)}</td><td>${NF(r.fattura.imponibile,2)}</td><td>${NF(r.fattura.totale,2)}</td><td class="l" style="white-space:normal">${lab[r.stato]}${r.avvisi.map(a=>`<br><span class="up">⚠ ${esc(a)}</span>`).join("")}${r.fattura.note?`<br><span class="muted">${esc(r.fattura.note)}</span>`:""}</td></tr>`).join("")}</tbody></table></div>
+  <div class="tools" style="margin-top:10px"><button class="btn primary" id="aqConf" ${aqCoda.length?"":"disabled"}>Salva ${aqCoda.length} ${aqCoda.length===1?"fattura":"fatture"}</button><span class="muted">${ris.length-aqCoda.length?"Le altre sono già presenti o ripetute.":""}</span></div>`:"");
+  const b=document.getElementById("aqConf");
+  if(b)b.onclick=()=>{saveVoci(aqCoda.map(r=>({tipo:"acqua",chiave:r.fattura.numero,dati:r.fattura})));toast(aqCoda.length+" fatture salvate");render()};
+}
+
 /* ---------- monitoraggio indicatori (scheda All. MGE) ---------- */
 const IND=[
   {pos:1,nome:"Consumo combustibili – Benzina",ogg:"Consumi: litri consumati ogni 100 km (l/km)×100",um:"l/100 km",dec:2,peggio:"su"},
@@ -541,7 +729,7 @@ function calcInd(pos,y,m){
   return{v,n:fr.length};
 }
 const schedaVal=(pos,y)=>{const r=D.monitoraggio.find(x=>x.pos===pos&&x.anno===y);return r?r.valore:null};
-const num2=(n,d)=>n==null?"":String(Number(n.toFixed(d))).replace(".",",");
+const num2=(n,d)=>n==null||n===""?"":String(Number(Number(n).toFixed(d))).replace(".",",");
 function parseNum(t){
   t=String(t==null?"":t).trim().replace(/\s/g,"");if(t==="")return null;
   if(t.includes(","))t=t.replace(/\./g,"").replace(",",".");
@@ -722,7 +910,7 @@ function salvaMese(){
   }catch(err){alert(err.message)}
 }
 
-const VIEWS={pan:[vPan,dPan],el:[vEl,dEl],gas:[vGas,dGas],carb:[vCarb,dCarb],fv:[vFv,dFv],flotta:[vFlotta,()=>{}],mon:[vMon,dMon],ins:[vIns,dIns],dati:[vDati,dDati],note:[vNote,()=>{}]};
+const VIEWS={pan:[vPan,dPan],el:[vEl,dEl],gas:[vGas,dGas],acq:[vAcq,dAcq],carb:[vCarb,dCarb],fv:[vFv,dFv],flotta:[vFlotta,()=>{}],mon:[vMon,dMon],ins:[vIns,dIns],dati:[vDati,dDati],note:[vNote,()=>{}]};
 function render(){
   charts.forEach(c=>c.destroy());charts=[];
   const [v,d]=VIEWS[tab];
