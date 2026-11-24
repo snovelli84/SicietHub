@@ -147,13 +147,13 @@ var ENERGIA_CONFIG={
 };
 const CFG=ENERGIA_CONFIG;
 // Versione della pagina: va aumentata a ogni modifica, così in fondo si vede quale è in uso.
-const VERSIONE="1.9",DATA_VERSIONE="24/11/2026";
+const VERSIONE="2.0",DATA_VERSIONE="24/11/2026";
 const KEY="siciet_energia_data_v1",KP="siciet_energia_pwd",KN="siciet_energia_nome",KQ="siciet_energia_coda";
 const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const ARR={mensile:"mensili",el:"elettrico_dettaglio",gas:"gas_dettaglio",fv:"fv",fv30:"fv30",acqua:"acqua_fatture",carbtx:"carb_tx",km:"km_mensili",scheda:"monitoraggio"};
 const KEYOF={mensile:r=>`${r.anno}|${r.mese}|${r.vettore}`,el:r=>`${r.anno}|${r.mese}`,gas:r=>`${r.anno}|${r.mese}`,fv:r=>`${r.anno}|${r.mese}`,fv30:r=>`${r.anno}|${r.mese}`,acqua:r=>r.numero,carbtx:r=>`${r.anno}|${r.mese}|${r.fonte}`,km:r=>`${r.anno}|${r.mese}`,scheda:r=>`${r.pos}|${r.anno}`};
-const BASE=["siti","flotta","carburanti_per_mezzo_mese","note","fv_storico","fv_simulazione","fv_impianti","fv_ricavi","interventi","riferimenti"];
-function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],fv30:[],acqua_fatture:[],carb_tx:[],fv_storico:[],fv_simulazione:{},fv_impianti:[],fv_ricavi:[],interventi:[],riferimenti:[],flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
+const BASE=["siti","flotta","carburanti_per_mezzo_mese","note","fv_storico","fv_simulazione","fv_impianti","fv_ricavi","interventi","riferimenti","gse_pagamenti"];
+function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],fv30:[],acqua_fatture:[],carb_tx:[],fv_storico:[],fv_simulazione:{},fv_impianti:[],fv_ricavi:[],interventi:[],riferimenti:[],gse_pagamenti:[],flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
 function norm(o){const v=vuoto(),d=Object.assign({},o);for(const k in v)if(d[k]==null)d[k]=v[k];return d}
 function applyVoce(v){
   if(v.tipo==="base"){if(!v.dati)return false;const a=JSON.stringify(D[v.chiave]);D[v.chiave]=v.dati.v;return a!==JSON.stringify(v.dati.v)}
@@ -463,6 +463,19 @@ function consumoAlto(){
   c.slice(-12).forEach(r=>{const p=c.find(x=>x.anno===r.anno-1&&x.mese===r.mese);if(p&&r.consumo_totale_kwh>p.consumo_totale_kwh*1.25)f.push(`${MESI[r.mese-1]} ${String(r.anno).slice(2)} ${"+"+NF((r.consumo_totale_kwh/p.consumo_totale_kwh-1)*100)}%`)});
   return f.length?`<div class="alert warn"><b>Consumo totale della sede in forte crescita</b> rispetto allo stesso mese dell'anno prima (prelievo + autoconsumo FV): ${f.join(", ")}. Non dipende solo dal fotovoltaico: è un consumo in più.</div>`:"";
 }
+function gseRiepilogo(){
+  const P=D.gse_pagamenti||[];if(!P.length)return"";
+  const ys=[...new Set(P.map(p=>p.data.slice(0,4)))].sort().reverse(),imps=[["54211","19,95 kWp"],["S09FSVC","29,75 kWp"]];
+  const somma=(l,k)=>l.reduce((s,p)=>s+(p[k]||0),0),inc=p=>p.tipo==="Incentivo"||p.tipo==="Conguaglio incentivo";
+  const righe=ys.flatMap(y=>imps.map(([c,n])=>{
+    const l=P.filter(p=>p.data.slice(0,4)===y&&p.impianto===c);if(!l.length)return"";
+    const i=l.filter(inc),v=l.filter(p=>p.tipo==="Vendita ritiro dedicato"),sc=l.filter(p=>p.tipo==="Scambio sul posto"),t=l.filter(p=>p.tipo==="Trattenuta GSE");
+    return`<tr><td class="l">${y}${y==="2026"?' <span class="muted">(fino a novembre)</span>':""}${y==="2024"?' <span class="muted">(solo dicembre)</span>':""}</td><td class="l">${n}</td><td>${NF(somma(i,"lordo"),0)}</td><td>${NF(somma(i,"ritenuta"),0)}</td><td>${NF(somma(v,"lordo"),0)}</td><td>${sc.length?NF(somma(sc,"lordo"),0):"–"}</td><td>${t.length?NF(somma(t,"netto"),0):"–"}</td><td><b>${NF(somma(l,"netto"),0)}</b></td></tr>`})).join("");
+  const el=P.slice().sort((a,b)=>b.data.localeCompare(a.data)).map(p=>`<tr><td class="l">${itd(p.data)}</td><td class="l">${p.impianto==="54211"?"19,95 kWp":"29,75 kWp"}</td><td class="l">${esc(p.tipo)}${p.convenzione?` <span class="muted">${esc(p.convenzione)}</span>`:""}</td><td class="l">${esc(p.documento)}</td><td>${p.lordo!=null?NF(p.lordo,2):""}</td><td>${p.ritenuta?NF(p.ritenuta,2):""}</td><td>${NF(p.netto,2)}</td></tr>`).join("");
+  return`<div class="card" style="margin-top:14px"><h2>Pagamenti GSE incassati (€)</h2><div class="scroll" style="max-height:none"><table><thead><tr><th class="l">Anno</th><th class="l">Impianto</th><th>Incentivo lordo</th><th>Ritenuta 4%</th><th>Vendita ritiro dedicato</th><th>Scambio sul posto</th><th>Trattenute GSE</th><th>Netto incassato</th></tr></thead><tbody>${righe}</tbody></table></div>
+    <p class="muted" style="margin-top:6px">Per data valuta. Il portale GSE mostra solo gli ultimi 24 mesi (da dicembre 2024). Il netto è il bonifico dopo la ritenuta e le compensazioni trattenute dal GSE. Le trattenute (costi amministrativi e altre somme dovute) hanno il dettaglio da aprire.</p>
+    <details style="margin-top:8px"><summary class="muted" style="cursor:pointer">Elenco dei ${P.length} pagamenti</summary><div class="scroll"><table><thead><tr><th class="l">Data valuta</th><th class="l">Impianto</th><th class="l">Voce</th><th class="l">Documento</th><th>Lordo</th><th>Ritenuta</th><th>Netto</th></tr></thead><tbody>${el}</tbody></table></div></details></div>`;
+}
 function vFv(){
   const pr=D.fv.filter(r=>r.produzione_kwh!=null),u=pr.slice(-12),f30=D.fv30.slice(-12);
   const sum=(a,k)=>a.reduce((s,r)=>s+(r[k]||0),0);
@@ -482,10 +495,11 @@ function vFv(){
   <div class="grid wide" style="margin-top:14px">
     ${box("f1","Produzione 20 kW per mese (kWh)")}${box("f2","Autoconsumo e immissione 20 kW (kWh)")}
     ${box("f3","Copertura FV del consumo (%)","Autoconsumo / (prelievo + autoconsumo)")}${box("f7","Consumo totale della sede per mese (kWh)","Prelievo da rete + autoconsumo FV, confronto tra anni")}${box("f4","Produzione annua per impianto (kWh)","Anni parziali in colore più chiaro. 29,75 kW: 2008–2020 dal file Excel in energia lorda GSE (circa +5% sulla misurata)")}
-    ${box("f5","Impianto 29,75 kW per mese (kWh)")}${box("f6","Ricavi annui dagli impianti (€)",D.fv_ricavi.length?"Dati GSE, IVA esclusa; il 2026 comprende solo gli acconti. Dal 2023 manca l'incentivo del 29,75 kW (da verificare nel Conto Energia 1): il calo dei ricavi è un dato mancante, non una perdita":"Vendita dell'energia e tariffa incentivante; dal 2023 gli importi non sono più registrati")}
+    ${box("f5","Impianto 29,75 kW per mese (kWh)")}${box("f6","Ricavi annui dagli impianti (€)",D.fv_ricavi.length?"Dati GSE (lordo, prima della ritenuta). Incentivi del 19,95 kWp: per competenza fino al 2024, per data di incasso dal 2025. Incentivo del 29,75 kWp: 2021–2022 dal file Excel, dicembre 2024 e poi per data di incasso; il 2023 e gennaio–novembre 2024 mancano (il portale mostra solo gli ultimi 24 mesi): il calo non è una perdita. Il 2026 è fino a novembre":"Vendita dell'energia e tariffa incentivante; dal 2023 gli importi non sono più registrati")}
   </div>
   ${D.fv_impianti.length?`<div class="card" style="margin-top:14px"><h2>Impianti</h2><div class="scroll"><table><thead><tr><th class="l">Codice GSE</th><th>kWp</th><th>In esercizio dal</th><th class="l">Convenzioni</th><th>Tariffa €/kWh</th><th>Fine incentivo</th><th class="l">POD</th><th class="l">Indirizzo</th></tr></thead><tbody>${D.fv_impianti.map(i=>`<tr><td class="l"><b>${esc(i.codice)}</b></td><td>${NF(i.potenza_kw,2)}</td><td>${itd(i.entrata_esercizio)}</td><td class="l" style="white-space:normal;min-width:260px">${esc(i.convenzione)}</td><td>${i.tariffa_eur_kwh!=null?NF(i.tariffa_eur_kwh,3):"n.d."}</td><td>${i.scadenza_incentivo?itd(i.scadenza_incentivo)+(i.scadenza_calcolata?' <span class="muted">(calcolata)</span>':""):'<span class="muted">n.d.</span>'}</td><td class="l">${esc(i.pod||"")}</td><td class="l" style="white-space:normal">${esc(i.indirizzo||"")}</td></tr>`).join("")}</tbody></table></div><p class="muted" style="margin-top:6px">${D.fv_impianti.map(i=>i.note?esc(i.codice)+": "+esc(i.note):"").filter(Boolean).join(" · ")}</p></div>`:""}
   ${D.interventi.length?`<div class="card" style="margin-top:14px"><h2>Interventi sugli impianti</h2><div class="scroll"><table><thead><tr><th class="l">Periodo</th><th class="l">Impianto</th><th class="l">Descrizione</th><th>Costo €</th></tr></thead><tbody>${D.interventi.map(i=>`<tr><td class="l">${esc(i.da)}${i.a&&i.a!==i.da?" – "+esc(i.a):""}</td><td class="l">${esc(i.impianto||"")}</td><td class="l" style="white-space:normal">${esc(i.descrizione)}</td><td>${i.costo!=null?NF(i.costo,2):"n.d."}</td></tr>`).join("")}</tbody></table></div></div>`:""}
+  ${gseRiepilogo()}
   ${sim?`<div class="card" style="margin-top:14px"><h2>Simulazione nuovo impianto con accumulo</h2><p class="muted" style="margin-bottom:8px">${esc(sim.descrizione||"")}</p>
     <div class="grid" style="margin-bottom:10px">${Object.entries(sim.indici_autoconsumo||{}).map(([n,v])=>k("Indice di autoconsumo – "+n,NF(v*100,0),"%","")).join("")}</div>
     <div class="scroll"><table><thead><tr><th class="l">Mese</th><th>Produzione nuovo impianto</th><th>Consumo totale</th><th>Autoconsumo</th><th>Immissione</th><th>Da accumulo</th><th>Totale autoconsumo</th></tr></thead><tbody>${sim.mesi.map(m=>`<tr><td class="l">${esc(m.mese)}</td><td>${NF(m.produzione)}</td><td>${NF(m.consumo_totale)}</td><td>${NF(m.autoconsumo)}</td><td>${NF(m.immissione)}</td><td>${NF(m.autoconsumo_accumulo)}</td><td>${NF(m.totale_autoconsumo)}</td></tr>`).join("")}</tbody></table></div></div>`:""}`;
