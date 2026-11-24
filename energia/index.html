@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SICIET Energia</title>
+<meta name="theme-color" content="#005baa">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="icons/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root{
+  --brand:#005baa;--bg:#f4f6f9;--card:#fff;--text:#1d2430;--muted:#5d6878;--border:#e3e7ee;
+  --chip:#e8eef6;--warn:#7a5600;--warn-bg:#fff4d6;--err:#b3261e;--err-bg:#fbe4e2;--ok:#1e7d3c;
+  --c1:#005baa;--c2:#e07b00;--c3:#2a9d6f;--c4:#8a5cc2;--c5:#9aa6b5;--grid:#e3e7ee;
+  --shadow:0 2px 10px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#11161d;--card:#1a212b;--text:#e8edf3;--muted:#9aa6b5;--border:#2a3340;--chip:#232c38;
+  --warn:#f1d38a;--warn-bg:#3a3018;--err:#f2b8b5;--err-bg:#3a1d1b;--ok:#7fd59a;
+  --c1:#6fb0ee;--c2:#f0a040;--c3:#5fcf9f;--c4:#b99bea;--c5:#7f8b9a;--grid:#2a3340;--shadow:0 2px 10px rgba(0,0,0,.4)}
+}
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.4}
+header{background:var(--brand);color:#fff;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+header img{width:34px;height:34px;border-radius:8px;background:#fff}
+header h1{font-size:1.15rem;flex:1}
+header small{opacity:.85;font-size:.78rem}
+.btn{border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:8px;padding:7px 12px;font-size:.85rem;cursor:pointer}
+header .btn{background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.35)}
+.btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+nav{display:flex;gap:6px;overflow-x:auto;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5}
+nav button{border:0;background:var(--chip);color:var(--text);padding:8px 14px;border-radius:999px;font-size:.88rem;white-space:nowrap;cursor:pointer}
+nav button.on{background:var(--brand);color:#fff}
+main{max-width:1200px;margin:0 auto;padding:16px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.grid.wide{grid-template-columns:repeat(auto-fit,minmax(420px,1fr))}
+@media(max-width:520px){.grid.wide{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;box-shadow:var(--shadow);min-width:0}
+.card h2{font-size:.95rem;margin-bottom:8px}
+.card h3{font-size:.8rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.kpi .v{font-size:1.7rem;font-weight:700;margin:4px 0 2px}
+.kpi .s{font-size:.82rem;color:var(--muted)}
+.up{color:var(--err)}.down{color:var(--ok)}
+.chartbox{position:relative;height:280px}
+.alert{border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:.9rem}
+.alert.warn{background:var(--warn-bg);color:var(--warn)}
+.alert.err{background:var(--err-bg);color:var(--err)}
+.sec{margin:18px 0 8px;font-size:1rem}
+table{width:100%;border-collapse:collapse;font-size:.83rem}
+th,td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}
+th:first-child,td:first-child,td.l,th.l{text-align:left}
+th{color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--card)}
+.scroll{overflow:auto;max-height:520px}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+select{padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text)}
+ul.note{padding-left:18px;font-size:.88rem}ul.note li{margin:5px 0}
+.muted{color:var(--muted);font-size:.8rem}
+#load{max-width:560px;margin:60px auto;text-align:center}
+#load .drop{border:2px dashed var(--border);border-radius:14px;padding:34px 16px;margin:18px 0;background:var(--card)}
+.tag{display:inline-block;background:var(--chip);border-radius:6px;padding:1px 7px;font-size:.75rem;margin-left:4px}
+</style>
+</head>
+<body>
+<header>
+  <img src="icons/icon-192.png" alt="">
+  <h1>SICIET Energia <small id="agg"></small></h1>
+  <button class="btn" id="btnLoad" hidden>Carica altro file</button>
+  <button class="btn" id="btnForget" hidden>Rimuovi dati</button>
+</header>
+
+<div id="load" hidden>
+  <h2>Carica i dati</h2>
+  <div class="drop">
+    <p>Seleziona il file <b>siciet_dashboard_data.json</b> generato dal progetto "Analisi Energetica".</p><br>
+    <input type="file" id="file" accept=".json,application/json">
+  </div>
+  <p class="muted">I dati restano solo su questo dispositivo (memoria del browser): non vengono inviati né pubblicati. Per aggiornarli basta caricare un nuovo file.</p>
+</div>
+
+<div id="app" hidden>
+  <nav id="tabs"></nav>
+  <main id="view"></main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+"use strict";
+const KEY="siciet_energia_data_v1";
+const MESI=["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"];
+const NF=(n,d=0)=>n==null||isNaN(n)?"n.d.":Number(n).toLocaleString("it-IT",{minimumFractionDigits:d,maximumFractionDigits:d,useGrouping:"always"});
+const EUR=(n,d=0)=>n==null||isNaN(n)?"n.d.":NF(n,d)+" €";
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const cv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const COL=()=>[cv("--c1"),cv("--c2"),cv("--c3"),cv("--c4"),cv("--c5")];
+const SCADENZE=[
+  {txt:"Offerta gas «Anno Sicuro Gas» (0,70 €/Smc materia prima)",data:"2026-11-30"},
+  {txt:"Condizioni contratto elettrico (prezzo fisso F1/F2/F3)",data:"2027-01-31"}
+];
+const TABS=[["pan","Panoramica"],["el","Elettricità"],["gas","Gas"],["carb","Carburanti"],["fv","Fotovoltaico"],["flotta","Flotta"],["dati","Dati"],["note","Note e dubbi"]];
+let D=null,tab="pan",charts=[];
+
+/* ---------- caricamento ---------- */
+function setData(obj,save){
+  if(!obj||!Array.isArray(obj.mensili)) throw new Error("File non valido: manca l'elenco «mensili».");
+  D=obj;
+  if(save){try{localStorage.setItem(KEY,JSON.stringify(obj))}catch(e){alert("Dati caricati ma non salvabili su questo dispositivo.")}}
+  show();
+}
+function show(){
+  document.getElementById("load").hidden=!!D;
+  document.getElementById("app").hidden=!D;
+  document.getElementById("btnLoad").hidden=!D;
+  document.getElementById("btnForget").hidden=!D;
+  if(!D) return;
+  const last=D.mensili.reduce((a,m)=>Math.max(a,m.anno*12+m.mese),0);
+  document.getElementById("agg").textContent="· dati fino a "+MESI[(last-1)%12]+" "+Math.floor((last-1)/12);
+  buildTabs();render();
+}
+document.getElementById("file").addEventListener("change",e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{try{setData(JSON.parse(r.result),true)}catch(err){alert(err.message)}};
+  r.readAsText(f);e.target.value="";
+});
+document.getElementById("btnLoad").onclick=()=>{D=null;show()};
+document.getElementById("btnForget").onclick=()=>{
+  if(confirm("Rimuovere i dati salvati su questo dispositivo?")){try{localStorage.removeItem(KEY)}catch(e){}D=null;show()}
+};
+try{const s=localStorage.getItem(KEY);if(s)D=JSON.parse(s)}catch(e){}
+function buildTabs(){
+  const n=document.getElementById("tabs");
+  n.innerHTML=TABS.map(([k,t])=>`<button data-k="${k}" class="${k===tab?"on":""}">${t}</button>`).join("");
+  n.onclick=e=>{const k=e.target.dataset.k;if(k){tab=k;buildTabs();render()}};
+}
+
+/* ---------- aggregazioni ---------- */
+const VET_UM={elettrico:"kWh",gas:"Smc",gasolio:"litri",benzina:"litri",HVO:"litri",AdBlue:"litri"};
+const rows=v=>D.mensili.filter(m=>m.vettore===v);
+const years=v=>[...new Set(rows(v).map(m=>m.anno))].sort();
+function monthly(v,y){const a=Array(12).fill(null);rows(v).filter(m=>m.anno===y).forEach(m=>a[m.mese-1]=m.quantita);return a}
+function annual(v,y){
+  const r=rows(v).filter(m=>m.anno===y);
+  const q=r.reduce((s,m)=>s+(m.quantita||0),0);
+  const rc=r.filter(m=>m.costo!=null&&m.quantita!=null);
+  return{q,mesi:r.length,qc:rc.reduce((s,m)=>s+m.quantita,0),c:rc.reduce((s,m)=>s+m.costo,0),mesiC:rc.length};
+}
+const complete=(v,y)=>annual(v,y).mesi===12;
+function lastMonth(v){const r=rows(v);const y=Math.max(...r.map(m=>m.anno));return{y,m:Math.max(...r.filter(m=>m.anno===y).map(m=>m.mese))}}
+function ytd(v,y,upTo){const r=rows(v).filter(m=>m.anno===y&&m.mese<=upTo);return r.reduce((s,m)=>s+(m.quantita||0),0)}
+function pct(a,b){return b?((a-b)/b*100):null}
+function delta(p){if(p==null)return"";return`<span class="${p>0?"up":"down"}">${p>0?"▲":"▼"} ${NF(Math.abs(p),1)}%</span>`}
+
+/* ---------- grafici ---------- */
+function chart(id,cfg){
+  const el=document.getElementById(id);if(!el)return;
+  const tx=cv("--muted"),gr=cv("--grid");
+  cfg.options=Object.assign({responsive:true,maintainAspectRatio:false,animation:false},cfg.options||{});
+  const o=cfg.options;o.plugins=Object.assign({legend:{labels:{color:tx,boxWidth:12}}},o.plugins||{});
+  o.scales=o.scales||{};
+  for(const k of Object.keys(o.scales)){const s=o.scales[k];s.ticks=Object.assign({color:tx},s.ticks);s.grid=Object.assign({color:gr},s.grid);if(s.title)s.title.color=tx}
+  charts.push(new Chart(el,cfg));
+}
+function box(id,title,sub){return`<div class="card"><h2>${title}</h2>${sub?`<p class="muted" style="margin-bottom:6px">${sub}</p>`:""}<div class="chartbox"><canvas id="${id}"></canvas></div></div>`}
+function yearLines(id,v,um){
+  const c=COL(),ys=years(v).slice(-5);
+  chart(id,{type:"line",data:{labels:MESI,datasets:ys.map((y,i)=>({label:y,data:monthly(v,y),borderColor:c[ys.length-1-i],backgroundColor:c[ys.length-1-i],tension:.25,pointRadius:2,spanGaps:false,borderWidth:i===ys.length-1?3:1.6}))},
+    options:{scales:{y:{title:{display:true,text:um}}}}});
+}
+function annualBars(id,v,um){
+  const ys=years(v).filter(y=>annual(v,y).q>0),c=COL();
+  chart(id,{type:"bar",data:{labels:ys.map(y=>complete(v,y)?y:y+" (parz.)"),datasets:[{label:um,data:ys.map(y=>annual(v,y).q),backgroundColor:ys.map(y=>complete(v,y)?c[0]:c[4])}]},
+    options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,title:{display:true,text:um}}}}});
+}
+function unitCost(id,v,um){
+  const ys=years(v),c=COL();
+  const d=ys.map(y=>{const a=annual(v,y);return a.qc>0?a.c/a.qc:null});
+  chart(id,{type:"line",data:{labels:ys.map(y=>{const a=annual(v,y);return a.mesiC&&a.mesiC<a.mesi?`${y} (${a.mesiC} mesi)`:y}),datasets:[{label:"€/"+um,data:d,borderColor:c[1],backgroundColor:c[1],tension:.2}]},
+    options:{plugins:{legend:{display:false}},scales:{y:{title:{display:true,text:"€/"+um+" (IVA esclusa)"}}}}});
+}
+function costBars(id,v){
+  const ys=years(v).filter(y=>annual(v,y).mesiC>0),c=COL();
+  chart(id,{type:"bar",data:{labels:ys.map(y=>{const a=annual(v,y);return a.mesiC<a.mesi?`${y} (${a.mesiC}/${a.mesi} mesi)`:y}),datasets:[{label:"€ imponibile",data:ys.map(y=>annual(v,y).c),backgroundColor:ys.map(y=>{const a=annual(v,y);return a.mesiC<a.mesi?c[4]:c[1]})}]},
+    options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,title:{display:true,text:"€ (IVA esclusa)"}}}}});
+}
+
+/* ---------- viste ---------- */
+function kpi(title,v,um,dec=0){
+  const lm=lastMonth(v),y=lm.y,full=lm.m===12;
+  const cur=ytd(v,y,lm.m),prev=ytd(v,y-1,lm.m),p=prev>0?pct(cur,prev):null;
+  return`<div class="card kpi"><h3>${title}</h3><div class="v">${NF(cur,dec)} <small style="font-size:.9rem">${um}</small></div>
+  <div class="s">${y} ${full?"anno":"gen–"+MESI[lm.m-1].toLowerCase()} ${p!=null?delta(p)+" vs "+(y-1):""}</div></div>`;
+}
+function vPan(){
+  const now=new Date(),h=[];
+  SCADENZE.forEach(s=>{
+    const g=Math.ceil((new Date(s.data)-now)/864e5);
+    if(g<=90)h.push(`<div class="alert ${g<=14?"err":"warn"}">${g>=0?`<b>Scade tra ${g} giorni</b>`:`<b>Scaduta da ${-g} giorni</b>`} (${new Date(s.data).toLocaleDateString("it-IT")}): ${s.txt}</div>`);
+  });
+  const el=lastMonth("elettrico"),elOver=D.elettrico_dettaglio.filter(r=>r.kw_fatturata>30&&r.anno>=el.y-1).length;
+  return h.join("")+`
+  <div class="grid">${kpi("Elettricità","elettrico","kWh")}${kpi("Gas","gas","Smc")}${kpi("Gasolio","gasolio","litri")}${kpi("Benzina","benzina","litri")}</div>
+  ${elOver?`<div class="alert warn" style="margin-top:12px">Potenza fatturata oltre i 30 kW disponibili in <b>${elOver}</b> mesi dal ${el.y-1}: verificare adeguamento potenza o penali.</div>`:""}
+  <h2 class="sec">Consumi annui</h2>
+  <div class="grid wide">${box("c1","Elettricità (kWh/anno)")}${box("c2","Gas (Smc/anno)")}${box("c3","Gasolio (litri/anno)")}${box("c4","Costo medio unitario (€)","Elettricità €/kWh e gas €/Smc, solo mesi con costo noto")}</div>
+  <p class="muted" style="margin-top:10px">Barre grigie = anno parziale. Costi IVA esclusa. Acqua, ricariche elettriche, fatturato e dipendenti non sono disponibili nel progetto.</p>`;
+}
+function dPan(){
+  annualBars("c1","elettrico","kWh");annualBars("c2","gas","Smc");annualBars("c3","gasolio","litri");
+  const c=COL(),ys=[...new Set([...years("elettrico"),...years("gas")])];
+  const f=v=>ys.map(y=>{const a=annual(v,y);return a.qc>0?a.c/a.qc:null});
+  chart("c4",{type:"line",data:{labels:ys,datasets:[{label:"Elettricità €/kWh",data:f("elettrico"),borderColor:c[0],backgroundColor:c[0],tension:.2},{label:"Gas €/Smc",data:f("gas"),borderColor:c[1],backgroundColor:c[1],tension:.2}]},options:{scales:{y:{title:{display:true,text:"€ (IVA esclusa)"}}}}});
+}
+function vEl(){
+  return`<div class="grid wide">${box("e1","Prelievo mensile per anno (kWh)")}${box("e2","Fasce F1/F2/F3 (kWh)")}${box("e3","Potenza fatturata (kW)","Linea tratteggiata: 30 kW disponibili")}${box("e4","Costo annuo (€)")}${box("e5","Costo medio €/kWh")}${box("e6","Energia reattiva e cos φ")}</div>
+  <p class="muted" style="margin-top:10px">Contratto: Enel Energia, prezzo fisso a fasce, ${esc((D.siti[0].punti_fornitura.find(p=>p.tipo==="elettrico")||{}).codice||"")}. Superficie ${NF(D.siti[0].superficie_mq)} m².</p>`;
+}
+function dEl(){
+  yearLines("e1","elettrico","kWh");
+  const c=COL(),r=D.elettrico_dettaglio.filter(x=>x.F1!=null).slice(-24),lab=x=>MESI[x.mese-1]+" "+String(x.anno).slice(2);
+  chart("e2",{type:"bar",data:{labels:r.map(lab),datasets:["F1","F2","F3"].map((k,i)=>({label:k,data:r.map(x=>x[k]),backgroundColor:c[i]}))},options:{scales:{x:{stacked:true},y:{stacked:true}}}});
+  const k=D.elettrico_dettaglio.filter(x=>x.kw_fatturata!=null);
+  chart("e3",{type:"line",data:{labels:k.map(lab),datasets:[{label:"kW fatturati",data:k.map(x=>x.kw_fatturata),borderColor:c[0],backgroundColor:c[0],pointRadius:2},{label:"Disponibile 30 kW",data:k.map(()=>30),borderColor:c[1],borderDash:[6,4],pointRadius:0}]},options:{scales:{x:{ticks:{maxTicksLimit:10}}}}});
+  costBars("e4","elettrico");unitCost("e5","elettrico","kWh");
+  const q=D.elettrico_dettaglio.filter(x=>x.cosfi!=null);
+  chart("e6",{type:"line",data:{labels:q.map(lab),datasets:[{label:"cos φ",data:q.map(x=>x.cosfi),borderColor:c[2],backgroundColor:c[2],yAxisID:"y"},{label:"Soglia 0,9",data:q.map(()=>.9),borderColor:c[1],borderDash:[6,4],pointRadius:0,yAxisID:"y"}]},options:{scales:{y:{min:.8,max:1},x:{ticks:{maxTicksLimit:10}}}}});
+}
+function vGas(){
+  return`<div class="grid wide">${box("g1","Consumo mensile per anno (Smc)")}${box("g2","Consumo annuo (Smc)")}${box("g3","Costo annuo (€)")}${box("g4","Costo medio €/Smc")}</div>
+  <p class="muted" style="margin-top:10px">Uso: riscaldamento uffici e acqua calda sanitaria. Il 2024 proviene dalla Diagnosi energetica (nessuna fattura nel progetto).</p>`;
+}
+function dGas(){yearLines("g1","gas","Smc");annualBars("g2","gas","Smc");costBars("g3","gas");unitCost("g4","gas","Smc")}
+const CARB=["gasolio","benzina","HVO","AdBlue"];
+function vCarb(){
+  const lm=lastMonth("gasolio");
+  const tot=(y)=>CARB.reduce((s,v)=>s+rows(v).filter(m=>m.anno===y).reduce((a,m)=>a+(m.costo||0),0),0);
+  return`<div class="grid wide">${box("k1","Litri mensili per carburante")}${box("k2","Gasolio per anno (litri)")}${box("k3","Costo mensile carburanti (€ IVA esclusa)")}${box("k4","Prezzo medio gasolio (€/l)")}</div>
+  <p class="muted" style="margin-top:10px">Fonti: Diagnosi 2024 (solo gasolio) poi carte Enilive, Q8, IP Plus dal dicembre 2024. L'ultimo mese è parziale (${MESI[lm.m-1]} ${lm.y}: IP Plus non più presente dopo il 25/09/2026). La CO₂ è calcolata solo per il gasolio (2,632 kg/l, derivato dalla Diagnosi).</p>`;
+}
+function dCarb(){
+  const c=COL(),keys=new Set();
+  CARB.forEach(v=>rows(v).forEach(m=>keys.add(m.anno*100+m.mese)));
+  const ks=[...keys].filter(k=>k>=202501).sort();
+  const lab=k=>MESI[(k%100)-1]+" "+String(Math.floor(k/100)).slice(2);
+  const val=(v,k,f)=>rows(v).filter(m=>m.anno*100+m.mese===k).reduce((s,m)=>s+(m[f]||0),0);
+  chart("k1",{type:"bar",data:{labels:ks.map(lab),datasets:["gasolio","benzina","HVO"].map((v,i)=>({label:v,data:ks.map(k=>val(v,k,"quantita")),backgroundColor:c[i]}))},options:{scales:{x:{stacked:true},y:{stacked:true,title:{display:true,text:"litri"}}}}});
+  annualBars("k2","gasolio","litri");
+  chart("k3",{type:"bar",data:{labels:ks.map(lab),datasets:["gasolio","benzina","HVO","AdBlue"].map((v,i)=>({label:v,data:ks.map(k=>val(v,k,"costo")),backgroundColor:c[i]}))},options:{scales:{x:{stacked:true},y:{stacked:true,title:{display:true,text:"€"}}}}});
+  const g=rows("gasolio").filter(m=>m.costo&&m.quantita);
+  chart("k4",{type:"line",data:{labels:g.map(m=>MESI[m.mese-1]+" "+String(m.anno).slice(2)),datasets:[{label:"€/l imponibile",data:g.map(m=>m.costo/m.quantita),borderColor:c[1],backgroundColor:c[1],tension:.2,pointRadius:2}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:10}}}}});
+}
+function vFv(){
+  const kwp=(D.fv.find(r=>r.kwp)||{}).kwp,a=D.fv.filter(r=>r.autoconsumo_kwh!=null);
+  const tot=a.reduce((s,r)=>s+r.autoconsumo_kwh,0),ct=a.reduce((s,r)=>s+(r.consumo_totale_kwh||0),0);
+  return`<div class="grid"><div class="card kpi"><h3>Potenza installata</h3><div class="v">${NF(kwp,2)} <small style="font-size:.9rem">kWp</small></div><div class="s">impianto datato, ~20 kWp</div></div>
+  <div class="card kpi"><h3>Autoconsumo 2024</h3><div class="v">${NF(tot)} <small style="font-size:.9rem">kWh</small></div><div class="s">${NF(ct?tot/ct*100:null,1)}% del consumo totale</div></div></div>
+  <div class="alert warn" style="margin-top:12px">Produzione e immissione in rete non sono disponibili nel progetto (solo l'autoconsumo 2024 dalla Diagnosi). Il raddoppio dei prelievi a luglio–agosto 2026 potrebbe indicare un calo del FV: da verificare con l'inverter o il portale del produttore.</div>
+  <div class="grid wide" style="margin-top:14px">${box("f1","Autoconsumo e prelievo da rete 2024 (kWh)")}${box("f2","Copertura FV del consumo 2024 (%)")}</div>`;
+}
+function dFv(){
+  const c=COL(),a=D.fv.filter(r=>r.autoconsumo_kwh!=null),l=r=>MESI[r.mese-1]+" "+r.anno;
+  chart("f1",{type:"bar",data:{labels:a.map(l),datasets:[{label:"Autoconsumo FV",data:a.map(r=>r.autoconsumo_kwh),backgroundColor:c[2]},{label:"Prelievo da rete",data:a.map(r=>r.prelievo_kwh),backgroundColor:c[0]}]},options:{scales:{x:{stacked:true,ticks:{maxTicksLimit:12}},y:{stacked:true}}}});
+  chart("f2",{type:"line",data:{labels:a.map(l),datasets:[{label:"% copertura",data:a.map(r=>r.copertura_fv_pct),borderColor:c[2],backgroundColor:c[2],tension:.25}]},options:{plugins:{legend:{display:false}},scales:{y:{min:0,max:60},x:{ticks:{maxTicksLimit:12}}}}});
+}
+function vFlotta(){
+  const km={};
+  D.carburanti_per_mezzo_mese.forEach(r=>{if(r.km_ricostruiti>0){const o=km[r.targa]||(km[r.targa]={l:0,k:0});o.l+=r.litri;o.k+=r.km_ricostruiti}});
+  const med=Object.values(km).map(o=>o.l/o.k*100).sort((a,b)=>a-b);const m=med[Math.floor(med.length/2)];
+  const rs=[...D.flotta].sort((a,b)=>b.litri_2025_26-a.litri_2025_26).map(f=>{
+    const o=km[f.targa],cons=o?o.l/o.k*100:null,anom=cons&&cons>(m*2);
+    return`<tr><td class="l"><b>${esc(f.targa)}</b></td><td class="l">${esc(f.modello||"")}</td><td class="l">${esc(f.alimentazione||"")}</td><td>${NF(f.litri_2025_26)}</td><td>${o?NF(o.k):"n.d."}</td><td class="${anom?"up":""}">${cons?NF(cons,1):"n.d."}${anom?" ⚠":""}</td><td class="l">${f.in_elenco_diagnosi?"":'<span class="tag">non in Diagnosi</span>'}</td></tr>`}).join("");
+  return`<div class="card"><h2>Mezzi (${D.flotta.length}) · litri 2025–2026</h2><p class="muted" style="margin-bottom:8px">Km ricostruiti dagli odometri (stime). Mediana flotta ${NF(m,1)} l/100 km; ⚠ = oltre il doppio, odometro probabilmente inaffidabile.</p>
+  <div class="scroll"><table><thead><tr><th class="l">Targa</th><th class="l">Modello</th><th class="l">Alim.</th><th>Litri</th><th>Km stimati</th><th>l/100 km</th><th></th></tr></thead><tbody>${rs}</tbody></table></div></div>`;
+}
+let fV="",fY="";
+function vDati(){
+  const vs=[...new Set(D.mensili.map(m=>m.vettore))],ys=[...new Set(D.mensili.map(m=>m.anno))].sort();
+  return`<div class="tools"><select id="fv"><option value="">Tutti i vettori</option>${vs.map(v=>`<option ${v===fV?"selected":""}>${v}</option>`).join("")}</select>
+  <select id="fy"><option value="">Tutti gli anni</option>${ys.map(y=>`<option ${String(y)===fY?"selected":""}>${y}</option>`).join("")}</select>
+  <button class="btn primary" id="exp">Esporta CSV</button></div>
+  <div class="card"><div class="scroll"><table><thead><tr><th class="l">Anno</th><th>Mese</th><th class="l">Vettore</th><th>Quantità</th><th class="l">UM</th><th>€ imponibile</th><th>€ IVA incl.</th><th class="l">Note</th></tr></thead><tbody id="tb"></tbody></table></div></div>`;
+}
+function datiRows(){return D.mensili.filter(m=>(!fV||m.vettore===fV)&&(!fY||String(m.anno)===fY)).sort((a,b)=>a.anno-b.anno||a.mese-b.mese||a.vettore.localeCompare(b.vettore))}
+function dDati(){
+  const t=document.getElementById("tb");
+  const draw=()=>{t.innerHTML=datiRows().map(m=>`<tr><td class="l">${m.anno}</td><td>${MESI[m.mese-1]}</td><td class="l">${esc(m.vettore)}</td><td>${NF(m.quantita,m.quantita%1?1:0)}</td><td class="l">${esc(m.um)}</td><td>${NF(m.costo,2)}</td><td>${NF(m.costo_iva,2)}</td><td class="l" style="white-space:normal;min-width:200px;color:var(--muted)">${esc(m.note)}</td></tr>`).join("")};
+  draw();
+  const sv=document.getElementById("fv"),sy=document.getElementById("fy");
+  sv.onchange=()=>{fV=sv.value;draw()};sy.onchange=()=>{fY=sy.value;draw()};
+  document.getElementById("exp").onclick=()=>{
+    const q=s=>'"'+String(s??"").replace(/"/g,'""')+'"';
+    const csv="anno;mese;vettore;quantita;um;costo_imponibile;costo_iva_inclusa;note\n"+datiRows().map(m=>[m.anno,m.mese,m.vettore,m.quantita,m.um,m.costo,m.costo_iva,q(m.note)].map(x=>x??"").join(";")).join("\n");
+    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["﻿"+csv],{type:"text/csv"}));a.download="consumi_siciet.csv";a.click();
+  };
+}
+function vNote(){
+  const n=D.note||{},L=(t,a)=>a&&a.length?`<div class="card" style="margin-bottom:14px"><h2>${t}</h2><ul class="note">${(Array.isArray(a)?a:Object.values(a)).map(x=>`<li>${esc(typeof x==="string"?x:JSON.stringify(x))}</li>`).join("")}</ul></div>`:"";
+  const siti=D.siti.map(s=>`<li><b>${esc(s.nome)}</b> — ${esc(s.indirizzo)}${(s.punti_fornitura||[]).map(p=>`<br><span class="muted">${esc(p.tipo)}: ${esc(p.codice||"")} · ${esc(p.fornitore||"")}</span>`).join("")}</li>`).join("");
+  return L("Analisi e azioni",n.analisi)+L("Dubbi e dati incoerenti",n.dubbi)+L("Convenzioni",n.convenzioni)+`<div class="card"><h2>Siti e forniture</h2><ul class="note">${siti}</ul></div>`;
+}
+const VIEWS={pan:[vPan,dPan],el:[vEl,dEl],gas:[vGas,dGas],carb:[vCarb,dCarb],fv:[vFv,dFv],flotta:[vFlotta,()=>{}],dati:[vDati,dDati],note:[vNote,()=>{}]};
+function render(){
+  charts.forEach(c=>c.destroy());charts=[];
+  const [v,d]=VIEWS[tab];
+  document.getElementById("view").innerHTML=v();
+  try{d()}catch(e){console.error(e)}
+}
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>D&&render());
+show();
+</script>
+</body>
+</html>
