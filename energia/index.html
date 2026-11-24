@@ -67,9 +67,10 @@ label.f input{padding:8px 10px;border-radius:8px;border:1px solid var(--border);
 details.ins{margin-bottom:12px}details.ins>summary{cursor:pointer;font-weight:700;font-size:.95rem}
 details.ins td{padding:4px 6px;border:0}
 a.tag{text-decoration:none;color:var(--text)}
+footer#ver{max-width:1200px;margin:8px auto 24px;padding:0 16px;font-size:.75rem;color:var(--muted);text-align:center}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--brand);color:#fff;padding:10px 18px;border-radius:999px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
 #toast.on{opacity:1}
-@media print{header,nav,.tools .btn,#stato{display:none!important}body{background:#fff}.card{box-shadow:none}input.sv{border:0;background:none}}
+@media print{header,nav,footer#ver,.tools .btn,#stato{display:none!important}body{background:#fff}.card{box-shadow:none}input.sv{border:0;background:none}}
 </style>
 </head>
 <body>
@@ -109,6 +110,8 @@ a.tag{text-decoration:none;color:var(--text)}
   <main id="view"></main>
 </div>
 
+<footer id="ver"></footer>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 "use strict";
@@ -134,12 +137,14 @@ var ENERGIA_CONFIG={
   secondi:30
 };
 const CFG=ENERGIA_CONFIG;
+// Versione della pagina: va aumentata a ogni modifica, così in fondo si vede quale è in uso.
+const VERSIONE="1.2",DATA_VERSIONE="24/11/2026";
 const KEY="siciet_energia_data_v1",KP="siciet_energia_pwd",KN="siciet_energia_nome",KQ="siciet_energia_coda";
 const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
-const ARR={mensile:"mensili",el:"elettrico_dettaglio",gas:"gas_dettaglio",fv:"fv",km:"km_mensili",scheda:"monitoraggio"};
-const KEYOF={mensile:r=>`${r.anno}|${r.mese}|${r.vettore}`,el:r=>`${r.anno}|${r.mese}`,gas:r=>`${r.anno}|${r.mese}`,fv:r=>`${r.anno}|${r.mese}`,km:r=>`${r.anno}|${r.mese}`,scheda:r=>`${r.pos}|${r.anno}`};
-const BASE=["siti","flotta","carburanti_per_mezzo_mese","note"];
-function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
+const ARR={mensile:"mensili",el:"elettrico_dettaglio",gas:"gas_dettaglio",fv:"fv",fv30:"fv30",km:"km_mensili",scheda:"monitoraggio"};
+const KEYOF={mensile:r=>`${r.anno}|${r.mese}|${r.vettore}`,el:r=>`${r.anno}|${r.mese}`,gas:r=>`${r.anno}|${r.mese}`,fv:r=>`${r.anno}|${r.mese}`,fv30:r=>`${r.anno}|${r.mese}`,km:r=>`${r.anno}|${r.mese}`,scheda:r=>`${r.pos}|${r.anno}`};
+const BASE=["siti","flotta","carburanti_per_mezzo_mese","note","fv_storico","fv_simulazione"];
+function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],fv30:[],fv_storico:[],fv_simulazione:{},flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
 function norm(o){const v=vuoto(),d=Object.assign({},o);for(const k in v)if(d[k]==null)d[k]=v[k];return d}
 function applyVoce(v){
   if(v.tipo==="base"){if(!v.dati)return false;const a=JSON.stringify(D[v.chiave]);D[v.chiave]=v.dati.v;return a!==JSON.stringify(v.dati.v)}
@@ -149,7 +154,7 @@ function applyVoce(v){
   if(i>=0){if(JSON.stringify(arr[i])===JSON.stringify(v.dati))return false;arr[i]=v.dati}else arr.push(v.dati);
   return true;
 }
-function sortD(){["mensili","fv","elettrico_dettaglio","gas_dettaglio","km_mensili"].forEach(a=>D[a].sort((x,y)=>x.anno-y.anno||x.mese-y.mese||String(x.vettore||"").localeCompare(String(y.vettore||""))))}
+function sortD(){["mensili","fv","fv30","elettrico_dettaglio","gas_dettaglio","km_mensili"].forEach(a=>D[a].sort((x,y)=>x.anno-y.anno||x.mese-y.mese||String(x.vettore||"").localeCompare(String(y.vettore||""))))}
 function vociDa(o){
   const out=[];
   for(const t in ARR)(o[ARR[t]]||[]).forEach(r=>out.push({tipo:t,chiave:KEYOF[t](r),dati:r}));
@@ -168,7 +173,14 @@ async function api(path,method,body){
   if(!res.ok)throw new Error(j.error||"Errore del servizio ("+res.status+").");
   return j;
 }
+function piede(){
+  const v=document.getElementById("ver");if(!v)return;
+  let dati="";
+  if(D&&D.mensili.length){const l=D.mensili.reduce((a,m)=>Math.max(a,m.anno*12+m.mese),0);dati=" · dati fino a "+MESI[(l-1)%12]+" "+Math.floor((l-1)/12)}
+  v.textContent="SICIET Energia · versione "+VERSIONE+" ("+DATA_VERSIONE+") · archivio: "+(CFG.api?"servizio condiviso":"solo questo dispositivo")+dati;
+}
 function mostraStato(){
+  piede();
   const s=document.getElementById("stato");if(!s)return;
   s.textContent=!CFG.api?"Modalità locale: dati solo su questo dispositivo":coda.length?"⏳ "+coda.length+" modifiche da inviare":stato||"✓ Sincronizzato";
 }
@@ -228,11 +240,12 @@ async function avvia(){
   }
 }
 function mostraAccesso(msg){
-  schermata("login");
+  piede();schermata("login");
   document.getElementById("nome").value=operatore();
   document.getElementById("loginErr").textContent=msg||"";
 }
 function show(){
+  piede();
   if(!D||!D.mensili.length){schermata("load");return}
   schermata("app");
   const last=D.mensili.reduce((a,m)=>Math.max(a,m.anno*12+m.mese),0);
@@ -403,18 +416,64 @@ function dCarb(){
   const g=rows("gasolio").filter(m=>m.costo&&m.quantita);
   chart("k4",{type:"line",data:{labels:g.map(m=>MESI[m.mese-1]+" "+String(m.anno).slice(2)),datasets:[{label:"€/l imponibile",data:g.map(m=>m.costo/m.quantita),borderColor:c[1],backgroundColor:c[1],tension:.2,pointRadius:2}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:10}}}}});
 }
+function anomalieFv(){
+  const out=[];
+  const chk=(nome,arr)=>arr.slice(-12).forEach(r=>{
+    const alt=arr.filter(x=>x.mese===r.mese&&x.anno<r.anno&&x.anno>=r.anno-3).map(x=>x.produzione_kwh);
+    if(alt.length<2)return;
+    const m=alt.reduce((a,b)=>a+b,0)/alt.length;
+    if(r.produzione_kwh<m*0.5)out.push(`<b>${nome} – ${MESI[r.mese-1]} ${r.anno}</b>: produzione ${NF(r.produzione_kwh)} kWh, il ${NF(r.produzione_kwh/m*100)}% della media dello stesso mese negli anni precedenti (${NF(m)} kWh). Verificare impianto e inverter.`);
+  });
+  chk("Impianto 30 kW",D.fv30);
+  chk("Impianto 20 kW",D.fv.filter(r=>r.produzione_kwh!=null));
+  return out;
+}
 function vFv(){
-  const kwp=(D.fv.find(r=>r.kwp)||{}).kwp,a=D.fv.filter(r=>r.autoconsumo_kwh!=null);
-  const tot=a.reduce((s,r)=>s+r.autoconsumo_kwh,0),ct=a.reduce((s,r)=>s+(r.consumo_totale_kwh||0),0);
-  return`<div class="grid"><div class="card kpi"><h3>Potenza installata</h3><div class="v">${NF(kwp,2)} <small style="font-size:.9rem">kWp</small></div><div class="s">impianto datato, ~20 kWp</div></div>
-  <div class="card kpi"><h3>Autoconsumo 2024</h3><div class="v">${NF(tot)} <small style="font-size:.9rem">kWh</small></div><div class="s">${NF(ct?tot/ct*100:null,1)}% del consumo totale</div></div></div>
-  <div class="alert warn" style="margin-top:12px">Produzione e immissione in rete non sono disponibili nel progetto (solo l'autoconsumo 2024 dalla Diagnosi). Il raddoppio dei prelievi a luglio–agosto 2026 potrebbe indicare un calo del FV: da verificare con l'inverter o il portale del produttore.</div>
-  <div class="grid wide" style="margin-top:14px">${box("f1","Autoconsumo e prelievo da rete 2024 (kWh)")}${box("f2","Copertura FV del consumo 2024 (%)")}</div>`;
+  const pr=D.fv.filter(r=>r.produzione_kwh!=null),u=pr.slice(-12),f30=D.fv30.slice(-12);
+  const sum=(a,k)=>a.reduce((s,r)=>s+(r[k]||0),0);
+  const per=a=>a.length?MESI[a[0].mese-1]+" "+a[0].anno+" – "+MESI[a[a.length-1].mese-1]+" "+a[a.length-1].anno:"";
+  const ct=sum(u,"consumo_totale_kwh"),kwp=kwpDef();
+  const al=anomalieFv().map(t=>`<div class="alert err">${t}</div>`).join("");
+  const lp=pr.length?pr[pr.length-1]:null,le=lastMonth("elettrico");
+  const gap=lp&&(lp.anno*12+lp.mese<le.y*12+le.m)?`<div class="alert warn">La produzione dell'impianto 20 kW è disponibile fino a <b>${MESI[lp.mese-1]} ${lp.anno}</b>: mancano i mesi successivi (si inseriscono da <b>＋ Inserisci mese</b>). Senza questi dati l'aumento dei prelievi del ${MESI[le.m-1]} ${le.y} non si può confrontare con la produzione FV.</div>`:"";
+  const k=(t,v,u2,s)=>`<div class="card kpi"><h3>${t}</h3><div class="v">${v} <small style="font-size:.9rem">${u2}</small></div><div class="s">${s}</div></div>`;
+  const sim=D.fv_simulazione&&D.fv_simulazione.mesi&&D.fv_simulazione.mesi.length?D.fv_simulazione:null;
+  return al+gap+`<div class="grid">
+    ${k("Impianto 20 kW (scambio sul posto)",NF(kwp,2),"kWp","produce per autoconsumo e immette il resto in rete")}
+    ${u.length?k("Produzione 20 kW, ultimi "+u.length+" mesi",NF(sum(u,"produzione_kwh")),"kWh",per(u)):""}
+    ${u.length&&ct?k("Autoconsumo",NF(sum(u,"autoconsumo_kwh")),"kWh",NF(sum(u,"autoconsumo_kwh")/ct*100,1)+"% del consumo totale"):""}
+    ${f30.length?k("Impianto 30 kW (ritiro dedicato)",NF(sum(f30,"produzione_kwh")),"kWh",per(f30)+" · tutta venduta"):""}
+  </div>
+  <div class="grid wide" style="margin-top:14px">
+    ${box("f1","Produzione 20 kW per mese (kWh)")}${box("f2","Autoconsumo e immissione 20 kW (kWh)")}
+    ${box("f3","Copertura FV del consumo (%)","Autoconsumo / (prelievo + autoconsumo)")}${box("f4","Produzione annua per impianto (kWh)","Anni parziali in colore più chiaro")}
+    ${box("f5","Impianto 30 kW per mese (kWh)")}${box("f6","Ricavi annui impianto 30 kW (€)","Vendita dell'energia e tariffa incentivante; dal 2023 gli importi non sono più registrati")}
+  </div>
+  ${sim?`<div class="card" style="margin-top:14px"><h2>Simulazione nuovo impianto con accumulo</h2><p class="muted" style="margin-bottom:8px">${esc(sim.descrizione||"")}</p>
+    <div class="grid" style="margin-bottom:10px">${Object.entries(sim.indici_autoconsumo||{}).map(([n,v])=>k("Indice di autoconsumo – "+n,NF(v*100,0),"%","")).join("")}</div>
+    <div class="scroll"><table><thead><tr><th class="l">Mese</th><th>Produzione nuovo impianto</th><th>Consumo totale</th><th>Autoconsumo</th><th>Immissione</th><th>Da accumulo</th><th>Totale autoconsumo</th></tr></thead><tbody>${sim.mesi.map(m=>`<tr><td class="l">${esc(m.mese)}</td><td>${NF(m.produzione)}</td><td>${NF(m.consumo_totale)}</td><td>${NF(m.autoconsumo)}</td><td>${NF(m.immissione)}</td><td>${NF(m.autoconsumo_accumulo)}</td><td>${NF(m.totale_autoconsumo)}</td></tr>`).join("")}</tbody></table></div></div>`:""}`;
 }
 function dFv(){
-  const c=COL(),a=D.fv.filter(r=>r.autoconsumo_kwh!=null),l=r=>MESI[r.mese-1]+" "+r.anno;
-  chart("f1",{type:"bar",data:{labels:a.map(l),datasets:[{label:"Autoconsumo FV",data:a.map(r=>r.autoconsumo_kwh),backgroundColor:c[2]},{label:"Prelievo da rete",data:a.map(r=>r.prelievo_kwh),backgroundColor:c[0]}]},options:{scales:{x:{stacked:true,ticks:{maxTicksLimit:12}},y:{stacked:true}}}});
-  chart("f2",{type:"line",data:{labels:a.map(l),datasets:[{label:"% copertura",data:a.map(r=>r.copertura_fv_pct),borderColor:c[2],backgroundColor:c[2],tension:.25}]},options:{plugins:{legend:{display:false}},scales:{y:{min:0,max:60},x:{ticks:{maxTicksLimit:12}}}}});
+  const c=COL(),lab=r=>MESI[r.mese-1]+" "+String(r.anno).slice(2);
+  const pr=D.fv.filter(r=>r.produzione_kwh!=null);
+  const ys=a=>[...new Set(a.map(r=>r.anno))].sort().slice(-5);
+  const lines=(arr,k)=>{const y=ys(arr);return{type:"line",data:{labels:MESI,datasets:y.map((a,i)=>({label:a,data:MESI.map((_,m)=>{const r=arr.find(x=>x.anno===a&&x.mese===m+1);return r?r[k]:null}),borderColor:c[y.length-1-i],backgroundColor:c[y.length-1-i],tension:.25,pointRadius:2,borderWidth:i===y.length-1?3:1.6}))},options:{scales:{y:{beginAtZero:true,title:{display:true,text:"kWh"}}}}}};
+  chart("f1",lines(pr,"produzione_kwh"));
+  const l24=pr.slice(-24);
+  chart("f2",{type:"bar",data:{labels:l24.map(lab),datasets:[{label:"Autoconsumo",data:l24.map(r=>r.autoconsumo_kwh),backgroundColor:c[2]},{label:"Immissione in rete",data:l24.map(r=>r.immissione_kwh),backgroundColor:c[1]}]},options:{scales:{x:{stacked:true,ticks:{maxTicksLimit:12}},y:{stacked:true,title:{display:true,text:"kWh"}}}}});
+  const cp=D.fv.filter(r=>r.copertura_fv_pct!=null);
+  chart("f3",{type:"line",data:{labels:cp.map(lab),datasets:[{label:"% copertura",data:cp.map(r=>r.copertura_fv_pct),borderColor:c[2],backgroundColor:c[2],tension:.25,pointRadius:2}]},options:{plugins:{legend:{display:false}},scales:{y:{min:0},x:{ticks:{maxTicksLimit:12}}}}});
+  const an=[...new Set([...D.fv_storico.map(r=>r.anno),...D.fv30.map(r=>r.anno)])].sort();
+  const s20=y=>D.fv_storico.find(r=>r.anno===y),s30=y=>{const r=D.fv30.filter(x=>x.anno===y);return r.length?{p:r.reduce((s,x)=>s+x.produzione_kwh,0),m:r.length}:null};
+  const part=(y,m)=>m<12;
+  chart("f4",{type:"bar",data:{labels:an,datasets:[
+    {label:"20 kW",data:an.map(y=>{const r=s20(y);return r?r.produzione_kwh:null}),backgroundColor:an.map(y=>{const r=s20(y);return r&&r.mesi<12?c[4]:c[0]})},
+    {label:"30 kW",data:an.map(y=>{const r=s30(y);return r?r.p:null}),backgroundColor:an.map(y=>{const r=s30(y);return r&&r.m<12?c[4]:c[1]})}]},options:{plugins:{legend:{labels:{color:cv("--muted"),boxWidth:12,generateLabels:ch=>ch.data.datasets.map((d,i)=>({text:d.label,fillStyle:[c[0],c[1]][i],strokeStyle:[c[0],c[1]][i],hidden:!ch.isDatasetVisible(i),datasetIndex:i,fontColor:cv("--muted")}))}}},scales:{y:{beginAtZero:true,title:{display:true,text:"kWh"}}}}});
+  chart("f5",lines(D.fv30,"produzione_kwh"));
+  const ric=[...new Set(D.fv30.filter(r=>r.importo_vendita!=null||r.importo_incentivo!=null).map(r=>r.anno))].sort();
+  const tot=(y,k)=>D.fv30.filter(r=>r.anno===y).reduce((s,r)=>s+(r[k]||0),0);
+  const mesi30=y=>D.fv30.filter(r=>r.anno===y&&(r.importo_vendita!=null||r.importo_incentivo!=null)).length;
+  chart("f6",{type:"bar",data:{labels:ric.map(y=>mesi30(y)<12?y+" (parz.)":y),datasets:[{label:"Vendita energia",data:ric.map(y=>tot(y,"importo_vendita")),backgroundColor:c[0]},{label:"Tariffa incentivante",data:ric.map(y=>tot(y,"importo_incentivo")),backgroundColor:c[2]}]},options:{scales:{x:{stacked:true},y:{stacked:true,title:{display:true,text:"€"}}}}});
 }
 function vFlotta(){
   const km={};
@@ -540,7 +599,7 @@ const fld=(id,lab,v,o={})=>`<label class="f"><span>${lab}</span><input id="${id}
 function vIns(){
   if(insA==null){const p=mesePrec();insA=p.y;insM=p.m}
   const cy=new Date().getFullYear(),ya=[];for(let y=Math.min(cy,insA)-0;y>=2021;y--)ya.push(y);
-  const A=insA,M=insM,el=trova("elettrico_dettaglio",A,M)||{},eM=trovaV("elettrico",A,M)||{},gd=trova("gas_dettaglio",A,M)||{},gM=trovaV("gas",A,M)||{},fv=trova("fv",A,M)||{},km=trova("km_mensili",A,M)||{};
+  const A=insA,M=insM,el=trova("elettrico_dettaglio",A,M)||{},eM=trovaV("elettrico",A,M)||{},gd=trova("gas_dettaglio",A,M)||{},gM=trovaV("gas",A,M)||{},fv=trova("fv",A,M)||{},km=trova("km_mensili",A,M)||{},v30=trova("fv30",A,M)||{};
   const carb=["gasolio","benzina","HVO","AdBlue"].map(f=>{const r=trovaV(f,A,M)||{};return`<tr><td class="l"><b>${f}</b></td><td>${fld("c_"+f+"_q","litri",r.quantita)}</td><td>${fld("c_"+f+"_c","€ imponibile",r.costo)}</td><td>${fld("c_"+f+"_i","€ IVA incl.",r.costo_iva)}</td><td>${fld("c_"+f+"_n","note",r.note,{t:1})}</td></tr>`}).join("");
   return`<div class="card" style="margin-bottom:14px"><h2>Mese da inserire o correggere</h2>
   <div class="tools"><select id="iA">${ya.map(y=>`<option ${y===A?"selected":""}>${y}</option>`).join("")}</select><select id="iM">${MESI.map((n,i)=>`<option value="${i+1}" ${i+1===M?"selected":""}>${n}</option>`).join("")}</select><span class="muted">Se il mese ha già dei dati compaiono nei campi: puoi correggerli.</span></div>
@@ -556,7 +615,7 @@ function vIns(){
   <details class="card ins" open><summary>⛽ Carburanti (flotta)</summary><div class="scroll" style="max-height:none"><table><tbody>${carb}</tbody></table></div></details>
   <details class="card ins" open><summary>☀️ Fotovoltaico</summary><div class="frm">
     ${fld("f_prod","Produzione kWh",fv.produzione_kwh)}${fld("f_imm","Immissione in rete kWh",fv.immissione_kwh)}${fld("f_auto","Autoconsumo kWh",fv.autoconsumo_kwh)}
-    ${fld("f_prodb","Producibile kWh",fv.producibile_kwh)}${fld("f_prp","Rendimento Prp",fv.prp)}${fld("f_kwp","Potenza kWp",fv.kwp||kwpDef())}${fld("f_note","Note",fv.note,{t:1})}
+    ${fld("f_prodb","Producibile kWh",fv.producibile_kwh)}${fld("f_prp","Rendimento Prp",fv.prp)}${fld("f_kwp","Potenza kWp",fv.kwp||kwpDef())}${fld("f_p30","Produzione impianto 30 kW kWh",v30.produzione_kwh)}${fld("f_note","Note",fv.note,{t:1})}
   </div><p class="muted" style="margin-top:6px">Autoconsumo = produzione − immissione, e Prp = produzione / producibile, se lasciati vuoti. Il prelievo è quello dell'elettricità.</p></details>
   <details class="card ins" open><summary>🚗 Km dei mezzi (per la scheda di monitoraggio)</summary><div class="frm">
     ${fld("k_ben","Km vetture a benzina",km.km_benzina)}${fld("k_gas","Km vetture a gasolio",km.km_gasolio)}${fld("k_el","Km auto elettrica",km.km_elettrico)}${fld("k_note","Note",km.note,{t:1})}
@@ -647,6 +706,10 @@ function salvaMese(){
       const r=fvMerge(A,M,patch);
       if(i>=0)voci[i].dati=r;else voci.push({tipo:"fv",chiave:`${A}|${M}`,dati:r});
     }
+    /* impianto 30 kW */
+    const p30=num("f_p30"),o30=trova("fv30",A,M);
+    if(p30!=null)voci.push({tipo:"fv30",chiave:`${A}|${M}`,dati:Object.assign({importo_vendita:null,importo_incentivo:null,note:""},o30||{},{anno:A,mese:M,produzione_kwh:p30})});
+    else if(o30){elim.push("Impianto 30 kW");voci.push({tipo:"fv30",chiave:`${A}|${M}`,dati:null})}
     /* km */
     const k={km_benzina:num("k_ben"),km_gasolio:num("k_gas"),km_elettrico:num("k_el"),note:txt("k_note")};
     if(any(k))voci.push({tipo:"km",chiave:`${A}|${M}`,dati:Object.assign({anno:A,mese:M},k)});
