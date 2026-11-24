@@ -141,13 +141,13 @@ var ENERGIA_CONFIG={
 };
 const CFG=ENERGIA_CONFIG;
 // Versione della pagina: va aumentata a ogni modifica, così in fondo si vede quale è in uso.
-const VERSIONE="1.6",DATA_VERSIONE="24/11/2026";
+const VERSIONE="1.7",DATA_VERSIONE="24/11/2026";
 const KEY="siciet_energia_data_v1",KP="siciet_energia_pwd",KN="siciet_energia_nome",KQ="siciet_energia_coda";
 const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
-const ARR={mensile:"mensili",el:"elettrico_dettaglio",gas:"gas_dettaglio",fv:"fv",fv30:"fv30",acqua:"acqua_fatture",km:"km_mensili",scheda:"monitoraggio"};
-const KEYOF={mensile:r=>`${r.anno}|${r.mese}|${r.vettore}`,el:r=>`${r.anno}|${r.mese}`,gas:r=>`${r.anno}|${r.mese}`,fv:r=>`${r.anno}|${r.mese}`,fv30:r=>`${r.anno}|${r.mese}`,acqua:r=>r.numero,km:r=>`${r.anno}|${r.mese}`,scheda:r=>`${r.pos}|${r.anno}`};
+const ARR={mensile:"mensili",el:"elettrico_dettaglio",gas:"gas_dettaglio",fv:"fv",fv30:"fv30",acqua:"acqua_fatture",carbtx:"carb_tx",km:"km_mensili",scheda:"monitoraggio"};
+const KEYOF={mensile:r=>`${r.anno}|${r.mese}|${r.vettore}`,el:r=>`${r.anno}|${r.mese}`,gas:r=>`${r.anno}|${r.mese}`,fv:r=>`${r.anno}|${r.mese}`,fv30:r=>`${r.anno}|${r.mese}`,acqua:r=>r.numero,carbtx:r=>`${r.anno}|${r.mese}|${r.fonte}`,km:r=>`${r.anno}|${r.mese}`,scheda:r=>`${r.pos}|${r.anno}`};
 const BASE=["siti","flotta","carburanti_per_mezzo_mese","note","fv_storico","fv_simulazione","fv_impianti","fv_ricavi","interventi","riferimenti"];
-function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],fv30:[],acqua_fatture:[],fv_storico:[],fv_simulazione:{},fv_impianti:[],fv_ricavi:[],interventi:[],riferimenti:[],flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
+function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],fv30:[],acqua_fatture:[],carb_tx:[],fv_storico:[],fv_simulazione:{},fv_impianti:[],fv_ricavi:[],interventi:[],riferimenti:[],flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
 function norm(o){const v=vuoto(),d=Object.assign({},o);for(const k in v)if(d[k]==null)d[k]=v[k];return d}
 function applyVoce(v){
   if(v.tipo==="base"){if(!v.dati)return false;const a=JSON.stringify(D[v.chiave]);D[v.chiave]=v.dati.v;return a!==JSON.stringify(v.dati.v)}
@@ -157,7 +157,7 @@ function applyVoce(v){
   if(i>=0){if(JSON.stringify(arr[i])===JSON.stringify(v.dati))return false;arr[i]=v.dati}else arr.push(v.dati);
   return true;
 }
-function sortD(){D.acqua_fatture.sort((x,y)=>x.dal.localeCompare(y.dal));["mensili","fv","fv30","elettrico_dettaglio","gas_dettaglio","km_mensili"].forEach(a=>D[a].sort((x,y)=>x.anno-y.anno||x.mese-y.mese||String(x.vettore||"").localeCompare(String(y.vettore||""))))}
+function sortD(){D.carb_tx.sort((x,y)=>x.anno-y.anno||x.mese-y.mese||x.fonte.localeCompare(y.fonte));D.acqua_fatture.sort((x,y)=>x.dal.localeCompare(y.dal));["mensili","fv","fv30","elettrico_dettaglio","gas_dettaglio","km_mensili"].forEach(a=>D[a].sort((x,y)=>x.anno-y.anno||x.mese-y.mese||String(x.vettore||"").localeCompare(String(y.vettore||""))))}
 function vociDa(o){
   const out=[];
   for(const t in ARR)(o[ARR[t]]||[]).forEach(r=>out.push({tipo:t,chiave:KEYOF[t](r),dati:r}));
@@ -407,10 +407,12 @@ const CARB=["gasolio","benzina","HVO","AdBlue"];
 function vCarb(){
   const lm=lastMonth("gasolio");
   const tot=(y)=>CARB.reduce((s,v)=>s+rows(v).filter(m=>m.anno===y).reduce((a,m)=>a+(m.costo||0),0),0);
-  return`<div class="grid wide">${box("k1","Litri mensili per carburante")}${box("k2","Gasolio per anno (litri)")}${box("k3","Costo mensile carburanti (€ IVA esclusa)")}${box("k4","Prezzo medio gasolio (€/l)")}</div>
-  <p class="muted" style="margin-top:10px">Fonti: Diagnosi 2024 (solo gasolio) poi carte Enilive, Q8, IP Plus dal dicembre 2024. L'ultimo mese è parziale (${MESI[lm.m-1]} ${lm.y}: IP Plus non più presente dopo il 25/09/2026). La CO₂ è calcolata solo per il gasolio (2,632 kg/l, derivato dalla Diagnosi).</p>`;
+  const up=`<details class="card ins" id="cbForm" open style="margin-bottom:14px"><summary>＋ Carica i file delle carte carburante</summary><div class="tools" style="margin-top:10px"><label class="btn primary" style="cursor:pointer">Scegli i file<input type="file" id="cbFile" accept=".pdf,.csv,.zip,.xls,.xlsx" multiple hidden></label><span class="muted">IP Plus: l'estratto dei rifornimenti (.xls). Enilive: la fattura (PDF). Q8: i due file della fattura PJ, transazioni (TRS) e riepilogo (ACC). La lettura avviene nel browser; vedrai un'anteprima con i controlli prima di salvare.</span></div><div id="cbAnt"></div></details>`;
+  return up+`<div class="grid wide">${box("k1","Litri mensili per carburante")}${box("k2","Gasolio per anno (litri)")}${box("k3","Costo mensile carburanti (€ IVA esclusa)")}${box("k4","Prezzo medio gasolio (€/l)")}${D.carb_tx.length?box("k5","Litri per carta di rifornimento (archivio delle transazioni)","IP Plus dal 2020; Enilive e Q8 dalle fatture caricate. Prima del 2024 i litri sono solo IP Plus, non il totale aziendale"):""}</div>
+  <p class="muted" style="margin-top:10px">Fonti: Diagnosi 2024 (solo gasolio) poi carte Enilive, Q8, IP Plus dal dicembre 2024. L'ultimo mese (${MESI[lm.m-1]} ${lm.y}) può essere parziale: i totali «Da transazioni» si completano quando si caricano i file di tutte le carte. La CO₂ è calcolata solo per il gasolio (2,632 kg/l, derivato dalla Diagnosi).</p>`;
 }
 function dCarb(){
+  document.getElementById("cbFile").onchange=e=>leggiCarburanti([...e.target.files]).then(()=>e.target.value="");
   const c=COL(),keys=new Set();
   CARB.forEach(v=>rows(v).forEach(m=>keys.add(m.anno*100+m.mese)));
   const ks=[...keys].filter(k=>k>=202501).sort();
@@ -421,6 +423,10 @@ function dCarb(){
   chart("k3",{type:"bar",data:{labels:ks.map(lab),datasets:["gasolio","benzina","HVO","AdBlue"].map((v,i)=>({label:v,data:ks.map(k=>val(v,k,"costo")),backgroundColor:c[i]}))},options:{scales:{x:{stacked:true},y:{stacked:true,title:{display:true,text:"€"}}}}});
   const g=rows("gasolio").filter(m=>m.costo&&m.quantita);
   chart("k4",{type:"line",data:{labels:g.map(m=>MESI[m.mese-1]+" "+String(m.anno).slice(2)),datasets:[{label:"€/l imponibile",data:g.map(m=>m.costo/m.quantita),borderColor:c[1],backgroundColor:c[1],tension:.2,pointRadius:2}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:10}}}}});
+  if(D.carb_tx.length){
+    const ks5=[...new Set(D.carb_tx.map(r=>r.anno*100+r.mese))].sort(),tot5=(k,f)=>D.carb_tx.filter(r=>r.anno*100+r.mese===k&&r.fonte===f).reduce((s,r)=>s+r.tx.reduce((a,x)=>a+x.l,0),0);
+    chart("k5",{type:"bar",data:{labels:ks5.map(lab),datasets:["IPPLUS","ENILIVE","Q8"].map((f,i)=>({label:FONTI[f],data:ks5.map(k=>tot5(k,f)),backgroundColor:c[i]}))},options:{scales:{x:{stacked:true,ticks:{maxTicksLimit:14}},y:{stacked:true,title:{display:true,text:"litri"}}}}});
+  }
 }
 function anomalieFv(){
   const voci=[],avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
@@ -668,8 +674,9 @@ async function testoPdf(file){
     return righe.sort((a,b)=>b.y-a.y).map(r=>r.it.sort((a,b)=>a.x-b.x).map(i=>i.s).join(" "));
   };
   for(let p=1;p<=pdf.numPages;p++){
-    const pg=await pdf.getPage(p),w=pg.view[2],c=await pg.getTextContent();
-    const it=c.items.filter(i=>i.str.trim()).map(i=>({s:i.str,x:i.transform[4],y:i.transform[5]}));
+    const pg=await pdf.getPage(p),vp=pg.getViewport({scale:1}),w=vp.width,c=await pg.getTextContent();
+    // coordinate della pagina come si vede (anche se è ruotata)
+    const it=c.items.filter(i=>i.str.trim()).map(i=>{const t=pdfjsLib.Util.transform(vp.transform,i.transform);return{s:i.str,x:t[4],y:-t[5]}});
     // la prima pagina ha due colonne (dati e riepilogo): si leggono separate, le altre sono tabelle a tutta larghezza
     const parti=p===1?[it.filter(i=>i.x<w*0.52),it.filter(i=>i.x>=w*0.52)]:[it];
     parti.forEach(x=>{out+=righeDi(x).join("\n")+"\n"});
@@ -774,6 +781,185 @@ function dRif(){
     D.riferimenti.forEach(o=>o.codici.forEach(c=>l.push([o.categoria,o.nome,o.sito,c.tipo,c.valore,c.ente,c.nota].map(q).join(";"))));
     const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["\ufeff"+l.join("\n")],{type:"text/csv"}));a.download="riferimenti_siciet.csv";a.click();
   };
+}
+
+/* ---------- carburanti: lettura dei file delle carte (IP Plus, Enilive, Q8) ---------- */
+const CARB_SITO="S2 Flotta automezzi",FONTI={IPPLUS:"IP Plus",ENILIVE:"Enilive",Q8:"Q8"};
+const normCarb=s=>{
+  s=String(s||"").toUpperCase();
+  if(/ADBLUE/.test(s))return"AdBlue";
+  if(/HVO/.test(s))return"HVO";
+  if(/SSPB|BENZ|27101245|\bSSP\b|SUPER SENZA/.test(s))return"benzina";
+  if(/GASOLIO|DIES|\bGLS\b|27102011/.test(s))return"gasolio";
+  return null;
+};
+const nIt=s=>{s=String(s==null?"":s).trim();if(!s)return null;const n=parseFloat(s.replace(/\./g,"").replace(",","."));return isFinite(n)?n:null};
+const isoLocal=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+function caricaLib(url,test){
+  return new Promise((ok,ko)=>{
+    if(test())return ok();
+    const s=document.createElement("script");s.src=url;s.onload=()=>ok();
+    s.onerror=()=>ko(new Error("Impossibile caricare una libreria di lettura: serve la connessione a Internet."));
+    document.head.appendChild(s);
+  });
+}
+const libZip=()=>caricaLib("https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js",()=>window.JSZip);
+const libXls=()=>caricaLib("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",()=>window.XLSX);
+function csvRighe(t){return t.split(/\r?\n/).filter(x=>x.trim()).map(r=>r.split(";"))}
+function parseQ8trs(testo,nome){
+  const r=csvRighe(testo),h=r[0].map(x=>x.trim()),ix=n=>h.indexOf(n),tx=[],avvisi=[];
+  const pj=(nome.match(/PJ\d{5,}/)||[""])[0];
+  r.slice(1).forEach(c=>{
+    if(!c[ix("Carta")]||!c[ix("Data")])return;
+    const dd=c[ix("Data")].split("/"),d="20"+dd[2]+"-"+dd[1]+"-"+dd[0],o=(c[ix("Ora")]||"").padStart(6,"0"),h2=o.slice(0,2)+":"+o.slice(2,4),prod=c[ix("Cod Prod")].trim(),cc=normCarb(prod);
+    if(!cc)avvisi.push("prodotto Q8 sconosciuto: "+prod);
+    const v=nIt(c[ix("Imp Tot")]);
+    tx.push({id:`${c[ix("Carta")]}|${c[ix("Num Ticket")]}|${d}|${o}`,f:"Q8",d,h:h2,t:(c[ix("Targa/Nome")]||"").trim(),c:cc||"altro",p:prod,l:nIt(c[ix("Vol")]),i:Math.round(v/1.22*100)/100,v,km:parseInt(c[ix("KM")],10)||null,doc:pj});
+  });
+  return{fonte:"Q8",documento:pj||"Q8",tx,avvisi};
+}
+function parseQ8acc(testo){
+  const out={};
+  csvRighe(testo).slice(1).forEach(c=>{const p=(c[0]||"").trim().toUpperCase();if(!p)return;out[p]={litri:nIt(c[1]),importo:nIt(c[2]),iva:nIt(c[3]),imponibile:nIt(c[4])}});
+  return out;
+}
+function parseEnilive(testo){
+  const t=testo.replace(/\u2212/g,"-"),righe=t.split("\n").map(x=>x.replace(/\s+/g," ").trim()).filter(Boolean),avvisi=[];
+  const g=re=>{const m=t.replace(/\s+/g," ").match(re);return m?m[1]:null};
+  const doc=g(/Nr Documento: ?(\d+)/),dt=g(/Data: ?(\d\d\/\d\d\/\d{4})/);
+  if(!doc||!/Riepilogo Acquisti/i.test(t))throw new Error("Non sembra una fattura Enilive Multicard.");
+  const dd=dt?dt.split("/").reverse().join("-"):"";
+  const tx=[],sommario={};let targa="",carta="";
+  righe.forEach(r=>{
+    let m=r.match(/^Nr carta ?: ?(\d+)\s+(.*)$/);
+    if(m){carta=m[1];const t2=m[2].match(/([A-Z]{2}\d{3}[A-Z]{2})\s*$/);targa=t2?t2[1]:m[2].split(" ").pop();return}
+    m=r.match(/^(\d{8}) ([A-Z+]+) (\d+,\d\d) ([\d.]+,\d\d) ([\d.]+,\d\d)$/);
+    if(m&&!/^\d\d\.\d\d\.\d\d/.test(r)){sommario[m[1]]={desc:m[2],litri:nIt(m[4]),totale:nIt(m[5])};return}
+    m=r.match(/^(\d\d)\.(\d\d)\.(\d\d) (\d\d:\d\d) (\d+) (\d+) (.+?) (27\d{6}) ([A-Z+]+) ([\d.]+) ([\d.]+,\d+) ([\d.]+,\d+) ([\d.]+,\d+)(.*)$/);
+    if(!m)return;
+    const nums=(m[14].match(/-?[\d.]+,\d\d/g)||[]),q=nums.slice(-4);
+    if(q.length<4){avvisi.push("riga non letta: "+r.slice(0,70));return}
+    const d="20"+m[3]+"-"+m[2]+"-"+m[1],cc=normCarb(m[8]+" "+m[9]);
+    if(!cc)avvisi.push("prodotto Enilive sconosciuto: "+m[8]+" "+m[9]);
+    tx.push({id:`${carta}|${d}|${m[4]}|${m[5]}`,f:"ENILIVE",d,h:m[4],t:targa,c:cc||"altro",p:m[8]+" "+m[9],l:nIt(m[11]),i:nIt(q[1]),v:nIt(q[0]),km:parseInt(m[10].replace(/\./g,""),10)||null,doc});
+  });
+  // riepilogo della fattura: totali («Totale : imponibile IVA totale») e righe per prodotto («IVA% quantità totale»)
+  const NUM="(\\d[\\d.]*,\\d\\d)",tot={imponibile:null,iva:null,totale:null};
+  const reT=new RegExp("^Totale : "+NUM+" "+NUM+" "+NUM+"$");
+  for(const r of righe){const m=r.match(reT);if(m&&Math.abs(nIt(m[1])+nIt(m[2])-nIt(m[3]))<0.02){tot.imponibile=nIt(m[1]);tot.iva=nIt(m[2]);tot.totale=nIt(m[3]);break}}
+  const prods=[];
+  righe.forEach(r=>{if(/^\d\d\.\d\d\.\d\d /.test(r))return;[...r.matchAll(/(27\d{6}) ([A-Z+]{3,})/g)].forEach(x=>prods.push({cod:x[1],desc:x[2]}))});
+  const reR=new RegExp("^(\\d+,\\d\\d) "+NUM+" "+NUM+"$"),pRighe=righe.map(r=>r.match(reR)).filter(m=>m&&nIt(m[1])<=22);
+  if(prods.length&&prods.length===pRighe.length)prods.forEach((x,i)=>{sommario[x.cod]={desc:x.desc,litri:nIt(pRighe[i][2]),totale:nIt(pRighe[i][3])}});
+  else if(prods.length)avvisi.push("riepilogo per prodotto non letto: i totali non sono controllati");
+  return{fonte:"ENILIVE",documento:doc,data:dd,tx,avvisi,sommario,tot};
+}
+async function parseIpPlus(buf){
+  await libXls();
+  const wb=XLSX.read(buf,{type:"array",cellDates:true}),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:null});
+  if(!rows.length||!("Pan Carta" in rows[0]))throw new Error("Non sembra l'estratto dei rifornimenti IP Plus.");
+  const tx=[],avvisi=new Set();
+  rows.forEach(r=>{
+    const dt=r["Data transazione"],d=dt instanceof Date?isoLocal(dt):String(dt).slice(0,10),cc=normCarb(r["Descrizione prodotto"]);
+    if(!cc)avvisi.add("prodotto IP Plus sconosciuto: "+r["Descrizione prodotto"]);
+    tx.push({id:`${r["Pan Carta"]}|${d}|${r["Ora transazione"]}|${r["Numero ticket"]}`,f:"IPPLUS",d,h:String(r["Ora transazione"]||"").slice(0,5),t:r["Targa"]||"",c:cc||"altro",p:r["Descrizione prodotto"],l:Number(r["Quantità"]),i:Number(r["Importo fatturato IVA esclusa"]),v:Number(r["Importo fatturato IVA inclusa"]),km:Number(r["Km"])||null,doc:r["Numero fattura"]||""});
+  });
+  return{fonte:"IPPLUS",documento:"estratto rifornimenti",tx,avvisi:[...avvisi]};
+}
+async function leggiFileCarburanti(file){
+  const buf=await file.arrayBuffer(),b=new Uint8Array(buf),testa=String.fromCharCode(...b.slice(0,4));
+  const nome=file.name;
+  if(testa==="%PDF"||/\.pdf$/i.test(nome)){const d=parseEnilive(await testoPdf(file));d.nome=nome;return[d]}
+  if(testa==="PK\u0003\u0004"&&!/\.xlsx$/i.test(nome)){
+    await libZip();const z=await JSZip.loadAsync(buf),out=[];
+    for(const n of Object.keys(z.files)){if(z.files[n].dir)continue;out.push(...await leggiTesto(await z.files[n].async("string"),n))}
+    return out;
+  }
+  if(testa==="\u00d0\u00cf\u0011\u00e0"||/\.xlsx?$/i.test(nome)||testa==="PK\u0003\u0004"){const d=await parseIpPlus(buf);d.nome=nome;return[d]}
+  return leggiTesto(new TextDecoder("utf-8").decode(buf),nome);
+}
+function leggiTesto(t,nome){
+  if(/^Carta;Num Ticket/i.test(t))return[Object.assign(parseQ8trs(t,nome),{nome})];
+  if(/^Prodotto;Quantita/i.test(t))return[{fonte:"Q8ACC",nome,acc:parseQ8acc(t),pj:(nome.match(/PJ\d{5,}/)||[""])[0]}];
+  throw new Error("Formato non riconosciuto: "+nome);
+}
+/* controlli e anteprima */
+let cbCoda=null;
+const cbChiave=(y,m,f)=>`${y}|${m}|${f}`;
+const round2=n=>Math.round(n*100)/100;
+function meseModificabile(y,m){
+  const k=y*100+m,mk=D.mensili.filter(r=>["gasolio","benzina","HVO","AdBlue"].includes(r.vettore));
+  if(mk.some(r=>r.anno===y&&r.mese===m&&String(r.note||"").startsWith("Da transazioni")))return true;
+  const ult=Math.max(0,...mk.filter(r=>!String(r.note||"").startsWith("Da transazioni")).map(r=>r.anno*100+r.mese));
+  return k>ult;
+}
+function mesiRighe(mesi,nota){
+  const riga=x=>`<tr><td class="l"><b>${MESI[x.m-1]} ${x.y}</b></td><td class="l" style="white-space:normal">${x.mod?`<span class="down">aggiorna i totali del mese</span>${x.ultimo.slice(0,7)===x.y+"-"+String(x.m).padStart(2,"0")?`<br><span class="muted">dati fino al ${itd(x.ultimo)}: mese parziale</span>`:""}`:'<span class="muted">solo archivio delle transazioni: il mese ha già i totali da altre fonti e non viene toccato</span>'}</td><td class="l" style="white-space:normal">${Object.entries(x.tot).map(([c,o])=>`${c} <b>${NF(o.l,1)} L</b> ${nota(o).replace("Da transazioni ","")}`).join("<br>")}</td></tr>`;
+  const mod=mesi.filter(x=>x.mod),arch=mesi.filter(x=>!x.mod);
+  const etich=x=>MESI[x.m-1]+" "+x.y;
+  return mod.map(riga).join("")+(arch.length?`<tr><td class="l"><b>Archivio</b></td><td class="l" style="white-space:normal">${arch.length} mesi (${etich(arch[0])} – ${etich(arch[arch.length-1])}): le transazioni vengono solo archiviate, perché questi mesi hanno già i totali da altre fonti o riguardano solo la carta IP Plus. I totali non cambiano.</td><td class="l muted">${arch.reduce((s,x)=>s+Object.values(x.tot).reduce((a,o)=>a+o.n,0),0)} transazioni</td></tr>`:"");
+}
+async function leggiCarburanti(files){
+  const el=document.getElementById("cbAnt");el.innerHTML='<p class="muted">Lettura in corso…</p>';
+  const docs=[],acc=[],err=[];
+  for(const f of files){try{(await leggiFileCarburanti(f)).forEach(d=>d.fonte==="Q8ACC"?acc.push(d):docs.push(d))}catch(e){err.push(`<div class="alert err"><b>${esc(f.name)}</b>: ${esc(e.message)}</div>`)}}
+  // controlli di quadratura
+  docs.forEach(d=>{
+    d.controlli=[];const per=k=>d.tx.filter(x=>x.c===k).reduce((s,x)=>({l:s.l+x.l,v:s.v+x.v,i:s.i+x.i}),{l:0,v:0,i:0});
+    if(d.fonte==="Q8"){
+      const a=acc.find(x=>x.pj&&x.pj===d.documento)||acc[0];
+      if(!a)d.controlli.push({ok:false,t:"manca il file di riepilogo (ACC) per il controllo dei totali"});
+      else{const nm={gasolio:"GASOLIO",benzina:"SUPER SENZA PB"};Object.entries(nm).forEach(([k,n])=>{const s=per(k),r=a.acc[n];if(!s.l&&!r)return;if(!r||Math.abs(s.l-r.litri)>0.05||Math.abs(s.v-r.importo)>0.05)d.controlli.push({ok:false,t:`${k}: transazioni ${NF(s.l,2)} L / ${NF(s.v,2)} €, riepilogo ${r?NF(r.litri,2)+" L / "+NF(r.importo,2)+" €":"assente"}`});else d.controlli.push({ok:true,t:`${k}: ${NF(s.l,2)} L e ${NF(s.v,2)} € coincidono con il riepilogo`})});
+        const ti=a.acc.TOTALE;if(ti){d.tx.forEach(x=>{});const imp=d.tx.reduce((s,x)=>s+x.i,0);if(Math.abs(imp-ti.imponibile)>0.1)d.controlli.push({ok:false,t:`imponibile ${NF(imp,2)} € contro ${NF(ti.imponibile,2)} € del riepilogo`})}}
+    }
+    if(d.fonte==="ENILIVE"){
+      Object.entries(d.sommario).forEach(([cod,s])=>{const cc=normCarb(cod+" "+s.desc),r=d.tx.filter(x=>x.c===cc).reduce((a,x)=>({l:a.l+x.l,v:a.v+x.v}),{l:0,v:0});
+        if(Math.abs(r.l-s.litri)>0.05||Math.abs(r.v-s.totale)>0.05)d.controlli.push({ok:false,t:`${s.desc}: righe ${NF(r.l,2)} L / ${NF(r.v,2)} €, riepilogo ${NF(s.litri,2)} L / ${NF(s.totale,2)} €`});else d.controlli.push({ok:true,t:`${s.desc}: ${NF(s.litri,2)} L e ${NF(s.totale,2)} € coincidono con il riepilogo`})});
+      const imp=d.tx.reduce((s,x)=>s+x.i,0);if(d.tot.imponibile!=null&&Math.abs(imp-d.tot.imponibile)>0.1)d.controlli.push({ok:false,t:`imponibile delle righe ${NF(imp,2)} € contro ${NF(d.tot.imponibile,2)} € in fattura`});
+    }
+    d.litri=d.tx.reduce((s,x)=>s+x.l,0);d.imp=d.tx.reduce((s,x)=>s+x.i,0);d.iva=d.tx.reduce((s,x)=>s+x.v,0);
+    d.da=d.tx.reduce((m,x)=>x.d<m?x.d:m,"9999");d.a=d.tx.reduce((m,x)=>x.d>m?x.d:m,"0000");
+  });
+  // unione con l'archivio
+  const nuove={},presenti=new Set(),doppie=new Set();
+  const esist={};D.carb_tx.forEach(r=>esist[cbChiave(r.anno,r.mese,r.fonte)]=r);
+  const vistiNuovi=new Set();
+  docs.forEach(d=>d.tx.forEach(x=>{
+    const y=+x.d.slice(0,4),m=+x.d.slice(5,7),k=cbChiave(y,m,x.f);
+    if(!nuove[k])nuove[k]={anno:y,mese:m,fonte:x.f,tx:(esist[k]?esist[k].tx.slice():[]),nuovi:0,uguali:0};
+    const n=nuove[k],i=n.tx.findIndex(z=>z.id===x.id);
+    if(i>=0){if(JSON.stringify(n.tx[i])===JSON.stringify(x))n.uguali++;else{n.tx[i]=x;n.nuovi++}}else{n.tx.push(x);n.nuovi++}
+  }));
+  const cambiati=Object.values(nuove).filter(n=>n.nuovi>0);
+  // mesi: totali dopo l'importazione
+  const stato=(y,m)=>{const out={};Object.keys(FONTI).forEach(f=>{const k=cbChiave(y,m,f),r=nuove[k]||esist[k];if(r)r.tx.forEach(x=>{const o=out[x.c]||(out[x.c]={l:0,i:0,v:0,n:0,f:{}});o.l+=x.l;o.i+=x.i;o.v+=x.v;o.n++;o.f[f]=(o.f[f]||0)+1})});return out};
+  const mesi=[...new Set(cambiati.map(n=>n.anno*100+n.mese))].sort().map(k=>({y:Math.floor(k/100),m:k%100}));
+  mesi.forEach(x=>{x.mod=meseModificabile(x.y,x.m);x.tot=stato(x.y,x.m);x.ultimo=Object.values(nuove).concat(D.carb_tx.filter(r=>r.anno===x.y&&r.mese===x.m)).filter(r=>r.anno===x.y&&r.mese===x.m).reduce((mx,r)=>r.tx.reduce((a,t)=>t.d>a?t.d:a,mx),"0000")});
+  const nota=ts=>"Da transazioni ("+Object.entries(ts.f).map(([f,n])=>FONTI[f]+" "+n).join(", ")+")";
+  const targhe=new Set(D.flotta.map(f=>f.targa)),ignote=new Set();
+  docs.forEach(d=>d.tx.forEach(x=>{if(x.t&&/^[A-Z]{2}\d{3}[A-Z]{2}$/.test(x.t)&&!targhe.has(x.t))ignote.add(x.t)}));
+  cbCoda={cambiati,mesi,nota};
+  const dc=n=>d=>`<tr><td class="l" style="white-space:normal;max-width:210px;overflow-wrap:anywhere">${esc(FONTI[d.fonte])}${d.nome?`<br><span class="muted">${esc(d.nome)}</span>`:""}</td><td class="l">${esc(d.documento)}${d.data?`<br><span class="muted">${itd(d.data)}</span>`:""}</td><td>${itd(d.da)} – ${itd(d.a)}</td><td>${d.tx.length}</td><td>${NF(d.litri,2)}</td><td>${NF(d.imp,2)}</td><td>${NF(d.iva,2)}</td><td class="l" style="white-space:normal">${d.controlli.map(c=>`<span class="${c.ok?"down":"up"}">${c.ok?"✓":"⚠"} ${esc(c.t)}</span>`).join("<br>")}${(d.avvisi||[]).map(a=>`<br><span class="up">⚠ ${esc(a)}</span>`).join("")}</td></tr>`;
+  const nm=cambiati.reduce((s,n)=>s+n.nuovi,0),ng=cambiati.reduce((s,n)=>s+n.uguali,0)+Object.values(nuove).filter(n=>!n.nuovi).reduce((s,n)=>s+n.uguali,0);
+  el.innerHTML=err.join("")+(docs.length?`<div class="scroll" style="max-height:none;margin-top:10px"><table><thead><tr><th class="l">Fonte</th><th class="l">Documento</th><th>Periodo</th><th>Transazioni</th><th>Litri</th><th>€ imponibile</th><th>€ IVA incl.</th><th class="l">Controlli</th></tr></thead><tbody>${docs.map(dc(1)).join("")}</tbody></table></div>
+    ${mesi.length?`<h3 style="margin:12px 0 6px">Mesi interessati</h3>`:""}<div class="scroll" style="max-height:none"><table style="${mesi.length?"":"display:none"}"><thead><tr><th class="l">Mese</th><th class="l">Cosa succede</th><th class="l">Litri per carburante</th></tr></thead><tbody>${mesiRighe(mesi,nota)}</tbody></table></div>
+    ${ignote.size?`<div class="alert warn" style="margin-top:10px">Targhe non presenti nell'elenco della flotta: ${[...ignote].map(esc).join(", ")}.</div>`:""}
+    <div class="tools" style="margin-top:10px"><button class="btn primary" id="cbConf" ${cambiati.length?"":"disabled"}>Salva ${nm} transazioni</button><span class="muted">${ng?ng+" transazioni erano già nell'archivio. ":""}${cambiati.length?"":"Non c'è niente di nuovo da salvare."}</span></div>`:"");
+  const b=document.getElementById("cbConf");if(b)b.onclick=salvaCarburanti;
+  if(docs.length&&!acc.length&&docs.some(d=>d.fonte==="Q8"))el.insertAdjacentHTML("afterbegin",'<div class="alert warn">Per il Q8 servono entrambi i file: transazioni (TRS) e riepilogo (ACC).</div>');
+}
+function salvaCarburanti(){
+  const {cambiati,mesi,nota}=cbCoda,voci=[];
+  cambiati.forEach(n=>voci.push({tipo:"carbtx",chiave:cbChiave(n.anno,n.mese,n.fonte),dati:{anno:n.anno,mese:n.mese,fonte:n.fonte,tx:n.tx}}));
+  let aggiornati=0;
+  mesi.forEach(x=>{
+    if(!x.mod)return;
+    Object.entries(x.tot).forEach(([c,o])=>{
+      if(c==="altro")return;
+      voci.push({tipo:"mensile",chiave:`${x.y}|${x.m}|${c}`,dati:{anno:x.y,mese:x.m,sito:CARB_SITO,vettore:c,quantita:round2(o.l),um:"litri",costo:round2(o.i),costo_iva:round2(o.v),note:nota(o)+"; dati fino al "+itd(x.ultimo)}});
+    });aggiornati++;
+  });
+  saveVoci(voci);toast(`Salvate ${cambiati.reduce((s,n)=>s+n.nuovi,0)} transazioni, aggiornati ${aggiornati} mesi`);cbCoda=null;render();
 }
 
 /* ---------- monitoraggio indicatori (scheda All. MGE) ---------- */
