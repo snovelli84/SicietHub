@@ -6,8 +6,8 @@
 <title>SICIET Energia</title>
 <meta name="theme-color" content="#005baa">
 <meta name="robots" content="noindex, nofollow">
-<link rel="icon" href="icons/favicon-32.png" type="image/png" sizes="32x32">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/favicon-32.png?v=2" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=2">
 <link rel="manifest" href="manifest.webmanifest">
 <style>
 :root{
@@ -25,7 +25,11 @@
 [hidden]{display:none!important}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.4}
 header{background:var(--brand);color:#fff;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-header img{width:34px;height:34px;border-radius:8px;background:#fff}
+.lockup{display:inline-flex;align-items:center;background:#fff;border-radius:8px;padding:5px 12px 5px 8px;text-decoration:none}
+.lockup img{height:30px;width:auto;display:block}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.plate{align-self:center;background:#fff;border-radius:12px;padding:10px 18px}
+.plate img{display:block;height:84px;width:auto}
 header h1{font-size:1.15rem;flex:1}
 header small{opacity:.85;font-size:.78rem}
 .btn{border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:8px;padding:7px 12px;font-size:.85rem;cursor:pointer}
@@ -78,8 +82,8 @@ footer#ver{max-width:1200px;margin:8px auto 24px;padding:0 16px;font-size:.75rem
 </head>
 <body>
 <header>
-  <img src="icons/icon-192.png" alt="">
-  <h1>SICIET Energia <small id="agg"></small><br><small id="stato" hidden></small></h1>
+  <a class="lockup" href="./" aria-label="SICIET Energia"><img src="icons/lockup.png" alt="SICIET Energia"></a>
+  <h1><span class="vh">SICIET Energia</span><small id="agg"></small><br><small id="stato" hidden></small></h1>
   <button class="btn" id="btnLoad" hidden>Importa file</button>
   <button class="btn" id="btnExp" hidden>Esporta</button>
   <button class="btn" id="btnForget" hidden>Rimuovi dati</button>
@@ -88,6 +92,7 @@ footer#ver{max-width:1200px;margin:8px auto 24px;padding:0 16px;font-size:.75rem
 
 <div id="login" hidden>
   <form id="loginForm" class="boxc">
+    <div class="plate"><img src="icons/logo.png" alt="SICIET Energia"></div>
     <h2>Accesso</h2>
     <label class="f"><span>Nome e cognome</span><input id="nome" autocomplete="name" required></label>
     <label class="f"><span>Password</span><input id="pwd" type="password" autocomplete="current-password" required></label>
@@ -99,6 +104,7 @@ footer#ver{max-width:1200px;margin:8px auto 24px;padding:0 16px;font-size:.75rem
 
 <div id="load" hidden>
   <div class="boxc">
+  <div class="plate"><img src="icons/logo.png" alt="SICIET Energia"></div>
   <h2>Carica i dati</h2>
   <div class="drop">
     <p>Seleziona il file <b>siciet_dashboard_data.json</b> generato dal progetto "Analisi Energetica".</p><br>
@@ -141,7 +147,7 @@ var ENERGIA_CONFIG={
 };
 const CFG=ENERGIA_CONFIG;
 // Versione della pagina: va aumentata a ogni modifica, così in fondo si vede quale è in uso.
-const VERSIONE="1.8",DATA_VERSIONE="24/11/2026";
+const VERSIONE="1.9",DATA_VERSIONE="24/11/2026";
 const KEY="siciet_energia_data_v1",KP="siciet_energia_pwd",KN="siciet_energia_nome",KQ="siciet_energia_coda";
 const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const ARR={mensile:"mensili",el:"elettrico_dettaglio",gas:"gas_dettaglio",fv:"fv",fv30:"fv30",acqua:"acqua_fatture",carbtx:"carb_tx",km:"km_mensili",scheda:"monitoraggio"};
@@ -598,10 +604,12 @@ function vAcq(){
   const an=seg.filter(x=>x.anomalo).map(x=>`<div class="alert err"><b>Consumo anomalo dal ${itd(x.dal)} al ${itd(x.al)}</b>: ${NF(x.gio,1)} m³ al giorno (${NF(x.mc)} m³ in ${x.gg} giorni), ${NF(x.gio/mediana,1)} volte la mediana di ${NF(mediana,1)} m³ al giorno. Controllare l'impianto: può essere una perdita.</div>`).join("");
   const cr=fs.filter(f=>f.totale<0).map(f=>`<div class="alert warn">La fattura <b>${f.numero}</b> del ${itd(f.emessa)} è di <b>credito</b> (${EUR(f.imponibile,2)} imponibile): conguaglio che applica la tariffa depenalizzata, compatibile con una perdita occulta riconosciuta.</div>`).join("");
   const vecchia=(Date.now()/864e5-gg(lf.al))>120?`<div class="alert warn">L'ultima fattura dell'acqua copre fino al ${itd(lf.al)}: ne manca una?</div>`:"";
+  const ic=((D.riferimenti.find(o=>o.id==="acqua-sede")||{}).codici||[]).find(c=>c.tipo==="Intestatario"),
+    intest=ic?`<div class="alert warn"><b>Intestatario e pagatore: ${esc(ic.valore)}.</b> ${esc(ic.nota||"")}</div>`:"";
   const k=(t,v,u,s)=>`<div class="card kpi"><h3>${t}</h3><div class="v">${v} <small style="font-size:.9rem">${u}</small></div><div class="s">${s}</div></div>`;
   const fine=gg(ult.al),c12=aqFinestra(seg,fine,365);
   const righe=fs.slice().reverse().map(f=>`<tr><td class="l">${esc(f.numero)}</td><td>${itd(f.emessa)}</td><td>${itd(f.dal)} – ${itd(f.al)}</td><td class="l">${f.tipo==="acconto"?"acconto":"saldo"}</td><td>${NF(f.mc)}</td><td>${NF(f.imponibile,2)}</td><td>${NF(f.iva,2)}</td><td>${NF(f.totale,2)}</td><td class="l" style="white-space:normal;min-width:180px;color:var(--muted)">${esc(f.note||"")}</td><td><button class="btn aqE" data-n="${esc(f.numero)}" title="Correggi">✎</button> <button class="btn aqX" data-n="${esc(f.numero)}" title="Elimina">🗑</button></td></tr>`).join("");
-  return vecchia+an+cr+`<div class="grid">
+  return vecchia+intest+an+cr+`<div class="grid">
     ${k("Ultimi 12 mesi",NF(c12),"m³","fino al "+itd(ult.al))}
     ${k("Ultimo periodo",NF(ult.gio,2),"m³ al giorno",itd(ult.dal)+" – "+itd(ult.al)+" · mediana "+NF(mediana,2))}
     ${k("Ultima fattura",NF(lf.imponibile,2),"€ imponibile",itd(lf.emessa)+" · "+NF(lf.mc)+" m³")}
@@ -712,6 +720,7 @@ function parseAcqua(testo){
   if(tot<0)note.push("fattura di credito (conguaglio con tariffa depenalizzata)");
   if(f.extra)note.push(`addebiti/accrediti extra fattura ${(f.extra>0?"+":"")+NF(f.extra,2)} € (rata o compensazione, non è un costo di consumo)`);
   f.note=note.join("; ");
+  const ultima=D.acqua_fatture[D.acqua_fatture.length-1]||{};f.sito=ultima.sito||"";f.intestatario=ultima.intestatario||"";
   const ut=AQ_UTENZA_ATTESA();
   if(ut&&f.utenza&&f.utenza!==ut)avvisi.push(`codice utenza ${f.utenza} diverso da quello delle altre fatture (${ut})`);
   const gh=gg(f.al)-gg(f.dal)+1,gio=f.mc/gh;
