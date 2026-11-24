@@ -59,6 +59,9 @@ select{padding:7px 10px;border-radius:8px;border:1px solid var(--border);backgro
 ul.note{padding-left:18px;font-size:.88rem}ul.note li{margin:5px 0}
 .muted{color:var(--muted);font-size:.8rem}
 .tag{display:inline-block;background:var(--chip);border-radius:6px;padding:1px 7px;font-size:.75rem;margin-left:4px}
+.rifrow{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);font-size:.85rem}
+.rifmain{min-width:0;overflow-wrap:anywhere}
+.rifbtn{display:flex;gap:6px;flex-shrink:0}
 .boxc{max-width:460px;margin:50px auto;padding:0 16px;display:flex;flex-direction:column;gap:12px}
 .drop{border:2px dashed var(--border);border-radius:14px;padding:30px 16px;background:var(--card);text-align:center}
 label.f{display:flex;flex-direction:column;gap:3px;font-size:.78rem;color:var(--muted)}
@@ -125,7 +128,7 @@ const SCADENZE=[
   {txt:"Offerta gas «Anno Sicuro Gas» (0,70 €/Smc materia prima)",data:"2026-11-30"},
   {txt:"Condizioni contratto elettrico (prezzo fisso F1/F2/F3)",data:"2027-01-31"}
 ];
-const TABS=[["pan","Panoramica"],["el","Elettricità"],["gas","Gas"],["acq","Acqua"],["carb","Carburanti"],["fv","Fotovoltaico"],["flotta","Flotta"],["mon","Monitoraggio"],["ins","＋ Inserisci mese"],["dati","Dati"],["note","Note e dubbi"]];
+const TABS=[["pan","Panoramica"],["el","Elettricità"],["gas","Gas"],["acq","Acqua"],["carb","Carburanti"],["fv","Fotovoltaico"],["flotta","Flotta"],["mon","Monitoraggio"],["ins","＋ Inserisci mese"],["dati","Dati"],["rif","Riferimenti"],["note","Note e dubbi"]];
 
 /* ---------- archivio e sincronizzazione ---------- */
 var ENERGIA_CONFIG={
@@ -138,13 +141,13 @@ var ENERGIA_CONFIG={
 };
 const CFG=ENERGIA_CONFIG;
 // Versione della pagina: va aumentata a ogni modifica, così in fondo si vede quale è in uso.
-const VERSIONE="1.5",DATA_VERSIONE="24/11/2026";
+const VERSIONE="1.6",DATA_VERSIONE="24/11/2026";
 const KEY="siciet_energia_data_v1",KP="siciet_energia_pwd",KN="siciet_energia_nome",KQ="siciet_energia_coda";
 const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const ARR={mensile:"mensili",el:"elettrico_dettaglio",gas:"gas_dettaglio",fv:"fv",fv30:"fv30",acqua:"acqua_fatture",km:"km_mensili",scheda:"monitoraggio"};
 const KEYOF={mensile:r=>`${r.anno}|${r.mese}|${r.vettore}`,el:r=>`${r.anno}|${r.mese}`,gas:r=>`${r.anno}|${r.mese}`,fv:r=>`${r.anno}|${r.mese}`,fv30:r=>`${r.anno}|${r.mese}`,acqua:r=>r.numero,km:r=>`${r.anno}|${r.mese}`,scheda:r=>`${r.pos}|${r.anno}`};
-const BASE=["siti","flotta","carburanti_per_mezzo_mese","note","fv_storico","fv_simulazione","fv_impianti","fv_ricavi","interventi"];
-function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],fv30:[],acqua_fatture:[],fv_storico:[],fv_simulazione:{},fv_impianti:[],fv_ricavi:[],interventi:[],flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
+const BASE=["siti","flotta","carburanti_per_mezzo_mese","note","fv_storico","fv_simulazione","fv_impianti","fv_ricavi","interventi","riferimenti"];
+function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],fv30:[],acqua_fatture:[],fv_storico:[],fv_simulazione:{},fv_impianti:[],fv_ricavi:[],interventi:[],riferimenti:[],flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
 function norm(o){const v=vuoto(),d=Object.assign({},o);for(const k in v)if(d[k]==null)d[k]=v[k];return d}
 function applyVoce(v){
   if(v.tipo==="base"){if(!v.dati)return false;const a=JSON.stringify(D[v.chiave]);D[v.chiave]=v.dati.v;return a!==JSON.stringify(v.dati.v)}
@@ -727,6 +730,52 @@ async function leggiFattureAcqua(files){
   if(b)b.onclick=()=>{saveVoci(aqCoda.map(r=>({tipo:"acqua",chiave:r.fattura.numero,dati:r.fattura})));toast(aqCoda.length+" fatture salvate");render()};
 }
 
+/* ---------- riferimenti: POD, codici GSE, matricole ---------- */
+let rifQ="";
+const RIFCAT={el:["luce"],gas:["gas"],acq:["acqua"],carb:["carburante"],fv:["fotovoltaico"]};
+function rifLine(cats){
+  const l=(D.riferimenti||[]).filter(o=>cats.includes(o.categoria)&&o.sito!=="non ancora in dashboard");
+  if(!l.length)return"";
+  return`<div class="muted" style="margin-bottom:12px;line-height:1.7">${l.map(o=>`<b>${esc(o.nome)}</b>: ${o.codici.filter(c=>c.principale).map(c=>`${esc(c.tipo)} <b>${esc(c.valore)}</b>`).join(" · ")}`).join("<br>")} · <a href="#" data-go="rif">tutti i riferimenti</a></div>`;
+}
+function vRif(){
+  const R=D.riferimenti||[];
+  const cats=[["luce","Luce"],["gas","Gas"],["acqua","Acqua"],["fotovoltaico","Fotovoltaico"],["carburante","Carte carburante"],["altro","Altro"]];
+  const filtro=o=>!rifQ||JSON.stringify(o).toLowerCase().includes(rifQ.toLowerCase());
+  const blocchi=cats.map(([k,n])=>{
+    const l=R.filter(o=>o.categoria===k&&filtro(o));if(!l.length)return"";
+    return`<h2 class="sec">${n}</h2><div class="grid wide">${l.map(o=>`<div class="card"><h2>${esc(o.nome)}</h2><p class="muted" style="margin-bottom:6px">${esc(o.sito||"")}${o.dati?" · usato in: "+esc(o.dati):""}</p>
+      ${o.codici.map((c,i)=>`<div class="rifrow"><div class="rifmain"><span class="muted">${esc(c.tipo)}${c.ente?" · "+esc(c.ente):""}</span><br><b>${esc(c.valore)}</b>${c.nota?`<br><span class="muted">${esc(c.nota)}</span>`:""}</div><div class="rifbtn"><button class="btn rifC" data-v="${esc(c.valore)}">Copia</button><button class="btn rifX" data-o="${esc(o.id)}" data-i="${i}" title="Elimina il codice">🗑</button></div></div>`).join("")}
+      ${o.note?`<p class="muted" style="margin-top:6px">${esc(o.note)}</p>`:""}<div class="tools" style="margin-top:8px"><button class="btn rifA" data-o="${esc(o.id)}">＋ codice</button></div></div>`).join("")}</div>`}).join("");
+  return`<div class="tools"><input id="rifQ" placeholder="Cerca un POD, una matricola, un codice GSE…" value="${esc(rifQ)}" style="flex:1;min-width:220px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:.95rem"><button class="btn" id="rifCsv">Esporta CSV</button></div>
+  ${blocchi||'<div class="alert warn">Nessun riferimento trovato.</div>'}`;
+}
+function salvaRif(){saveVoci([{tipo:"base",chiave:"riferimenti",dati:{v:D.riferimenti}}])}
+function dRif(){
+  const i=document.getElementById("rifQ");
+  i.oninput=()=>{rifQ=i.value;const pos=i.selectionStart;render();const n=document.getElementById("rifQ");n.focus();n.setSelectionRange(pos,pos)};
+  document.querySelectorAll(".rifC").forEach(b=>b.onclick=()=>{
+    const v=b.dataset.v,ok=()=>toast("Copiato: "+v);
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(v).then(ok,()=>prompt("Copia il codice:",v));else prompt("Copia il codice:",v);
+  });
+  document.querySelectorAll(".rifX").forEach(b=>b.onclick=()=>{
+    const o=D.riferimenti.find(x=>x.id===b.dataset.o),c=o&&o.codici[+b.dataset.i];
+    if(c&&confirm("Eliminare il codice «"+c.valore+"» ("+c.tipo+")?")){o.codici.splice(+b.dataset.i,1);salvaRif();render()}
+  });
+  document.querySelectorAll(".rifA").forEach(b=>b.onclick=()=>{
+    const o=D.riferimenti.find(x=>x.id===b.dataset.o);if(!o)return;
+    const tipo=(prompt("Tipo di codice (es. POD, matricola, codice GSE):")||"").trim();if(!tipo)return;
+    const valore=(prompt("Valore del codice:")||"").trim();if(!valore)return;
+    const ente=(prompt("Ente che lo ha assegnato (facoltativo):")||"").trim(),nota=(prompt("Nota (facoltativa):")||"").trim();
+    o.codici.push({tipo,valore,ente,nota,principale:false});salvaRif();render();
+  });
+  document.getElementById("rifCsv").onclick=()=>{
+    const q=x=>'"'+String(x==null?"":x).replace(/"/g,'""')+'"',l=["categoria;oggetto;sito;tipo;codice;ente;nota"];
+    D.riferimenti.forEach(o=>o.codici.forEach(c=>l.push([o.categoria,o.nome,o.sito,c.tipo,c.valore,c.ente,c.nota].map(q).join(";"))));
+    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["\ufeff"+l.join("\n")],{type:"text/csv"}));a.download="riferimenti_siciet.csv";a.click();
+  };
+}
+
 /* ---------- monitoraggio indicatori (scheda All. MGE) ---------- */
 const IND=[
   {pos:1,nome:"Consumo combustibili – Benzina",ogg:"Consumi: litri consumati ogni 100 km (l/km)×100",um:"l/100 km",dec:2,peggio:"su"},
@@ -938,11 +987,13 @@ function salvaMese(){
   }catch(err){alert(err.message)}
 }
 
-const VIEWS={pan:[vPan,dPan],el:[vEl,dEl],gas:[vGas,dGas],acq:[vAcq,dAcq],carb:[vCarb,dCarb],fv:[vFv,dFv],flotta:[vFlotta,()=>{}],mon:[vMon,dMon],ins:[vIns,dIns],dati:[vDati,dDati],note:[vNote,()=>{}]};
+const VIEWS={pan:[vPan,dPan],el:[vEl,dEl],gas:[vGas,dGas],acq:[vAcq,dAcq],carb:[vCarb,dCarb],fv:[vFv,dFv],flotta:[vFlotta,()=>{}],mon:[vMon,dMon],ins:[vIns,dIns],dati:[vDati,dDati],rif:[vRif,dRif],note:[vNote,()=>{}]};
 function render(){
   charts.forEach(c=>c.destroy());charts=[];
   const [v,d]=VIEWS[tab];
-  document.getElementById("view").innerHTML=v();
+  const rc=RIFCAT[tab];
+  document.getElementById("view").innerHTML=(rc?rifLine(rc):"")+v();
+  document.querySelectorAll("[data-go]").forEach(a=>a.onclick=e=>{e.preventDefault();tab=a.dataset.go;buildTabs();render()});
   try{d()}catch(e){console.error(e)}
 }
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>D&&D.mensili.length&&render());
