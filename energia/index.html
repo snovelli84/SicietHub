@@ -128,7 +128,7 @@ const SCADENZE=[
   {txt:"Offerta gas «Anno Sicuro Gas» (0,70 €/Smc materia prima)",data:"2026-11-30"},
   {txt:"Condizioni contratto elettrico (prezzo fisso F1/F2/F3)",data:"2027-01-31"}
 ];
-const TABS=[["pan","Panoramica"],["el","Elettricità"],["gas","Gas"],["acq","Acqua"],["carb","Carburanti"],["fv","Fotovoltaico"],["flotta","Flotta"],["mon","Monitoraggio"],["ins","＋ Inserisci mese"],["dati","Dati"],["rif","Riferimenti"],["note","Note e dubbi"]];
+const TABS=[["pan","Panoramica"],["conf","Confronto"],["el","Elettricità"],["gas","Gas"],["acq","Acqua"],["carb","Carburanti"],["fv","Fotovoltaico"],["flotta","Flotta"],["mon","Monitoraggio"],["ins","＋ Inserisci mese"],["dati","Dati"],["rif","Riferimenti"],["note","Note e dubbi"]];
 
 /* ---------- archivio e sincronizzazione ---------- */
 var ENERGIA_CONFIG={
@@ -141,7 +141,7 @@ var ENERGIA_CONFIG={
 };
 const CFG=ENERGIA_CONFIG;
 // Versione della pagina: va aumentata a ogni modifica, così in fondo si vede quale è in uso.
-const VERSIONE="1.7",DATA_VERSIONE="24/11/2026";
+const VERSIONE="1.8",DATA_VERSIONE="24/11/2026";
 const KEY="siciet_energia_data_v1",KP="siciet_energia_pwd",KN="siciet_energia_nome",KQ="siciet_energia_coda";
 const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const ARR={mensile:"mensili",el:"elettrico_dettaglio",gas:"gas_dettaglio",fv:"fv",fv30:"fv30",acqua:"acqua_fatture",carbtx:"carb_tx",km:"km_mensili",scheda:"monitoraggio"};
@@ -737,6 +737,75 @@ async function leggiFattureAcqua(files){
   if(b)b.onclick=()=>{saveVoci(aqCoda.map(r=>({tipo:"acqua",chiave:r.fattura.numero,dati:r.fattura})));toast(aqCoda.length+" fatture salvate");render()};
 }
 
+/* ---------- confronto tra periodi scelti ---------- */
+const CF={preset:"anno",voce:"el",a:["",""],b:["",""]};
+const idxDi=s=>{const[y,m]=s.split("-").map(Number);return y*12+m-1};
+const idxIn=i=>`${Math.floor(i/12)}-${String(i%12+1).padStart(2,"0")}`;
+const etIdx=i=>MESI[i%12]+" "+Math.floor(i/12);
+const mrec=(v,i)=>D.mensili.find(m=>m.anno===Math.floor(i/12)&&m.mese===i%12+1&&m.vettore===v);
+const mq=(v,i)=>{const r=mrec(v,i);return r?r.quantita:null};
+const mcost=v=>i=>{const r=mrec(v,i);return r&&r.costo!=null?r.costo:null};
+const fvr=(i)=>D.fv.find(r=>r.anno===Math.floor(i/12)&&r.mese===i%12+1);
+const aqMese=(()=>{let cache=null,key="";return i=>{
+  if(!D.acqua_fatture.length)return null;
+  const k=D.acqua_fatture.length+"|"+D.acqua_fatture[D.acqua_fatture.length-1].numero;
+  if(k!==key){key=k;const{seg}=segmentiAcqua(),m={};seg.forEach(x=>{const d0=gg(x.dal);for(let j=0;j<x.gg;j++){const d=new Date((d0+j)*864e5),ix=d.getUTCFullYear()*12+d.getUTCMonth();m[ix]=(m[ix]||0)+x.gio}});
+    const ks=Object.keys(m).map(Number).sort((a,b)=>a-b);cache={m,da:ks[0]+1,a:ks[ks.length-1]-1}}
+  return i>=cache.da&&i<=cache.a?cache.m[i]:null}})();
+const CF_VOCI=[
+  {id:"el",n:"Elettricità prelevata dalla rete",u:"kWh",f:i=>mq("elettrico",i)},
+  {id:"tot",n:"Consumo totale della sede (prelievo + autoconsumo FV)",u:"kWh",f:i=>{const r=fvr(i);return r&&r.consumo_totale_kwh!=null?r.consumo_totale_kwh:null}},
+  {id:"fv20",n:"Produzione impianto 19,95 kWp",u:"kWh",f:i=>{const r=fvr(i);return r&&r.produzione_kwh!=null?r.produzione_kwh:null},buono:"su"},
+  {id:"fv30",n:"Produzione impianto 29,75 kWp",u:"kWh",f:i=>{const r=D.fv30.find(x=>x.anno===Math.floor(i/12)&&x.mese===i%12+1);return r?r.produzione_kwh:null},buono:"su"},
+  {id:"gas",n:"Gas",u:"Smc",f:i=>mq("gas",i)},
+  {id:"acq",n:"Acqua (ripartita sui giorni delle fatture)",u:"m³",f:aqMese},
+  {id:"gasolio",n:"Gasolio",u:"litri",f:i=>mq("gasolio",i)},
+  {id:"benzina",n:"Benzina",u:"litri",f:i=>mq("benzina",i)},
+  {id:"cel",n:"Costo elettricità (€ imponibile)",u:"€",f:mcost("elettrico")},
+  {id:"cgas",n:"Costo gas (€ imponibile)",u:"€",f:mcost("gas")},
+  {id:"ccarb",n:"Costo carburanti (€ imponibile)",u:"€",f:i=>{const l=["gasolio","benzina","HVO","AdBlue"].map(v=>mcost(v)(i)).filter(x=>x!=null);return l.length?l.reduce((a,b)=>a+b,0):null}}
+];
+function cfPeriodi(){
+  const L=D.mensili.reduce((a,m)=>Math.max(a,m.anno*12+m.mese-1),0);
+  if(CF.preset==="anno"){const y=Math.floor(L/12)*12;return{a:[y,L],b:[y-12,L-12]}}
+  if(CF.preset==="12m")return{a:[L-11,L],b:[L-23,L-12]};
+  if(CF.preset==="3m")return{a:[L-2,L],b:[L-14,L-12]};
+  const ok=x=>x[0]&&x[1];
+  if(!ok(CF.a)||!ok(CF.b)){const y=Math.floor(L/12)*12;return{a:[y,L],b:[y-12,L-12]}}
+  return{a:[idxDi(CF.a[0]),idxDi(CF.a[1])],b:[idxDi(CF.b[0]),idxDi(CF.b[1])]};
+}
+function cfStat(f,p){let s=0,n=0;for(let i=p[0];i<=p[1];i++){const v=f(i);if(v!=null){s+=v;n++}}return{s,n,tot:p[1]-p[0]+1,avg:n?s/n:null}}
+function vConf(){
+  const P=cfPeriodi(),pers=CF.preset==="pers";
+  const set=(k,v)=>`<input type="month" id="${k}" value="${v}" ${pers?"":"disabled"} style="padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text)">`;
+  const nm=Math.max(P.a[1]-P.a[0],P.b[1]-P.b[0])+1;
+  const righe=CF_VOCI.map(v=>{
+    const a=cfStat(v.f,P.a),b=cfStat(v.f,P.b);
+    if(!a.n&&!b.n)return"";
+    let pa=0,pb=0,pn=0;
+    for(let k=0;k<nm;k++){const x=P.a[0]+k<=P.a[1]?v.f(P.a[0]+k):null,y=P.b[0]+k<=P.b[1]?v.f(P.b[0]+k):null;if(x!=null&&y!=null){pa+=x;pb+=y;pn++}}
+    const parz=pn>0&&pn<Math.max(a.n,b.n),d=pn?pa-pb:null,p=pn&&pb?pct(pa,pb):null,dec=v.u==="m³"?1:0;
+    const col=p==null?"":(v.buono==="su"?(p>0?"down":"up"):(p>0?"up":"down"));
+    const cov=s=>s.n===s.tot?`${s.n} mesi`:`<span class="up">${s.n} mesi su ${s.tot}</span>`;
+    return`<tr><td class="l" style="white-space:normal">${v.n}${parz?`<br><span class="muted">variazione sui ${pn} mesi presenti in entrambi i periodi</span>`:""}${!pn&&a.n&&b.n?`<br><span class="muted">nessun mese in comune: variazione non calcolabile</span>`:""}</td><td>${a.n?NF(a.s,dec)+' <span class="muted">'+v.u+"</span>":"n.d."}<br><span class="muted">${cov(a)}</span></td><td>${b.n?NF(b.s,dec)+' <span class="muted">'+v.u+"</span>":"n.d."}<br><span class="muted">${cov(b)}</span></td><td class="${col}">${d!=null?(d>0?"+":"")+NF(d,dec):""}</td><td class="${col}">${p!=null?(p>0?"▲ ":"▼ ")+NF(Math.abs(p),1)+"%":"n.d."}</td></tr>`}).join("");
+  const voceSel=CF_VOCI.filter(v=>cfStat(v.f,P.a).n||cfStat(v.f,P.b).n);
+  return`<div class="card"><h2>Scegli i periodi da confrontare</h2>
+  <div class="tools"><select id="cfPre"><option value="anno" ${CF.preset==="anno"?"selected":""}>Anno in corso contro anno precedente (stessi mesi)</option><option value="12m" ${CF.preset==="12m"?"selected":""}>Ultimi 12 mesi contro i 12 precedenti</option><option value="3m" ${CF.preset==="3m"?"selected":""}>Ultimi 3 mesi contro gli stessi 3 mesi dell'anno prima</option><option value="pers" ${pers?"selected":""}>Periodi a scelta</option></select></div>
+  <div class="tools"><b>Periodo A</b> da ${set("cfA0",idxIn(P.a[0]))} a ${set("cfA1",idxIn(P.a[1]))} &nbsp; <b>Periodo B</b> da ${set("cfB0",idxIn(P.b[0]))} a ${set("cfB1",idxIn(P.b[1]))}</div>
+  <p class="muted">A = ${etIdx(P.a[0])} – ${etIdx(P.a[1])}; B = ${etIdx(P.b[0])} – ${etIdx(P.b[1])}. La variazione è A rispetto a B e si calcola solo sui mesi che hanno dati in entrambi i periodi (nella stessa posizione: primo mese con primo mese, e così via).</p></div>
+  <div class="card" style="margin-top:14px"><div class="scroll"><table><thead><tr><th class="l">Voce</th><th>Periodo A</th><th>Periodo B</th><th>Variazione</th><th>%</th></tr></thead><tbody>${righe||'<tr><td class="l" colspan="5">Nessun dato nei periodi scelti.</td></tr>'}</tbody></table></div></div>
+  <div class="card" style="margin-top:14px"><h2>Andamento mese per mese</h2><div class="tools"><select id="cfVoce">${voceSel.map(v=>`<option value="${v.id}" ${CF.voce===v.id?"selected":""}>${v.n}</option>`).join("")}</select></div><div class="chartbox"><canvas id="cf1"></canvas></div></div>`;
+}
+function dConf(){
+  const P=cfPeriodi(),$=id=>document.getElementById(id);
+  $("cfPre").onchange=()=>{CF.preset=$("cfPre").value;if(CF.preset==="pers"){CF.a=[idxIn(P.a[0]),idxIn(P.a[1])];CF.b=[idxIn(P.b[0]),idxIn(P.b[1])]}render()};
+  ["cfA0","cfA1","cfB0","cfB1"].forEach(id=>$(id).onchange=()=>{CF.a=[$("cfA0").value,$("cfA1").value];CF.b=[$("cfB0").value,$("cfB1").value];render()});
+  $("cfVoce").onchange=()=>{CF.voce=$("cfVoce").value;render()};
+  const v=CF_VOCI.find(x=>x.id===CF.voce)||CF_VOCI[0],c=COL(),n=Math.max(P.a[1]-P.a[0],P.b[1]-P.b[0])+1;
+  const ser=p=>Array.from({length:n},(_,k)=>p[0]+k<=p[1]?v.f(p[0]+k):null);
+  chart("cf1",{type:"bar",data:{labels:Array.from({length:n},(_,k)=>(k+1)+"° mese"+(P.a[0]+k<=P.a[1]?" ("+etIdx(P.a[0]+k)+")":"")),datasets:[{label:"A: "+etIdx(P.a[0])+" – "+etIdx(P.a[1]),data:ser(P.a),backgroundColor:c[0]},{label:"B: "+etIdx(P.b[0])+" – "+etIdx(P.b[1]),data:ser(P.b),backgroundColor:c[4]}]},options:{scales:{y:{beginAtZero:true,title:{display:true,text:v.u}}}}});
+}
+
 /* ---------- riferimenti: POD, codici GSE, matricole ---------- */
 let rifQ="";
 const RIFCAT={el:["luce"],gas:["gas"],acq:["acqua"],carb:["carburante"],fv:["fotovoltaico"]};
@@ -1173,7 +1242,7 @@ function salvaMese(){
   }catch(err){alert(err.message)}
 }
 
-const VIEWS={pan:[vPan,dPan],el:[vEl,dEl],gas:[vGas,dGas],acq:[vAcq,dAcq],carb:[vCarb,dCarb],fv:[vFv,dFv],flotta:[vFlotta,()=>{}],mon:[vMon,dMon],ins:[vIns,dIns],dati:[vDati,dDati],rif:[vRif,dRif],note:[vNote,()=>{}]};
+const VIEWS={pan:[vPan,dPan],conf:[vConf,dConf],el:[vEl,dEl],gas:[vGas,dGas],acq:[vAcq,dAcq],carb:[vCarb,dCarb],fv:[vFv,dFv],flotta:[vFlotta,()=>{}],mon:[vMon,dMon],ins:[vIns,dIns],dati:[vDati,dDati],rif:[vRif,dRif],note:[vNote,()=>{}]};
 function render(){
   charts.forEach(c=>c.destroy());charts=[];
   const [v,d]=VIEWS[tab];
