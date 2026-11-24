@@ -4,11 +4,13 @@ Dashboard dei consumi energetici aziendali (elettricità, gas, carburanti, fotov
 
 ## Uso
 
-- **Panoramica, Elettricità, Gas, Carburanti, Fotovoltaico, Flotta**: grafici e indicatori, sempre calcolati sui dati inseriti.
+- **Panoramica, Elettricità, Gas, Carburanti, Fotovoltaico, Flotta**: grafici e indicatori, sempre calcolati sui dati inseriti. **Fotovoltaico** comprende la produzione, l'immissione e l'autoconsumo dell'impianto da 20 kW (scambio sul posto), la produzione e i ricavi dell'impianto da 30 kW (ritiro dedicato), lo storico annuo dal 2008, gli avvisi automatici quando un mese produce meno della metà dello stesso mese degli anni precedenti e la simulazione del nuovo impianto con accumulo.
+- **Versione**: in fondo a ogni pagina compaiono la versione della pagina, l'archivio in uso (servizio condiviso o solo questo dispositivo) e l'ultimo mese con dati. Il numero (`VERSIONE` all'inizio dello script di `index.html`) va aumentato a ogni modifica.
 - **Monitoraggio**: la scheda *All. MGE – Monitoraggio indicatori energetici* con i 4 indicatori (consumo benzina e gasolio in l/100 km, % di km fatti dall'auto elettrica, rendimento FV Prp > 0,8) per anno. Il **risultato** è il valore calcolato dai dati mensili, se ci sono; altrimenti il **valore della scheda**, che si può scrivere o correggere nella colonna omonima. **Stampa la scheda** produce la pagina da firmare.
 - **＋ Inserisci mese**: un modulo per mese con elettricità (kWh, F1/F2/F3, potenza, cos φ, costi, fattura), gas, carburanti per tipo, fotovoltaico (produzione, immissione, autoconsumo, producibile, Prp) e km dei mezzi. Il mese proposto è quello appena concluso; sopra il modulo compaiono i mesi senza dati dell'anno, da toccare per aprirli. Se il mese ha già dei dati compaiono nei campi e si possono correggere; un riquadro svuotato del tutto elimina i dati del mese (con conferma).
   - Numeri all'italiana: `3.012` è tremiladodici, i decimali si scrivono con la virgola (`850,5`).
   - Se vuoti si calcolano da soli: i kWh dalla somma F1+F2+F3, l'autoconsumo FV (produzione − immissione), la copertura FV e il Prp (produzione / producibile). Se F1+F2+F3 non torna con il prelievo la pagina lo segnala.
+  - Per il fotovoltaico c'è anche la produzione mensile dell'impianto da 30 kW.
   - I **km** servono per gli indicatori 1–3: il l/100 km di un mese si calcola solo se per quel mese sono stati inseriti i km e i litri.
 - **Dati**: tabella di tutte le righe, con filtri ed **Esporta CSV**.
 
@@ -36,7 +38,7 @@ Lo schema è quello di SICIET InvenTrack, sullo stesso account Cloudflare (piano
 
 Verifica: aprire `hub.siciet.it/energia/`, inserire nome e password, caricare il file dati e inserire/correggere un mese. "Servizio non configurato" indica che manca l'associazione `DB` o il segreto `PASSWORD`.
 
-Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo.
+Quando si modifica `api/worker.js` va ricopiato su Cloudflare allo stesso modo (la versione 1.2 aggiunge il tipo di voce `fv30`: chi ha già attivato il servizio deve ricopiare il file).
 
 ## Limiti
 

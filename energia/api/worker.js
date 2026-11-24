@@ -25,7 +25,8 @@
  * Una voce è { tipo, chiave, dati, operatore, quando }. I tipi sono:
  *   mensile   riga di consumo di un vettore (chiave anno|mese|vettore)
  *   el, gas   dettaglio della bolletta (chiave anno|mese)
- *   fv        fotovoltaico del mese (chiave anno|mese)
+ *   fv        fotovoltaico del mese, impianto 20 kW (chiave anno|mese)
+ *   fv30      produzione del mese dell'impianto 30 kW (chiave anno|mese)
  *   km        km del mese per benzina, gasolio ed elettrico (chiave anno|mese)
  *   scheda    valore dell'indicatore nella scheda di monitoraggio (chiave posizione|anno)
  *   base      dati fissi (siti, flotta, note…) caricati con l'importazione del file
@@ -33,7 +34,7 @@
  */
 
 const MB = 1024 * 1024;
-const TIPI = ["mensile", "el", "gas", "fv", "km", "scheda", "base"];
+const TIPI = ["mensile", "el", "gas", "fv", "fv30", "km", "scheda", "base"];
 const MAX_VOCI = 600;       // voci per richiesta
 const MAX_DATI = 1.5 * MB;  // dimensione di una voce
 
