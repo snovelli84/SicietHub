@@ -27,6 +27,7 @@
  *   el, gas   dettaglio della bolletta (chiave anno|mese)
  *   fv        fotovoltaico del mese, impianto 20 kW (chiave anno|mese)
  *   fv30      produzione del mese dell'impianto 30 kW (chiave anno|mese)
+ *   acqua     fattura dell'acqua (chiave: numero fattura)
  *   km        km del mese per benzina, gasolio ed elettrico (chiave anno|mese)
  *   scheda    valore dell'indicatore nella scheda di monitoraggio (chiave posizione|anno)
  *   base      dati fissi (siti, flotta, note…) caricati con l'importazione del file
@@ -34,7 +35,7 @@
  */
 
 const MB = 1024 * 1024;
-const TIPI = ["mensile", "el", "gas", "fv", "fv30", "km", "scheda", "base"];
+const TIPI = ["mensile", "el", "gas", "fv", "fv30", "acqua", "km", "scheda", "base"];
 const MAX_VOCI = 600;       // voci per richiesta
 const MAX_DATI = 1.5 * MB;  // dimensione di una voce
 
