@@ -59,6 +59,9 @@ select{padding:7px 10px;border-radius:8px;border:1px solid var(--border);backgro
 ul.note{padding-left:18px;font-size:.88rem}ul.note li{margin:5px 0}
 .muted{color:var(--muted);font-size:.8rem}
 .tag{display:inline-block;background:var(--chip);border-radius:6px;padding:1px 7px;font-size:.75rem;margin-left:4px}
+.rifrow{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);font-size:.85rem}
+.rifmain{min-width:0;overflow-wrap:anywhere}
+.rifbtn{display:flex;gap:6px;flex-shrink:0}
 .boxc{max-width:460px;margin:50px auto;padding:0 16px;display:flex;flex-direction:column;gap:12px}
 .drop{border:2px dashed var(--border);border-radius:14px;padding:30px 16px;background:var(--card);text-align:center}
 label.f{display:flex;flex-direction:column;gap:3px;font-size:.78rem;color:var(--muted)}
@@ -125,7 +128,7 @@ const SCADENZE=[
   {txt:"Offerta gas «Anno Sicuro Gas» (0,70 €/Smc materia prima)",data:"2026-11-30"},
   {txt:"Condizioni contratto elettrico (prezzo fisso F1/F2/F3)",data:"2027-01-31"}
 ];
-const TABS=[["pan","Panoramica"],["el","Elettricità"],["gas","Gas"],["acq","Acqua"],["carb","Carburanti"],["fv","Fotovoltaico"],["flotta","Flotta"],["mon","Monitoraggio"],["ins","＋ Inserisci mese"],["dati","Dati"],["note","Note e dubbi"]];
+const TABS=[["pan","Panoramica"],["el","Elettricità"],["gas","Gas"],["acq","Acqua"],["carb","Carburanti"],["fv","Fotovoltaico"],["flotta","Flotta"],["mon","Monitoraggio"],["ins","＋ Inserisci mese"],["dati","Dati"],["rif","Riferimenti"],["note","Note e dubbi"]];
 
 /* ---------- archivio e sincronizzazione ---------- */
 var ENERGIA_CONFIG={
@@ -138,13 +141,13 @@ var ENERGIA_CONFIG={
 };
 const CFG=ENERGIA_CONFIG;
 // Versione della pagina: va aumentata a ogni modifica, così in fondo si vede quale è in uso.
-const VERSIONE="1.3",DATA_VERSIONE="24/11/2026";
+const VERSIONE="1.6",DATA_VERSIONE="24/11/2026";
 const KEY="siciet_energia_data_v1",KP="siciet_energia_pwd",KN="siciet_energia_nome",KQ="siciet_energia_coda";
 const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const ARR={mensile:"mensili",el:"elettrico_dettaglio",gas:"gas_dettaglio",fv:"fv",fv30:"fv30",acqua:"acqua_fatture",km:"km_mensili",scheda:"monitoraggio"};
 const KEYOF={mensile:r=>`${r.anno}|${r.mese}|${r.vettore}`,el:r=>`${r.anno}|${r.mese}`,gas:r=>`${r.anno}|${r.mese}`,fv:r=>`${r.anno}|${r.mese}`,fv30:r=>`${r.anno}|${r.mese}`,acqua:r=>r.numero,km:r=>`${r.anno}|${r.mese}`,scheda:r=>`${r.pos}|${r.anno}`};
-const BASE=["siti","flotta","carburanti_per_mezzo_mese","note","fv_storico","fv_simulazione"];
-function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],fv30:[],acqua_fatture:[],fv_storico:[],fv_simulazione:{},flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
+const BASE=["siti","flotta","carburanti_per_mezzo_mese","note","fv_storico","fv_simulazione","fv_impianti","fv_ricavi","interventi","riferimenti"];
+function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],fv30:[],acqua_fatture:[],fv_storico:[],fv_simulazione:{},fv_impianti:[],fv_ricavi:[],interventi:[],riferimenti:[],flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
 function norm(o){const v=vuoto(),d=Object.assign({},o);for(const k in v)if(d[k]==null)d[k]=v[k];return d}
 function applyVoce(v){
   if(v.tipo==="base"){if(!v.dati)return false;const a=JSON.stringify(D[v.chiave]);D[v.chiave]=v.dati.v;return a!==JSON.stringify(v.dati.v)}
@@ -253,12 +256,15 @@ function show(){
   mostraStato();buildTabs();render();
 }
 function importa(obj){
-  if(!obj||!Array.isArray(obj.mensili))throw new Error("File non valido: manca l'elenco «mensili».");
-  const o=norm(obj);
-  if(CFG.api){
-    if(D&&D.mensili.length&&!confirm("I dati del file sostituiranno quelli già presenti per gli stessi mesi. Continuare?"))return;
-    saveVoci(vociDa(o));
+  const patch=obj&&obj.aggiornamento===true;
+  if(!obj||(!Array.isArray(obj.mensili)&&!patch))throw new Error("File non valido: manca l'elenco «mensili».");
+  // un file di aggiornamento si unisce sempre ai dati esistenti e tocca solo le sezioni che contiene
+  if(patch||CFG.api){
+    if(!patch&&D&&D.mensili.length&&!confirm("I dati del file sostituiranno quelli già presenti per gli stessi mesi. Continuare?"))return;
+    const v=vociDa(obj);saveVoci(v);
+    if(patch)toast("Aggiornamento applicato: "+v.length+" voci");
   }else{
+    const o=norm(obj);
     if(D&&D.mensili.length&&!confirm("I dati del file sostituiranno tutti quelli salvati su questo dispositivo. Continuare?"))return;
     D=o;sortD();salvaLocale();
   }
@@ -417,38 +423,57 @@ function dCarb(){
   chart("k4",{type:"line",data:{labels:g.map(m=>MESI[m.mese-1]+" "+String(m.anno).slice(2)),datasets:[{label:"€/l imponibile",data:g.map(m=>m.costo/m.quantita),borderColor:c[1],backgroundColor:c[1],tension:.2,pointRadius:2}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:10}}}}});
 }
 function anomalieFv(){
-  const out=[];
-  const chk=(nome,arr)=>arr.slice(-12).forEach(r=>{
-    const alt=arr.filter(x=>x.mese===r.mese&&x.anno<r.anno&&x.anno>=r.anno-3).map(x=>x.produzione_kwh);
+  const voci=[],avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+  const interv=(y,m)=>(D.interventi||[]).find(i=>{const k=y*100+m;return k>=+i.da.replace("-","")&&k<=+i.a.replace("-","")});
+  const chk=(nome,arr,k,etichetta,applica)=>arr.slice(-12).forEach(r=>{
+    if(r[k]==null||(applica&&!applica(r)))return;
+    const alt=arr.filter(x=>x.mese===r.mese&&x.anno<r.anno&&x.anno>=r.anno-3&&x[k]!=null).map(x=>x[k]);
     if(alt.length<2)return;
-    const m=alt.reduce((a,b)=>a+b,0)/alt.length;
-    if(r.produzione_kwh<m*0.5)out.push(`<b>${nome} – ${MESI[r.mese-1]} ${r.anno}</b>: produzione ${NF(r.produzione_kwh)} kWh, il ${NF(r.produzione_kwh/m*100)}% della media dello stesso mese negli anni precedenti (${NF(m)} kWh). Verificare impianto e inverter.`);
+    const m=avg(alt);
+    if(r[k]<m*0.5)voci.push({anno:r.anno,mese:r.mese,nome,iv:interv(r.anno,r.mese),html:`<b>${nome} – ${MESI[r.mese-1]} ${r.anno}</b>: ${etichetta} ${NF(r[k])} kWh, il ${NF(r[k]/m*100)}% della media dello stesso mese negli anni precedenti (${NF(m)} kWh). Verificare impianto e inverter.`});
   });
-  chk("Impianto 30 kW",D.fv30);
-  chk("Impianto 20 kW",D.fv.filter(r=>r.produzione_kwh!=null));
+  chk("Impianto 29,75 kW",D.fv30,"produzione_kwh","produzione");
+  chk("Impianto 20 kW",D.fv.filter(r=>r.produzione_kwh!=null),"produzione_kwh","produzione");
+  // dove la produzione del 20 kW manca si controlla l'energia immessa in rete
+  chk("Impianto 20 kW",D.fv.filter(r=>r.immissione_kwh!=null),"immissione_kwh","immissione in rete",r=>r.produzione_kwh==null);
+  const per={},out=[];
+  voci.forEach(v=>{(per[v.anno+"|"+v.mese]=per[v.anno+"|"+v.mese]||[]).push(v)});
+  Object.entries(per).forEach(([k,l])=>{
+    const[y,m]=k.split("|"),iv=l[0].iv;
+    if(iv&&l.every(v=>v.iv)){out.push({tipo:"info",html:`<b>${MESI[m-1]} ${y}: intervento registrato</b> – ${esc(iv.descrizione)}. Il calo di produzione è atteso (${[...new Set(l.map(v=>v.nome))].join(", ")}).`});return}
+    if(new Set(l.map(v=>v.nome)).size>=2)out.push({tipo:"err",html:`<b>Calo simultaneo dei due impianti – ${MESI[m-1]} ${y}</b>: è più probabile una causa comune (guasto elettrico, distacco dalla rete, problema di misura) che due guasti indipendenti.`});
+    l.forEach(v=>out.push({tipo:"err",html:v.html}));
+  });
   return out;
+}
+function consumoAlto(){
+  const c=D.fv.filter(r=>r.consumo_totale_kwh!=null),f=[];
+  c.slice(-12).forEach(r=>{const p=c.find(x=>x.anno===r.anno-1&&x.mese===r.mese);if(p&&r.consumo_totale_kwh>p.consumo_totale_kwh*1.25)f.push(`${MESI[r.mese-1]} ${String(r.anno).slice(2)} ${"+"+NF((r.consumo_totale_kwh/p.consumo_totale_kwh-1)*100)}%`)});
+  return f.length?`<div class="alert warn"><b>Consumo totale della sede in forte crescita</b> rispetto allo stesso mese dell'anno prima (prelievo + autoconsumo FV): ${f.join(", ")}. Non dipende solo dal fotovoltaico: è un consumo in più.</div>`:"";
 }
 function vFv(){
   const pr=D.fv.filter(r=>r.produzione_kwh!=null),u=pr.slice(-12),f30=D.fv30.slice(-12);
   const sum=(a,k)=>a.reduce((s,r)=>s+(r[k]||0),0);
   const per=a=>a.length?MESI[a[0].mese-1]+" "+a[0].anno+" – "+MESI[a[a.length-1].mese-1]+" "+a[a.length-1].anno:"";
   const ct=sum(u,"consumo_totale_kwh"),kwp=kwpDef();
-  const al=anomalieFv().map(t=>`<div class="alert err">${t}</div>`).join("");
+  const al=anomalieFv().map(x=>`<div class="alert ${x.tipo==="info"?"warn":"err"}">${x.html}</div>`).join("")+consumoAlto();
   const lp=pr.length?pr[pr.length-1]:null,le=lastMonth("elettrico");
-  const gap=lp&&(lp.anno*12+lp.mese<le.y*12+le.m)?`<div class="alert warn">La produzione dell'impianto 20 kW è disponibile fino a <b>${MESI[lp.mese-1]} ${lp.anno}</b>: mancano i mesi successivi (si inseriscono da <b>＋ Inserisci mese</b>). Senza questi dati l'aumento dei prelievi del ${MESI[le.m-1]} ${le.y} non si può confrontare con la produzione FV.</div>`:"";
+  const gap=lp&&(le.y*12+le.m)-(lp.anno*12+lp.mese)>1?`<div class="alert warn">La produzione dell'impianto 20 kW è disponibile fino a <b>${MESI[lp.mese-1]} ${lp.anno}</b>: i mesi successivi si inseriscono da <b>＋ Inserisci mese</b> quando il GSE pubblica le misure.</div>`:"";
   const k=(t,v,u2,s)=>`<div class="card kpi"><h3>${t}</h3><div class="v">${v} <small style="font-size:.9rem">${u2}</small></div><div class="s">${s}</div></div>`;
   const sim=D.fv_simulazione&&D.fv_simulazione.mesi&&D.fv_simulazione.mesi.length?D.fv_simulazione:null;
   return al+gap+`<div class="grid">
-    ${k("Impianto 20 kW (scambio sul posto)",NF(kwp,2),"kWp","produce per autoconsumo e immette il resto in rete")}
+    ${k("Impianto 19,95 kWp (CE2, scambio sul posto)",NF(kwp,2),"kWp","produce per autoconsumo e immette il resto in rete")}
     ${u.length?k("Produzione 20 kW, ultimi "+u.length+" mesi",NF(sum(u,"produzione_kwh")),"kWh",per(u)):""}
     ${u.length&&ct?k("Autoconsumo",NF(sum(u,"autoconsumo_kwh")),"kWh",NF(sum(u,"autoconsumo_kwh")/ct*100,1)+"% del consumo totale"):""}
-    ${f30.length?k("Impianto 30 kW (ritiro dedicato)",NF(sum(f30,"produzione_kwh")),"kWh",per(f30)+" · tutta venduta"):""}
+    ${f30.length?k("Impianto 29,75 kW (ritiro dedicato)",NF(sum(f30,"produzione_kwh")),"kWh",per(f30)+" · tutta venduta"):""}
   </div>
   <div class="grid wide" style="margin-top:14px">
     ${box("f1","Produzione 20 kW per mese (kWh)")}${box("f2","Autoconsumo e immissione 20 kW (kWh)")}
-    ${box("f3","Copertura FV del consumo (%)","Autoconsumo / (prelievo + autoconsumo)")}${box("f4","Produzione annua per impianto (kWh)","Anni parziali in colore più chiaro")}
-    ${box("f5","Impianto 30 kW per mese (kWh)")}${box("f6","Ricavi annui impianto 30 kW (€)","Vendita dell'energia e tariffa incentivante; dal 2023 gli importi non sono più registrati")}
+    ${box("f3","Copertura FV del consumo (%)","Autoconsumo / (prelievo + autoconsumo)")}${box("f7","Consumo totale della sede per mese (kWh)","Prelievo da rete + autoconsumo FV, confronto tra anni")}${box("f4","Produzione annua per impianto (kWh)","Anni parziali in colore più chiaro. 29,75 kW: 2008–2020 dal file Excel in energia lorda GSE (circa +5% sulla misurata)")}
+    ${box("f5","Impianto 29,75 kW per mese (kWh)")}${box("f6","Ricavi annui dagli impianti (€)",D.fv_ricavi.length?"Dati GSE, IVA esclusa; il 2026 comprende solo gli acconti. Dal 2023 manca l'incentivo del 29,75 kW (da verificare nel Conto Energia 1): il calo dei ricavi è un dato mancante, non una perdita":"Vendita dell'energia e tariffa incentivante; dal 2023 gli importi non sono più registrati")}
   </div>
+  ${D.fv_impianti.length?`<div class="card" style="margin-top:14px"><h2>Impianti</h2><div class="scroll"><table><thead><tr><th class="l">Codice GSE</th><th>kWp</th><th>In esercizio dal</th><th class="l">Convenzioni</th><th>Tariffa €/kWh</th><th>Fine incentivo</th><th class="l">POD</th><th class="l">Indirizzo</th></tr></thead><tbody>${D.fv_impianti.map(i=>`<tr><td class="l"><b>${esc(i.codice)}</b></td><td>${NF(i.potenza_kw,2)}</td><td>${itd(i.entrata_esercizio)}</td><td class="l" style="white-space:normal;min-width:260px">${esc(i.convenzione)}</td><td>${i.tariffa_eur_kwh!=null?NF(i.tariffa_eur_kwh,3):"n.d."}</td><td>${i.scadenza_incentivo?itd(i.scadenza_incentivo)+(i.scadenza_calcolata?' <span class="muted">(calcolata)</span>':""):'<span class="muted">n.d.</span>'}</td><td class="l">${esc(i.pod||"")}</td><td class="l" style="white-space:normal">${esc(i.indirizzo||"")}</td></tr>`).join("")}</tbody></table></div><p class="muted" style="margin-top:6px">${D.fv_impianti.map(i=>i.note?esc(i.codice)+": "+esc(i.note):"").filter(Boolean).join(" · ")}</p></div>`:""}
+  ${D.interventi.length?`<div class="card" style="margin-top:14px"><h2>Interventi sugli impianti</h2><div class="scroll"><table><thead><tr><th class="l">Periodo</th><th class="l">Impianto</th><th class="l">Descrizione</th><th>Costo €</th></tr></thead><tbody>${D.interventi.map(i=>`<tr><td class="l">${esc(i.da)}${i.a&&i.a!==i.da?" – "+esc(i.a):""}</td><td class="l">${esc(i.impianto||"")}</td><td class="l" style="white-space:normal">${esc(i.descrizione)}</td><td>${i.costo!=null?NF(i.costo,2):"n.d."}</td></tr>`).join("")}</tbody></table></div></div>`:""}
   ${sim?`<div class="card" style="margin-top:14px"><h2>Simulazione nuovo impianto con accumulo</h2><p class="muted" style="margin-bottom:8px">${esc(sim.descrizione||"")}</p>
     <div class="grid" style="margin-bottom:10px">${Object.entries(sim.indici_autoconsumo||{}).map(([n,v])=>k("Indice di autoconsumo – "+n,NF(v*100,0),"%","")).join("")}</div>
     <div class="scroll"><table><thead><tr><th class="l">Mese</th><th>Produzione nuovo impianto</th><th>Consumo totale</th><th>Autoconsumo</th><th>Immissione</th><th>Da accumulo</th><th>Totale autoconsumo</th></tr></thead><tbody>${sim.mesi.map(m=>`<tr><td class="l">${esc(m.mese)}</td><td>${NF(m.produzione)}</td><td>${NF(m.consumo_totale)}</td><td>${NF(m.autoconsumo)}</td><td>${NF(m.immissione)}</td><td>${NF(m.autoconsumo_accumulo)}</td><td>${NF(m.totale_autoconsumo)}</td></tr>`).join("")}</tbody></table></div></div>`:""}`;
@@ -470,9 +495,15 @@ function dFv(){
     {label:"20 kW",data:an.map(y=>{const r=s20(y);return r?r.produzione_kwh:null}),backgroundColor:an.map(y=>{const r=s20(y);return r&&r.mesi<12?c[4]:c[0]})},
     {label:"30 kW",data:an.map(y=>{const r=s30(y);return r?r.p:null}),backgroundColor:an.map(y=>{const r=s30(y);return r&&r.m<12?c[4]:c[1]})}]},options:{plugins:{legend:{labels:{color:cv("--muted"),boxWidth:12,generateLabels:ch=>ch.data.datasets.map((d,i)=>({text:d.label,fillStyle:[c[0],c[1]][i],strokeStyle:[c[0],c[1]][i],hidden:!ch.isDatasetVisible(i),datasetIndex:i,fontColor:cv("--muted")}))}}},scales:{y:{beginAtZero:true,title:{display:true,text:"kWh"}}}}});
   chart("f5",lines(D.fv30,"produzione_kwh"));
+  chart("f7",lines(D.fv.filter(r=>r.consumo_totale_kwh!=null),"consumo_totale_kwh"));
+  if(D.fv_ricavi.length){
+    const rc=D.fv_ricavi,ys=[...new Set(rc.map(r=>r.anno))].sort(),nome=r=>r.impianto+" – "+r.tipo,tipi=[...new Set(rc.map(nome))];
+    chart("f6",{type:"bar",data:{labels:ys.map(y=>rc.some(r=>r.anno===y&&r.parziale)?y+" (parz.)":y),datasets:tipi.map((t,i)=>({label:t,data:ys.map(y=>rc.filter(r=>r.anno===y&&nome(r)===t).reduce((s,r)=>s+r.importo,0)),backgroundColor:c[i%5]}))},options:{scales:{x:{stacked:true},y:{stacked:true,title:{display:true,text:"€"}}}}});
+    return;
+  }
   const ric=[...new Set(D.fv30.filter(r=>r.importo_vendita!=null||r.importo_incentivo!=null).map(r=>r.anno))].sort();
-  const tot=(y,k)=>D.fv30.filter(r=>r.anno===y).reduce((s,r)=>s+(r[k]||0),0);
   const mesi30=y=>D.fv30.filter(r=>r.anno===y&&(r.importo_vendita!=null||r.importo_incentivo!=null)).length;
+  const tot=(y,k)=>D.fv30.filter(r=>r.anno===y).reduce((s,r)=>s+(r[k]||0),0);
   chart("f6",{type:"bar",data:{labels:ric.map(y=>mesi30(y)<12?y+" (parz.)":y),datasets:[{label:"Vendita energia",data:ric.map(y=>tot(y,"importo_vendita")),backgroundColor:c[0]},{label:"Tariffa incentivante",data:ric.map(y=>tot(y,"importo_incentivo")),backgroundColor:c[2]}]},options:{scales:{x:{stacked:true},y:{stacked:true,title:{display:true,text:"€"}}}}});
 }
 function vFlotta(){
@@ -699,6 +730,52 @@ async function leggiFattureAcqua(files){
   if(b)b.onclick=()=>{saveVoci(aqCoda.map(r=>({tipo:"acqua",chiave:r.fattura.numero,dati:r.fattura})));toast(aqCoda.length+" fatture salvate");render()};
 }
 
+/* ---------- riferimenti: POD, codici GSE, matricole ---------- */
+let rifQ="";
+const RIFCAT={el:["luce"],gas:["gas"],acq:["acqua"],carb:["carburante"],fv:["fotovoltaico"]};
+function rifLine(cats){
+  const l=(D.riferimenti||[]).filter(o=>cats.includes(o.categoria)&&o.sito!=="non ancora in dashboard");
+  if(!l.length)return"";
+  return`<div class="muted" style="margin-bottom:12px;line-height:1.7">${l.map(o=>`<b>${esc(o.nome)}</b>: ${o.codici.filter(c=>c.principale).map(c=>`${esc(c.tipo)} <b>${esc(c.valore)}</b>`).join(" · ")}`).join("<br>")} · <a href="#" data-go="rif">tutti i riferimenti</a></div>`;
+}
+function vRif(){
+  const R=D.riferimenti||[];
+  const cats=[["luce","Luce"],["gas","Gas"],["acqua","Acqua"],["fotovoltaico","Fotovoltaico"],["carburante","Carte carburante"],["altro","Altro"]];
+  const filtro=o=>!rifQ||JSON.stringify(o).toLowerCase().includes(rifQ.toLowerCase());
+  const blocchi=cats.map(([k,n])=>{
+    const l=R.filter(o=>o.categoria===k&&filtro(o));if(!l.length)return"";
+    return`<h2 class="sec">${n}</h2><div class="grid wide">${l.map(o=>`<div class="card"><h2>${esc(o.nome)}</h2><p class="muted" style="margin-bottom:6px">${esc(o.sito||"")}${o.dati?" · usato in: "+esc(o.dati):""}</p>
+      ${o.codici.map((c,i)=>`<div class="rifrow"><div class="rifmain"><span class="muted">${esc(c.tipo)}${c.ente?" · "+esc(c.ente):""}</span><br><b>${esc(c.valore)}</b>${c.nota?`<br><span class="muted">${esc(c.nota)}</span>`:""}</div><div class="rifbtn"><button class="btn rifC" data-v="${esc(c.valore)}">Copia</button><button class="btn rifX" data-o="${esc(o.id)}" data-i="${i}" title="Elimina il codice">🗑</button></div></div>`).join("")}
+      ${o.note?`<p class="muted" style="margin-top:6px">${esc(o.note)}</p>`:""}<div class="tools" style="margin-top:8px"><button class="btn rifA" data-o="${esc(o.id)}">＋ codice</button></div></div>`).join("")}</div>`}).join("");
+  return`<div class="tools"><input id="rifQ" placeholder="Cerca un POD, una matricola, un codice GSE…" value="${esc(rifQ)}" style="flex:1;min-width:220px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:.95rem"><button class="btn" id="rifCsv">Esporta CSV</button></div>
+  ${blocchi||'<div class="alert warn">Nessun riferimento trovato.</div>'}`;
+}
+function salvaRif(){saveVoci([{tipo:"base",chiave:"riferimenti",dati:{v:D.riferimenti}}])}
+function dRif(){
+  const i=document.getElementById("rifQ");
+  i.oninput=()=>{rifQ=i.value;const pos=i.selectionStart;render();const n=document.getElementById("rifQ");n.focus();n.setSelectionRange(pos,pos)};
+  document.querySelectorAll(".rifC").forEach(b=>b.onclick=()=>{
+    const v=b.dataset.v,ok=()=>toast("Copiato: "+v);
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(v).then(ok,()=>prompt("Copia il codice:",v));else prompt("Copia il codice:",v);
+  });
+  document.querySelectorAll(".rifX").forEach(b=>b.onclick=()=>{
+    const o=D.riferimenti.find(x=>x.id===b.dataset.o),c=o&&o.codici[+b.dataset.i];
+    if(c&&confirm("Eliminare il codice «"+c.valore+"» ("+c.tipo+")?")){o.codici.splice(+b.dataset.i,1);salvaRif();render()}
+  });
+  document.querySelectorAll(".rifA").forEach(b=>b.onclick=()=>{
+    const o=D.riferimenti.find(x=>x.id===b.dataset.o);if(!o)return;
+    const tipo=(prompt("Tipo di codice (es. POD, matricola, codice GSE):")||"").trim();if(!tipo)return;
+    const valore=(prompt("Valore del codice:")||"").trim();if(!valore)return;
+    const ente=(prompt("Ente che lo ha assegnato (facoltativo):")||"").trim(),nota=(prompt("Nota (facoltativa):")||"").trim();
+    o.codici.push({tipo,valore,ente,nota,principale:false});salvaRif();render();
+  });
+  document.getElementById("rifCsv").onclick=()=>{
+    const q=x=>'"'+String(x==null?"":x).replace(/"/g,'""')+'"',l=["categoria;oggetto;sito;tipo;codice;ente;nota"];
+    D.riferimenti.forEach(o=>o.codici.forEach(c=>l.push([o.categoria,o.nome,o.sito,c.tipo,c.valore,c.ente,c.nota].map(q).join(";"))));
+    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["\ufeff"+l.join("\n")],{type:"text/csv"}));a.download="riferimenti_siciet.csv";a.click();
+  };
+}
+
 /* ---------- monitoraggio indicatori (scheda All. MGE) ---------- */
 const IND=[
   {pos:1,nome:"Consumo combustibili – Benzina",ogg:"Consumi: litri consumati ogni 100 km (l/km)×100",um:"l/100 km",dec:2,peggio:"su"},
@@ -910,11 +987,13 @@ function salvaMese(){
   }catch(err){alert(err.message)}
 }
 
-const VIEWS={pan:[vPan,dPan],el:[vEl,dEl],gas:[vGas,dGas],acq:[vAcq,dAcq],carb:[vCarb,dCarb],fv:[vFv,dFv],flotta:[vFlotta,()=>{}],mon:[vMon,dMon],ins:[vIns,dIns],dati:[vDati,dDati],note:[vNote,()=>{}]};
+const VIEWS={pan:[vPan,dPan],el:[vEl,dEl],gas:[vGas,dGas],acq:[vAcq,dAcq],carb:[vCarb,dCarb],fv:[vFv,dFv],flotta:[vFlotta,()=>{}],mon:[vMon,dMon],ins:[vIns,dIns],dati:[vDati,dDati],rif:[vRif,dRif],note:[vNote,()=>{}]};
 function render(){
   charts.forEach(c=>c.destroy());charts=[];
   const [v,d]=VIEWS[tab];
-  document.getElementById("view").innerHTML=v();
+  const rc=RIFCAT[tab];
+  document.getElementById("view").innerHTML=(rc?rifLine(rc):"")+v();
+  document.querySelectorAll("[data-go]").forEach(a=>a.onclick=e=>{e.preventDefault();tab=a.dataset.go;buildTabs();render()});
   try{d()}catch(e){console.error(e)}
 }
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>D&&D.mensili.length&&render());
