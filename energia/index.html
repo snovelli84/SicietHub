@@ -618,12 +618,10 @@ function vAcq(){
   const an=seg.filter(x=>x.anomalo).map(x=>`<div class="alert err"><b>Consumo anomalo dal ${itd(x.dal)} al ${itd(x.al)}</b>: ${NF(x.gio,1)} m³ al giorno (${NF(x.mc)} m³ in ${x.gg} giorni), ${NF(x.gio/mediana,1)} volte la mediana di ${NF(mediana,1)} m³ al giorno. Controllare l'impianto: può essere una perdita.</div>`).join("");
   const cr=fs.filter(f=>f.totale<0).map(f=>`<div class="alert warn">La fattura <b>${f.numero}</b> del ${itd(f.emessa)} è di <b>credito</b> (${EUR(f.imponibile,2)} imponibile): conguaglio che applica la tariffa depenalizzata, compatibile con una perdita occulta riconosciuta.</div>`).join("");
   const vecchia=(Date.now()/864e5-gg(lf.al))>120?`<div class="alert warn">L'ultima fattura dell'acqua copre fino al ${itd(lf.al)}: ne manca una?</div>`:"";
-  const ic=((D.riferimenti.find(o=>o.id==="acqua-sede")||{}).codici||[]).find(c=>c.tipo==="Intestatario"),
-    intest=ic?`<div class="alert warn"><b>Intestatario e pagatore: ${esc(ic.valore)}.</b> ${esc(ic.nota||"")}</div>`:"";
   const k=(t,v,u,s)=>`<div class="card kpi"><h3>${t}</h3><div class="v">${v} <small style="font-size:.9rem">${u}</small></div><div class="s">${s}</div></div>`;
   const fine=gg(ult.al),c12=aqFinestra(seg,fine,365);
   const righe=fs.slice().reverse().map(f=>`<tr><td class="l">${esc(f.numero)}</td><td>${itd(f.emessa)}</td><td>${itd(f.dal)} – ${itd(f.al)}</td><td class="l">${f.tipo==="acconto"?"acconto":"saldo"}</td><td>${NF(f.mc)}</td><td>${NF(f.imponibile,2)}</td><td>${NF(f.iva,2)}</td><td>${NF(f.totale,2)}</td><td class="l" style="white-space:normal;min-width:180px;color:var(--muted)">${esc(f.note||"")}</td><td><button class="btn aqE" data-n="${esc(f.numero)}" title="Correggi">✎</button> <button class="btn aqX" data-n="${esc(f.numero)}" title="Elimina">🗑</button></td></tr>`).join("");
-  return vecchia+intest+an+cr+`<div class="grid">
+  return vecchia+an+cr+`<div class="grid">
     ${k("Ultimi 12 mesi",NF(c12),"m³","fino al "+itd(ult.al))}
     ${k("Ultimo periodo",NF(ult.gio,2),"m³ al giorno",itd(ult.dal)+" – "+itd(ult.al)+" · mediana "+NF(mediana,2))}
     ${k("Ultima fattura",NF(lf.imponibile,2),"€ imponibile",itd(lf.emessa)+" · "+NF(lf.mc)+" m³")}
@@ -734,7 +732,7 @@ function parseAcqua(testo){
   if(tot<0)note.push("fattura di credito (conguaglio con tariffa depenalizzata)");
   if(f.extra)note.push(`addebiti/accrediti extra fattura ${(f.extra>0?"+":"")+NF(f.extra,2)} € (rata o compensazione, non è un costo di consumo)`);
   f.note=note.join("; ");
-  const ultima=D.acqua_fatture[D.acqua_fatture.length-1]||{};f.sito=ultima.sito||"";f.intestatario=ultima.intestatario||"";
+  const ultima=D.acqua_fatture[D.acqua_fatture.length-1]||{};f.sito=ultima.sito||"";
   const ut=AQ_UTENZA_ATTESA();
   if(ut&&f.utenza&&f.utenza!==ut)avvisi.push(`codice utenza ${f.utenza} diverso da quello delle altre fatture (${ut})`);
   const gh=gg(f.al)-gg(f.dal)+1,gio=f.mc/gh;
