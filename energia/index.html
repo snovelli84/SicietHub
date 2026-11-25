@@ -147,7 +147,7 @@ var ENERGIA_CONFIG={
 };
 const CFG=ENERGIA_CONFIG;
 // Versione della pagina: va aumentata a ogni modifica, così in fondo si vede quale è in uso.
-const VERSIONE="2.0",DATA_VERSIONE="24/11/2026";
+const VERSIONE="2.1",DATA_VERSIONE="24/11/2026";
 const KEY="siciet_energia_data_v1",KP="siciet_energia_pwd",KN="siciet_energia_nome",KQ="siciet_energia_coda";
 const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const ARR={mensile:"mensili",el:"elettrico_dettaglio",gas:"gas_dettaglio",fv:"fv",fv30:"fv30",acqua:"acqua_fatture",carbtx:"carb_tx",km:"km_mensili",scheda:"monitoraggio"};
@@ -773,6 +773,25 @@ const aqMese=(()=>{let cache=null,key="";return i=>{
   if(k!==key){key=k;const{seg}=segmentiAcqua(),m={};seg.forEach(x=>{const d0=gg(x.dal);for(let j=0;j<x.gg;j++){const d=new Date((d0+j)*864e5),ix=d.getUTCFullYear()*12+d.getUTCMonth();m[ix]=(m[ix]||0)+x.gio}});
     const ks=Object.keys(m).map(Number).sort((a,b)=>a-b);cache={m,da:ks[0]+1,a:ks[ks.length-1]-1}}
   return i>=cache.da&&i<=cache.a?cache.m[i]:null}})();
+const carbMap=(()=>{let key="",m={};return t=>{
+  const k=D.flotta.length+"|"+D.carb_tx.length;
+  if(k!==key){key=k;m={};const lit={};D.carb_tx.forEach(r=>r.tx.forEach(x=>{if(x.t&&(x.c==="gasolio"||x.c==="benzina")){(lit[x.t]=lit[x.t]||{gasolio:0,benzina:0})[x.c]+=x.l}}));Object.keys(lit).forEach(tg=>m[tg]=lit[tg].benzina>lit[tg].gasolio?"benzina":"gasolio")}
+  const f=D.flotta.find(x=>x.targa===t);
+  if(f&&f.carburante)return f.carburante;if(f&&f.alimentazione==="elettrico")return"elettrico";return m[t]||"gasolio"}})();
+const odoOk=t=>{const f=D.flotta.find(x=>x.targa===t);return!(f&&f.odometro_inaffidabile)};
+/* km del mese per tipo di carburante: dai km inseriti a mano, altrimenti dagli odometri per mezzo (esclusi i mezzi con odometro inaffidabile) */
+function kmMese(i){
+  const y=Math.floor(i/12),m=i%12+1,man=D.km_mensili.find(r=>r.anno===y&&r.mese===m);
+  if(man){const lg=(mq("gasolio",i)||0)+(mq("HVO",i)||0),lb=mq("benzina",i)||0;
+    return{gasolio:man.km_gasolio!=null?{km:man.km_gasolio,l:lg}:null,benzina:man.km_benzina!=null?{km:man.km_benzina,l:lb}:null,elettrico:man.km_elettrico!=null?man.km_elettrico:null}}
+  const key=y+"-"+String(m).padStart(2,"0"),rs=D.carburanti_per_mezzo_mese.filter(r=>r.anno_mese===key);
+  if(!rs.length)return null;
+  const o={gasolio:{km:0,l:0},benzina:{km:0,l:0},elettrico:null};
+  rs.forEach(r=>{const f=carbMap(r.targa);if(f==="elettrico"||!odoOk(r.targa)||r.km_ricostruiti==null)return;const g=o[f]||o.gasolio;g.km+=r.km_ricostruiti;g.l+=(r.litri||0)});
+  return o;
+}
+const kmDi=f=>i=>{const k=kmMese(i);return k&&k[f]&&k[f].km>0?k[f].km:null};
+const rappDi=f=>({rapp:true,k:100,nf:i=>{const k=kmMese(i);return k&&k[f]&&k[f].km>0?k[f].l:null},df:kmDi(f),f:i=>{const k=kmMese(i);return k&&k[f]&&k[f].km>0&&k[f].l>0?k[f].l/k[f].km*100:null}});
 const CF_VOCI=[
   {id:"el",n:"Elettricità prelevata dalla rete",u:"kWh",f:i=>mq("elettrico",i)},
   {id:"tot",n:"Consumo totale della sede (prelievo + autoconsumo FV)",u:"kWh",f:i=>{const r=fvr(i);return r&&r.consumo_totale_kwh!=null?r.consumo_totale_kwh:null}},
@@ -782,6 +801,11 @@ const CF_VOCI=[
   {id:"acq",n:"Acqua (ripartita sui giorni delle fatture)",u:"m³",f:aqMese},
   {id:"gasolio",n:"Gasolio",u:"litri",f:i=>mq("gasolio",i)},
   {id:"benzina",n:"Benzina",u:"litri",f:i=>mq("benzina",i)},
+  Object.assign({id:"kmg",n:"Km percorsi – mezzi a gasolio (stima dagli odometri)",u:"km"},{f:kmDi("gasolio")}),
+  Object.assign({id:"kmb",n:"Km percorsi – mezzi a benzina (stima dagli odometri)",u:"km"},{f:kmDi("benzina")}),
+  Object.assign({id:"cg",n:"Consumo dei mezzi a gasolio",u:"l/100 km"},rappDi("gasolio")),
+  Object.assign({id:"cb",n:"Consumo dei mezzi a benzina",u:"l/100 km"},rappDi("benzina")),
+  {id:"kme",n:"Km percorsi – auto elettrica",u:"km",f:i=>{const k=kmMese(i);return k&&k.elettrico!=null?k.elettrico:null}},
   {id:"cel",n:"Costo elettricità (€ imponibile)",u:"€",f:mcost("elettrico")},
   {id:"cgas",n:"Costo gas (€ imponibile)",u:"€",f:mcost("gas")},
   {id:"ccarb",n:"Costo carburanti (€ imponibile)",u:"€",f:i=>{const l=["gasolio","benzina","HVO","AdBlue"].map(v=>mcost(v)(i)).filter(x=>x!=null);return l.length?l.reduce((a,b)=>a+b,0):null}}
@@ -795,26 +819,37 @@ function cfPeriodi(){
   if(!ok(CF.a)||!ok(CF.b)){const y=Math.floor(L/12)*12;return{a:[y,L],b:[y-12,L-12]}}
   return{a:[idxDi(CF.a[0]),idxDi(CF.a[1])],b:[idxDi(CF.b[0]),idxDi(CF.b[1])]};
 }
+function cfStatV(v,p){
+  if(!v.rapp)return cfStat(v.f,p);
+  let nn=0,dd=0,n=0;for(let i=p[0];i<=p[1];i++){const d=v.df(i),x=v.nf(i);if(d!=null&&d>0&&x!=null){nn+=x;dd+=d;n++}}
+  return{s:dd?nn/dd*v.k:0,n,tot:p[1]-p[0]+1,avg:null};
+}
 function cfStat(f,p){let s=0,n=0;for(let i=p[0];i<=p[1];i++){const v=f(i);if(v!=null){s+=v;n++}}return{s,n,tot:p[1]-p[0]+1,avg:n?s/n:null}}
 function vConf(){
   const P=cfPeriodi(),pers=CF.preset==="pers";
   const set=(k,v)=>`<input type="month" id="${k}" value="${v}" ${pers?"":"disabled"} style="padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text)">`;
   const nm=Math.max(P.a[1]-P.a[0],P.b[1]-P.b[0])+1;
   const righe=CF_VOCI.map(v=>{
-    const a=cfStat(v.f,P.a),b=cfStat(v.f,P.b);
+    const a=cfStatV(v,P.a),b=cfStatV(v,P.b);
     if(!a.n&&!b.n)return"";
     let pa=0,pb=0,pn=0;
+    if(v.rapp){let na=0,da=0,nb=0,db=0;
+      for(let k=0;k<nm;k++){const ia=P.a[0]+k,ib=P.b[0]+k,xa=ia<=P.a[1]?v.nf(ia):null,ya=ia<=P.a[1]?v.df(ia):null,xb=ib<=P.b[1]?v.nf(ib):null,yb=ib<=P.b[1]?v.df(ib):null;
+        if(xa!=null&&ya>0&&xb!=null&&yb>0){na+=xa;da+=ya;nb+=xb;db+=yb;pn++}}
+      if(pn){pa=na/da*v.k;pb=nb/db*v.k}
+    }else
     for(let k=0;k<nm;k++){const x=P.a[0]+k<=P.a[1]?v.f(P.a[0]+k):null,y=P.b[0]+k<=P.b[1]?v.f(P.b[0]+k):null;if(x!=null&&y!=null){pa+=x;pb+=y;pn++}}
-    const parz=pn>0&&pn<Math.max(a.n,b.n),d=pn?pa-pb:null,p=pn&&pb?pct(pa,pb):null,dec=v.u==="m³"?1:0;
+    const parz=pn>0&&pn<Math.max(a.n,b.n),d=pn?pa-pb:null,p=pn&&pb?pct(pa,pb):null,dec=(v.u==="m³"||v.rapp)?1:0;
     const col=p==null?"":(v.buono==="su"?(p>0?"down":"up"):(p>0?"up":"down"));
     const cov=s=>s.n===s.tot?`${s.n} mesi`:`<span class="up">${s.n} mesi su ${s.tot}</span>`;
     return`<tr><td class="l" style="white-space:normal">${v.n}${parz?`<br><span class="muted">variazione sui ${pn} mesi presenti in entrambi i periodi</span>`:""}${!pn&&a.n&&b.n?`<br><span class="muted">nessun mese in comune: variazione non calcolabile</span>`:""}</td><td>${a.n?NF(a.s,dec)+' <span class="muted">'+v.u+"</span>":"n.d."}<br><span class="muted">${cov(a)}</span></td><td>${b.n?NF(b.s,dec)+' <span class="muted">'+v.u+"</span>":"n.d."}<br><span class="muted">${cov(b)}</span></td><td class="${col}">${d!=null?(d>0?"+":"")+NF(d,dec):""}</td><td class="${col}">${p!=null?(p>0?"▲ ":"▼ ")+NF(Math.abs(p),1)+"%":"n.d."}</td></tr>`}).join("");
-  const voceSel=CF_VOCI.filter(v=>cfStat(v.f,P.a).n||cfStat(v.f,P.b).n);
+  const voceSel=CF_VOCI.filter(v=>cfStatV(v,P.a).n||cfStatV(v,P.b).n);
+  const ultKm=D.carburanti_per_mezzo_mese.reduce((m,r)=>r.anno_mese>m?r.anno_mese:m,""),esclusi=D.flotta.filter(f=>f.odometro_inaffidabile).map(f=>f.targa);
   return`<div class="card"><h2>Scegli i periodi da confrontare</h2>
   <div class="tools"><select id="cfPre"><option value="anno" ${CF.preset==="anno"?"selected":""}>Anno in corso contro anno precedente (stessi mesi)</option><option value="12m" ${CF.preset==="12m"?"selected":""}>Ultimi 12 mesi contro i 12 precedenti</option><option value="3m" ${CF.preset==="3m"?"selected":""}>Ultimi 3 mesi contro gli stessi 3 mesi dell'anno prima</option><option value="pers" ${pers?"selected":""}>Periodi a scelta</option></select></div>
   <div class="tools"><b>Periodo A</b> da ${set("cfA0",idxIn(P.a[0]))} a ${set("cfA1",idxIn(P.a[1]))} &nbsp; <b>Periodo B</b> da ${set("cfB0",idxIn(P.b[0]))} a ${set("cfB1",idxIn(P.b[1]))}</div>
   <p class="muted">A = ${etIdx(P.a[0])} – ${etIdx(P.a[1])}; B = ${etIdx(P.b[0])} – ${etIdx(P.b[1])}. La variazione è A rispetto a B e si calcola solo sui mesi che hanno dati in entrambi i periodi (nella stessa posizione: primo mese con primo mese, e così via).</p></div>
-  <div class="card" style="margin-top:14px"><div class="scroll"><table><thead><tr><th class="l">Voce</th><th>Periodo A</th><th>Periodo B</th><th>Variazione</th><th>%</th></tr></thead><tbody>${righe||'<tr><td class="l" colspan="5">Nessun dato nei periodi scelti.</td></tr>'}</tbody></table></div></div>
+  <div class="card" style="margin-top:14px"><div class="scroll"><table><thead><tr><th class="l">Voce</th><th>Periodo A</th><th>Periodo B</th><th>Variazione</th><th>%</th></tr></thead><tbody>${righe||'<tr><td class="l" colspan="5">Nessun dato nei periodi scelti.</td></tr>'}</tbody></table></div>${righe.includes("l/100 km")||righe.includes("Km percorsi")?`<p class="muted" style="margin-top:8px">Km e consumi: stime dagli odometri dei rifornimenti (interpolazione tra le letture), per tipo di carburante del mezzo (il gasolio comprende l'HVO) e solo per i mezzi con odometro affidabile${esclusi.length?" (esclusi "+esclusi.join(", ")+")":""}. Il consumo è litri / km dello stesso gruppo di mezzi e mesi. Disponibili fino a ${ultKm?MESI[+ultKm.slice(5)-1]+" "+ultKm.slice(0,4):"n.d."}; i mesi con km inseriti a mano usano quelli. Su un mese solo i valori sono approssimati: conta il periodo.</p>`:""}</div>
   <div class="card" style="margin-top:14px"><h2>Andamento mese per mese</h2><div class="tools"><select id="cfVoce">${voceSel.map(v=>`<option value="${v.id}" ${CF.voce===v.id?"selected":""}>${v.n}</option>`).join("")}</select></div><div class="chartbox"><canvas id="cf1"></canvas></div></div>`;
 }
 function dConf(){
