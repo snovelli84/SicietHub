@@ -147,13 +147,13 @@ var ENERGIA_CONFIG={
 };
 const CFG=ENERGIA_CONFIG;
 // Versione della pagina: va aumentata a ogni modifica, così in fondo si vede quale è in uso.
-const VERSIONE="2.2",DATA_VERSIONE="25/11/2026";
+const VERSIONE="2.3",DATA_VERSIONE="25/11/2026";
 const KEY="siciet_energia_data_v1",KP="siciet_energia_pwd",KN="siciet_energia_nome",KQ="siciet_energia_coda";
 const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const ARR={mensile:"mensili",el:"elettrico_dettaglio",gas:"gas_dettaglio",fv:"fv",fv30:"fv30",acqua:"acqua_fatture",carbtx:"carb_tx",km:"km_mensili",scheda:"monitoraggio"};
 const KEYOF={mensile:r=>`${r.anno}|${r.mese}|${r.vettore}`,el:r=>`${r.anno}|${r.mese}`,gas:r=>`${r.anno}|${r.mese}`,fv:r=>`${r.anno}|${r.mese}`,fv30:r=>`${r.anno}|${r.mese}`,acqua:r=>r.numero,carbtx:r=>`${r.anno}|${r.mese}|${r.fonte}`,km:r=>`${r.anno}|${r.mese}`,scheda:r=>`${r.pos}|${r.anno}`};
-const BASE=["siti","flotta","carburanti_per_mezzo_mese","note","fv_storico","fv_simulazione","fv_impianti","fv_ricavi","interventi","riferimenti","gse_pagamenti","km_gps"];
-function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],fv30:[],acqua_fatture:[],carb_tx:[],fv_storico:[],fv_simulazione:{},fv_impianti:[],fv_ricavi:[],interventi:[],riferimenti:[],gse_pagamenti:[],km_gps:[],flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
+const BASE=["siti","flotta","carburanti_per_mezzo_mese","note","fv_storico","fv_simulazione","fv_impianti","fv_ricavi","interventi","riferimenti","gse_pagamenti","km_gps","acqua_letture"];
+function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],fv30:[],acqua_fatture:[],carb_tx:[],fv_storico:[],fv_simulazione:{},fv_impianti:[],fv_ricavi:[],interventi:[],riferimenti:[],gse_pagamenti:[],km_gps:[],acqua_letture:[],flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
 function norm(o){const v=vuoto(),d=Object.assign({},o);for(const k in v)if(d[k]==null)d[k]=v[k];return d}
 function applyVoce(v){
   if(v.tipo==="base"){if(!v.dati)return false;const a=JSON.stringify(D[v.chiave]);D[v.chiave]=v.dati.v;return a!==JSON.stringify(v.dati.v)}
@@ -267,10 +267,10 @@ function importa(obj){
   // un file di aggiornamento si unisce sempre ai dati esistenti e tocca solo le sezioni che contiene
   if(patch||CFG.api){
     if(!patch&&D&&D.mensili.length&&!confirm("I dati del file sostituiranno quelli già presenti per gli stessi mesi. Continuare?"))return;
-    if(patch&&Array.isArray(obj.km_gps)){ // i km GPS si uniscono a quelli già presenti (chiave: anno, mese, targa)
-      const m=new Map(((D&&D.km_gps)||[]).map(r=>[r.anno+"|"+r.mese+"|"+r.targa,r]));
-      obj.km_gps.forEach(r=>m.set(r.anno+"|"+r.mese+"|"+r.targa,r));obj=Object.assign({},obj,{km_gps:[...m.values()]});
-    }
+    // le letture dei contatori e i km GPS si uniscono a quelli già presenti
+    [["km_gps",r=>r.anno+"|"+r.mese+"|"+r.targa],["acqua_letture",r=>r.data]].forEach(([k,kf])=>{
+      if(patch&&Array.isArray(obj[k])){const m=new Map(((D&&D[k])||[]).map(r=>[kf(r),r]));obj[k].forEach(r=>m.set(kf(r),r));obj=Object.assign({},obj,{[k]:[...m.values()]})}
+    });
     const v=vociDa(obj);saveVoci(v);
     if(patch)toast("Aggiornamento applicato: "+v.length+" voci");
   }else{
@@ -578,6 +578,17 @@ const gg=s=>Date.UTC(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10))/864e5;
 const itd=s=>s?s.slice(8,10)+"/"+s.slice(5,7)+"/"+s.slice(0,4):"";
 const itdc=s=>s?s.slice(8,10)+"/"+s.slice(5,7)+"/"+s.slice(2,4):"";
 const addGg=(s,n)=>new Date((gg(s)+n)*864e5).toISOString().slice(0,10);
+const isoGg=d=>new Date(d*864e5).toISOString().slice(0,10);
+/* punti di lettura del contatore attuale (data, lettura): dalle fatture e dalle letture inserite a mano */
+function aqAnchors(){
+  const fs=D.acqua_fatture,lc=fs.length?fs[fs.length-1].contatore:"",m=new Map();
+  fs.filter(f=>!lc||f.contatore===lc).forEach(f=>(f.letture||[]).forEach(l=>{
+    if(l.da==null||l.a==null)return;
+    m.set(isoGg(gg(l.dal)-1),{d:isoGg(gg(l.dal)-1),v:l.da,src:"fattura"});m.set(l.al,{d:l.al,v:l.a,src:"fattura"})}));
+  D.acqua_letture.forEach(r=>m.set(r.data,{d:r.data,v:r.lettura,src:"lettura",nota:r.nota}));
+  const out=[];[...m.values()].sort((a,b)=>a.d.localeCompare(b.d)).forEach(p=>{if(!out.length||p.v>=out[out.length-1].v)out.push(p)});
+  return out;
+}
 function segmentiAcqua(){
   const out=[];
   D.acqua_fatture.forEach(f=>{
@@ -585,8 +596,15 @@ function segmentiAcqua(){
     const lista=r.length&&Math.abs(s-f.mc)<=1?r.map(l=>({dal:l.dal,al:l.al,mc:l.mc})):[{dal:f.dal,al:f.al,mc:f.mc}];
     lista.forEach(l=>out.push({dal:l.dal,al:l.al,mc:l.mc,stima:f.tipo==="acconto",fattura:f.numero,gg:gg(l.al)-gg(l.dal)+1}));
   });
-  out.forEach(x=>x.gio=x.mc/x.gg);
   out.sort((a,b)=>a.dal.localeCompare(b.dal));
+  // letture del contatore fatte dopo l'ultima fattura: consumo dal punto di lettura precedente
+  if(out.length&&D.acqua_letture.length){
+    const an=aqAnchors();let prev=an.filter(p=>p.d<=out[out.length-1].al).pop();
+    D.acqua_letture.slice().sort((x,y)=>x.data.localeCompare(y.data)).forEach(r=>{
+      if(!prev||r.data<=prev.d||r.lettura<prev.v)return;
+      const dal=isoGg(gg(prev.d)+1);out.push({dal,al:r.data,mc:r.lettura-prev.v,stima:false,fattura:"autolettura",gg:gg(r.data)-gg(dal)+1,lettura:true});prev={d:r.data,v:r.lettura}});
+  }
+  out.forEach(x=>x.gio=x.mc/x.gg);
   const g=out.filter(x=>!x.stima).map(x=>x.gio).sort((a,b)=>a-b);
   const mediana=g.length?g[Math.floor(g.length/2)]:0;
   out.forEach(x=>x.anomalo=!x.stima&&mediana>0&&x.gio>mediana*2.5&&x.mc>=30);
@@ -606,6 +624,33 @@ function aqKpi(){
   const c=aqFinestra(seg,fine,365),p=seg[0]&&gg(seg[0].dal)<=fine-365*2+1?aqFinestra(seg,fine-365,365):null;
   return`<div class="card kpi"><h3>Acqua</h3><div class="v">${NF(c)} <small style="font-size:.9rem">m³</small></div><div class="s">ultimi 12 mesi al ${itd(seg[seg.length-1].al)} ${p?delta(pct(c,p))+" vs i 12 mesi prima":""}</div></div>`;
 }
+let AQY=0;
+/* lettura del contatore a fine giorno d (stringa): interpolata tra i punti, oltre l'ultima con il ritmo recente */
+function aqTabella(){
+  const an=aqAnchors();if(an.length<2)return"";
+  const ult=an[an.length-1],yL=+ult.d.slice(0,4),anni=[...new Set(an.map(p=>+p.d.slice(0,4)))];
+  if(!AQY||!anni.concat([yL]).includes(AQY))AQY=yL;
+  const ri=an.filter(p=>gg(p.d)<=gg(ult.d)-45).pop()||an[0],rate=gg(ult.d)>gg(ri.d)?(ult.v-ri.v)/(gg(ult.d)-gg(ri.d)):0;
+  const val=d=>{const t=gg(d);if(t<gg(an[0].d))return null;
+    if(t>=gg(ult.d))return ult.v+(t-gg(ult.d))*rate;
+    for(let i=0;i<an.length-1;i++){const a=gg(an[i].d),b=gg(an[i+1].d);if(t>=a&&t<=b)return an[i].v+(an[i+1].v-an[i].v)*(t-a)/(b-a)}return null};
+  const fine=(y,m)=>isoGg(Date.UTC(y,m,0)/864e5);
+  let prev=val(fine(AQY-1,12)),tot=0,n=0,stm=0;
+  const rows=MESI.map((nm,k)=>{const d=fine(AQY,k+1),v=val(d),c=v!=null&&prev!=null?v-prev:null,est=gg(d)>gg(ult.d);prev=v;
+    if(c!=null){tot+=c;n++;if(est)stm+=c}
+    return`<tr><td class="l">${nm} ${AQY}</td><td class="l">${itd(d)}</td><td><b>${NF(v,1)}</b></td><td>${NF(c,1)}</td><td class="l" style="color:var(--muted)">${v==null?"":est?"stima (ritmo recente)":"da letture"}</td></tr>`}).join("");
+  const reali=an.filter(p=>+p.d.slice(0,4)===AQY||+p.d.slice(0,4)===AQY-1&&p.d>=AQY-1+"-11-01").map(p=>{
+    const man=D.acqua_letture.find(r=>r.data===p.d);
+    return`<tr><td class="l">${itd(p.d)}</td><td>${NF(p.v,3)}</td><td class="l">${p.src==="lettura"?"lettura inserita"+(p.nota?" · "+esc(p.nota):""):"fattura"}</td><td>${man?`<button class="btn aqLX" data-d="${p.d}" title="Elimina">🗑</button>`:""}</td></tr>`}).join("");
+  return`<div class="card" style="margin-top:14px"><h2>Letture del contatore a fine mese</h2>
+    <div class="tools"><select id="aqAnno">${[...new Set(anni.concat([yL]))].sort().map(y=>`<option ${y===AQY?"selected":""}>${y}</option>`).join("")}</select></div>
+    <div class="scroll"><table><thead><tr><th class="l">Mese</th><th class="l">Data</th><th>Lettura m³</th><th>Consumo del mese m³</th><th class="l">Base</th></tr></thead><tbody>${rows}
+    <tr><td class="l" colspan="3"><b>Totale ${AQY}</b></td><td><b>${NF(tot,0)}</b></td><td class="l" style="color:var(--muted)">${stm?NF(stm,0)+" m³ di stima":""}</td></tr></tbody></table></div>
+    <p class="muted" style="margin-top:8px">Le letture a fine mese sono interpolate tra le letture reali del contatore (sotto), supponendo un consumo uniforme tra una lettura e l'altra. Dopo l'ultima lettura (${itd(ult.d)}) la stima continua con il ritmo degli ultimi giorni, ${NF(rate,2)} m³ al giorno: sono valori indicativi, da sostituire con una lettura vera.</p>
+    <h3 style="margin-top:12px">Letture reali del contatore</h3>
+    <div class="scroll"><table><thead><tr><th class="l">Data</th><th>Lettura m³</th><th class="l">Origine</th><th></th></tr></thead><tbody>${reali}</tbody></table></div>
+    <div class="tools" style="margin-top:10px"><label class="f"><span>Data lettura</span><input id="al_d" type="date" value="${new Date().toISOString().slice(0,10)}"></label><label class="f"><span>Lettura m³</span><input id="al_v" inputmode="decimal" placeholder="es. 1627,172"></label><label class="f"><span>Nota</span><input id="al_n" placeholder="facoltativa"></label><button class="btn primary" id="al_salva">Salva la lettura</button></div></div>`;
+}
 function vAcq(){
   const fs=D.acqua_fatture;
   const forma=`<details class="card ins" ${fs.length?"":"open"} id="aqForm"><summary>＋ Aggiungi fatture dell'acqua</summary>
@@ -621,7 +666,7 @@ function vAcq(){
   const {seg,mediana}=segmentiAcqua(),ult=seg[seg.length-1],lf=fs[fs.length-1];
   const an=seg.filter(x=>x.anomalo).map(x=>`<div class="alert err"><b>Consumo anomalo dal ${itd(x.dal)} al ${itd(x.al)}</b>: ${NF(x.gio,1)} m³ al giorno (${NF(x.mc)} m³ in ${x.gg} giorni), ${NF(x.gio/mediana,1)} volte la mediana di ${NF(mediana,1)} m³ al giorno. Controllare l'impianto: può essere una perdita.</div>`).join("");
   const cr=fs.filter(f=>f.totale<0).map(f=>`<div class="alert warn">La fattura <b>${f.numero}</b> del ${itd(f.emessa)} è di <b>credito</b> (${EUR(f.imponibile,2)} imponibile): conguaglio che applica la tariffa depenalizzata, compatibile con una perdita occulta riconosciuta.</div>`).join("");
-  const vecchia=(Date.now()/864e5-gg(lf.al))>120?`<div class="alert warn">L'ultima fattura dell'acqua copre fino al ${itd(lf.al)}: ne manca una?</div>`:"";
+  const vecchia=(Date.now()/864e5-gg(lf.al))>120&&(Date.now()/864e5-gg(ult.al))>120?`<div class="alert warn">L'ultima fattura dell'acqua copre fino al ${itd(lf.al)}: ne manca una?</div>`:"";
   const k=(t,v,u,s)=>`<div class="card kpi"><h3>${t}</h3><div class="v">${v} <small style="font-size:.9rem">${u}</small></div><div class="s">${s}</div></div>`;
   const fine=gg(ult.al),c12=aqFinestra(seg,fine,365);
   const righe=fs.slice().reverse().map(f=>`<tr><td class="l">${esc(f.numero)}</td><td>${itd(f.emessa)}</td><td>${itd(f.dal)} – ${itd(f.al)}</td><td class="l">${f.tipo==="acconto"?"acconto":"saldo"}</td><td>${NF(f.mc)}</td><td>${NF(f.imponibile,2)}</td><td>${NF(f.iva,2)}</td><td>${NF(f.totale,2)}</td><td class="l" style="white-space:normal;min-width:180px;color:var(--muted)">${esc(f.note||"")}</td><td><button class="btn aqE" data-n="${esc(f.numero)}" title="Correggi">✎</button> <button class="btn aqX" data-n="${esc(f.numero)}" title="Elimina">🗑</button></td></tr>`).join("");
@@ -633,9 +678,21 @@ function vAcq(){
   <div class="grid wide" style="margin-top:14px">${box("q1","Consumo al giorno per periodo di lettura (m³)","Linea tratteggiata: mediana. Barre rosse: consumo anomalo; grigie: stima in acconto")}${box("q2","Consumo annuo (m³)","Ripartito sui giorni di ogni periodo; l'ultimo anno è parziale")}
   ${box("q3","Importo imponibile di ogni fattura (€)","Per data di emissione; il credito di conguaglio compare in negativo")}${box("q4","Costo medio per m³ (€ imponibile)","Fatture emesse nell'anno / consumo di quelle fatture, con quota fissa e depurazione. Il 2026 è basso perché comprende il credito di marzo, che riguarda i consumi del 2025")}</div>
   <div class="card" style="margin-top:14px"><h2>Fatture (${fs.length})</h2><div class="scroll"><table><thead><tr><th class="l">Numero</th><th>Emessa</th><th>Periodo</th><th class="l">Tipo</th><th>m³</th><th>€ imponibile</th><th>€ IVA</th><th>€ totale</th><th class="l">Note</th><th></th></tr></thead><tbody>${righe}</tbody></table></div></div>
+  ${aqTabella()}
   ${forma}`;
 }
 function dAcq(){
+  const sel=document.getElementById("aqAnno");if(sel)sel.onchange=()=>{AQY=+sel.value;render()};
+  const sv=document.getElementById("al_salva");
+  if(sv)sv.onclick=()=>{
+    const d=document.getElementById("al_d").value,v=parseFloat(document.getElementById("al_v").value.replace(/\./g,"").replace(",",".")),nt=document.getElementById("al_n").value.trim();
+    if(!d||!(v>0))return alert("Indica la data e la lettura del contatore.");
+    const an=aqAnchors().filter(p=>p.d!==d),pr=an.filter(p=>p.d<d).pop(),nx=an.find(p=>p.d>d);
+    if((pr&&v<pr.v)||(nx&&v>nx.v))return alert("La lettura non è coerente con le altre: il contatore non può tornare indietro.");
+    const arr=D.acqua_letture.filter(r=>r.data!==d).concat([{data:d,lettura:v,nota:nt||undefined}]).sort((a,b)=>a.data.localeCompare(b.data));
+    saveVoci([{tipo:"base",chiave:"acqua_letture",dati:{v:arr}}]);toast("Lettura salvata");render();
+  };
+  document.querySelectorAll(".aqLX").forEach(b=>b.onclick=()=>{if(confirm("Eliminare questa lettura?")){saveVoci([{tipo:"base",chiave:"acqua_letture",dati:{v:D.acqua_letture.filter(r=>r.data!==b.dataset.d)}}]);render()}});
   document.getElementById("aqPdf").onchange=e=>leggiFattureAcqua([...e.target.files]).then(()=>e.target.value="");
   document.getElementById("a_salva").onclick=salvaFatturaManuale;
   document.querySelectorAll(".aqX").forEach(b=>b.onclick=()=>{const n=b.dataset.n;if(confirm("Eliminare la fattura "+n+"?")){saveVoci([{tipo:"acqua",chiave:n,dati:null}]);render()}});
