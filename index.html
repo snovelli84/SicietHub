@@ -65,6 +65,28 @@ header h1{margin:0}
 .logo img{display:block;height:80px;width:auto}
 header p{margin-top:12px;opacity:.9}
 
+/* Saluto e meteo */
+.greeting{margin:14px auto 0;max-width:560px;display:grid;gap:4px}
+.greeting p{margin:0;opacity:1}
+.greeting-hello{font-size:18px;font-weight:600;text-wrap:balance}
+.greeting-weather{font-size:15px;opacity:.9!important}
+.greeting-edit{
+  border:0;background:transparent;color:#fff;opacity:.75;
+  font-size:15px;cursor:pointer;padding:2px 6px;border-radius:6px;
+}
+.greeting-edit:hover{opacity:1}
+.greeting-edit:focus-visible{outline:2px solid #fff}
+.greeting-form[hidden]{display:none}
+.greeting-form{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;font-size:15px}
+.greeting-form input{
+  font:inherit;font-size:16px;padding:6px 10px;border-radius:8px;border:0;
+  min-width:0;width:12em;color:#1d2430;
+}
+.greeting-form button{
+  font:inherit;font-size:15px;font-weight:600;padding:6px 14px;border-radius:8px;border:0;
+  background:#fff;color:var(--brand);cursor:pointer;
+}
+
 main{
   max-width:720px;
   margin:-36px auto 0;
@@ -222,6 +244,18 @@ footer{text-align:center;padding:24px 16px calc(24px + env(safe-area-inset-botto
 <header>
   <h1><span class="logo"><img src="icons/logo.png" alt="SICIET HUB" width="447" height="360"></span></h1>
   <p>Portale Applicazioni Aziendali</p>
+  <div class="greeting" id="greeting">
+    <p class="greeting-hello">
+      <span id="greetingText">Benvenuto su SICIET HUB.</span>
+      <button type="button" class="greeting-edit" id="greetingEdit" aria-label="Scrivi il tuo nome" title="Scrivi il tuo nome">✎</button>
+    </p>
+    <form class="greeting-form" id="greetingForm" hidden>
+      <label for="greetingName">Come ti chiami?</label>
+      <input type="text" id="greetingName" autocomplete="given-name" maxlength="40">
+      <button type="submit">Salva</button>
+    </form>
+    <p class="greeting-weather" id="greetingWeather" hidden></p>
+  </div>
 </header>
 
 <main>
@@ -257,6 +291,7 @@ footer{text-align:center;padding:24px 16px calc(24px + env(safe-area-inset-botto
 
 <script src="apps.js"></script>
 <script src="launcher.js"></script>
+<script src="saluto.js"></script>
 <script>
 (function(){
   "use strict";

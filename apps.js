@@ -52,6 +52,15 @@
  */
 
 /*
+ * Meteo nel saluto in cima al portale (dati da Open-Meteo, senza chiave).
+ */
+window.SICIET_METEO = {
+  luogo: "Albinia",
+  lat: 42.5036,
+  lon: 11.2117
+};
+
+/*
  * IP pubblici della rete aziendale. Se il dispositivo esce su Internet con
  * uno di questi indirizzi è considerato "in sede": si aprono le app desktop
  * e si usa webSede (es. MailStore).
