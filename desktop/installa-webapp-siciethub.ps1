@@ -1,9 +1,12 @@
 <#
   SICIET HUB - installazione della webapp su tutti i PC (Chrome ed Edge).
 
-  Imposta la policy WebAppInstallForceList di Google Chrome e Microsoft Edge:
-  il browser installa SICIET HUB come app per tutti gli utenti del PC, con
-  l'icona nel menu Start e sul desktop, e la apre in una finestra sua.
+  COSI' COM'E', SENZA PARAMETRI:
+  - installa SICIET HUB come app in Chrome ed Edge per tutti gli utenti del
+    PC (icona nel menu Start e sul desktop, finestra senza barra degli
+    indirizzi; policy WebAppInstallForceList);
+  - la apre con Chrome all'accesso a Windows (policy WebAppSettings,
+    run_on_os_login).
 
   Uso con NinjaOne: Amministrazione > Libreria > Automazione > Aggiungi script
   (PowerShell, esegui come "Sistema"), poi eseguirlo sui dispositivi o in una
@@ -12,25 +15,25 @@
 
   Parametri (in NinjaOne nel campo "Parametri preimpostati" dello script,
   es. -ApriAllAvvio; oppure da riga di comando):
-    -ApriAllAvvio  apre anche hub.siciet.it all'avvio di Chrome ed Edge
-    -ApriAlLogin   apre la webapp SICIET HUB all'accesso a Windows
-                   (policy WebAppSettings, run_on_os_login), con un solo
-                   browser per non aprire due finestre:
-    -Browser       Chrome (predefinito) oppure Edge, per -ApriAlLogin
-    -Rimuovi       toglie la webapp e le aperture automatiche dalle policy
+  Parametri facoltativi, solo se serve cambiare il comportamento:
+    -NonAprireAlLogin  installa la webapp ma non la apre all'accesso a Windows
+    -Browser Edge      apre la webapp all'accesso con Edge invece che con Chrome
+    -ApriAllAvvio      apre anche hub.siciet.it come scheda all'avvio del browser
+    -Rimuovi           toglie la webapp e le aperture automatiche dalle policy
 
   Tocca solo i valori di SICIET HUB: le altre voci di WebAppInstallForceList
   e WebAppSettings e le altre policy dei browser restano come sono.
 #>
 param(
   [switch]$ApriAllAvvio,
-  [switch]$ApriAlLogin,
+  [switch]$NonAprireAlLogin,
   [ValidateSet("Chrome", "Edge")]
   [string]$Browser = "Chrome",
   [switch]$Rimuovi
 )
 
 $ErrorActionPreference = "Stop"
+$ApriAlLogin = -not $NonAprireAlLogin
 $Url = "https://hub.siciet.it/"
 
 $Browsers = @(

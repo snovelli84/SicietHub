@@ -123,9 +123,12 @@ Lo script [`desktop/installa-webapp-siciethub.ps1`](desktop/installa-webapp-sici
 
 Con NinjaOne: **Amministrazione → Libreria → Automazione → Aggiungi script**, linguaggio PowerShell, esecuzione come **Sistema**, incollando il contenuto del file; poi eseguirlo sui dispositivi o inserirlo in una policy. Il browser applica la policy al riavvio successivo (o subito da `chrome://policy` / `edge://policy` → *Ricarica criteri*).
 
-Opzioni (campo *Parametri preimpostati* dello script):
-- `-ApriAllAvvio`: apre anche hub.siciet.it all'avvio di Chrome ed Edge (`RestoreOnStartup` = 4);
-- `-ApriAlLogin`: apre la webapp SICIET HUB all'accesso a Windows (policy `WebAppSettings`, `run_on_os_login` = `run_windowed`), in un solo browser per non aprire due finestre: `-Browser Chrome` (predefinito) oppure `-Browser Edge`;
+Così com'è, **senza parametri**, lo script installa la webapp in Chrome ed Edge e la apre **con Chrome all'accesso a Windows** (policy `WebAppSettings`, `run_on_os_login` = `run_windowed`).
+
+Parametri facoltativi (campo *Parametri preimpostati* dello script), solo se serve cambiare il comportamento:
+- `-NonAprireAlLogin`: installa la webapp ma non la apre all'accesso a Windows;
+- `-Browser Edge`: all'accesso la apre con Edge invece che con Chrome;
+- `-ApriAllAvvio`: apre anche hub.siciet.it come scheda all'avvio di Chrome ed Edge (`RestoreOnStartup` = 4);
 - `-Rimuovi`: toglie la webapp e le aperture automatiche impostate dallo script.
 
-Lo script descrive lo stato voluto: rieseguendolo senza `-ApriAlLogin` l'apertura all'accesso viene tolta.
+Lo script descrive lo stato voluto: rieseguendolo con `-NonAprireAlLogin` l'apertura all'accesso viene tolta.
