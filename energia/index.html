@@ -134,7 +134,7 @@ const SCADENZE=[
   {txt:"Offerta gas «Anno Sicuro Gas» (0,70 €/Smc materia prima)",data:"2026-11-30"},
   {txt:"Condizioni contratto elettrico (prezzo fisso F1/F2/F3)",data:"2027-01-31"}
 ];
-const TABS=[["pan","Panoramica"],["conf","Confronto"],["el","Elettricità"],["gas","Gas"],["acq","Acqua"],["carb","Carburanti"],["fv","Fotovoltaico"],["flotta","Flotta"],["mon","Monitoraggio"],["ins","＋ Inserisci mese"],["dati","Dati"],["rif","Riferimenti"],["note","Note e dubbi"]];
+const TABS=[["pan","Panoramica"],["conf","Confronto"],["el","Elettricità"],["gas","Gas"],["acq","Acqua"],["carb","Carburanti"],["fv","Fotovoltaico"],["let","Letture contatori"],["flotta","Flotta"],["mon","Monitoraggio"],["ins","＋ Inserisci mese"],["dati","Dati"],["rif","Riferimenti"],["note","Note e dubbi"]];
 
 /* ---------- archivio e sincronizzazione ---------- */
 var ENERGIA_CONFIG={
@@ -147,13 +147,13 @@ var ENERGIA_CONFIG={
 };
 const CFG=ENERGIA_CONFIG;
 // Versione della pagina: va aumentata a ogni modifica, così in fondo si vede quale è in uso.
-const VERSIONE="2.3",DATA_VERSIONE="25/11/2026";
+const VERSIONE="2.4",DATA_VERSIONE="25/11/2026";
 const KEY="siciet_energia_data_v1",KP="siciet_energia_pwd",KN="siciet_energia_nome",KQ="siciet_energia_coda";
 const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const ARR={mensile:"mensili",el:"elettrico_dettaglio",gas:"gas_dettaglio",fv:"fv",fv30:"fv30",acqua:"acqua_fatture",carbtx:"carb_tx",km:"km_mensili",scheda:"monitoraggio"};
 const KEYOF={mensile:r=>`${r.anno}|${r.mese}|${r.vettore}`,el:r=>`${r.anno}|${r.mese}`,gas:r=>`${r.anno}|${r.mese}`,fv:r=>`${r.anno}|${r.mese}`,fv30:r=>`${r.anno}|${r.mese}`,acqua:r=>r.numero,carbtx:r=>`${r.anno}|${r.mese}|${r.fonte}`,km:r=>`${r.anno}|${r.mese}`,scheda:r=>`${r.pos}|${r.anno}`};
-const BASE=["siti","flotta","carburanti_per_mezzo_mese","note","fv_storico","fv_simulazione","fv_impianti","fv_ricavi","interventi","riferimenti","gse_pagamenti","km_gps","acqua_letture"];
-function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],fv30:[],acqua_fatture:[],carb_tx:[],fv_storico:[],fv_simulazione:{},fv_impianti:[],fv_ricavi:[],interventi:[],riferimenti:[],gse_pagamenti:[],km_gps:[],acqua_letture:[],flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
+const BASE=["siti","flotta","carburanti_per_mezzo_mese","note","fv_storico","fv_simulazione","fv_impianti","fv_ricavi","interventi","riferimenti","gse_pagamenti","km_gps","acqua_letture","letture_fv"];
+function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],fv30:[],acqua_fatture:[],carb_tx:[],fv_storico:[],fv_simulazione:{},fv_impianti:[],fv_ricavi:[],interventi:[],riferimenti:[],gse_pagamenti:[],km_gps:[],acqua_letture:[],letture_fv:[],flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
 function norm(o){const v=vuoto(),d=Object.assign({},o);for(const k in v)if(d[k]==null)d[k]=v[k];return d}
 function applyVoce(v){
   if(v.tipo==="base"){if(!v.dati)return false;const a=JSON.stringify(D[v.chiave]);D[v.chiave]=v.dati.v;return a!==JSON.stringify(v.dati.v)}
@@ -268,10 +268,11 @@ function importa(obj){
   if(patch||CFG.api){
     if(!patch&&D&&D.mensili.length&&!confirm("I dati del file sostituiranno quelli già presenti per gli stessi mesi. Continuare?"))return;
     // le letture dei contatori e i km GPS si uniscono a quelli già presenti
-    [["km_gps",r=>r.anno+"|"+r.mese+"|"+r.targa],["acqua_letture",r=>r.data]].forEach(([k,kf])=>{
+    [["km_gps",r=>r.anno+"|"+r.mese+"|"+r.targa],["acqua_letture",r=>r.data],["letture_fv",r=>r.anno+"|"+r.mese]].forEach(([k,kf])=>{
       if(patch&&Array.isArray(obj[k])){const m=new Map(((D&&D[k])||[]).map(r=>[kf(r),r]));obj[k].forEach(r=>m.set(kf(r),r));obj=Object.assign({},obj,{[k]:[...m.values()]})}
     });
     const v=vociDa(obj);saveVoci(v);
+    if(Array.isArray(obj.letture_fv)){const ex=[];D.letture_fv.forEach(r=>ex.push(...lRiempi(r)));if(ex.length){saveVoci(ex);toast("Letture dei contatori: "+ex.length+" mesi completati nei dati del fotovoltaico")}}
     if(patch)toast("Aggiornamento applicato: "+v.length+" voci");
   }else{
     const o=norm(obj);
@@ -877,6 +878,9 @@ const CF_VOCI=[
   Object.assign({id:"cg",n:"Consumo dei mezzi a gasolio",u:"l/100 km"},rappDi("gasolio")),
   Object.assign({id:"cb",n:"Consumo dei mezzi a benzina",u:"l/100 km"},rappDi("benzina")),
   {id:"kme",n:"Km percorsi – auto elettrica",u:"km",f:i=>{const k=kmMese(i);return k&&k.elettrico!=null?k.elettrico:null}},
+  {id:"su",n:"Contatore interno – capannone uffici",u:"kWh",f:i=>lSubMese("uffici",i)},
+  {id:"so1",n:"Contatore interno – officina elettrica 1",u:"kWh",f:i=>lSubMese("off1",i)},
+  {id:"so2",n:"Contatore interno – officina elettrica 2",u:"kWh",f:i=>lSubMese("off2",i)},
   {id:"cel",n:"Costo elettricità (€ imponibile)",u:"€",f:mcost("elettrico")},
   {id:"cgas",n:"Costo gas (€ imponibile)",u:"€",f:mcost("gas")},
   {id:"ccarb",n:"Costo carburanti (€ imponibile)",u:"€",f:i=>{const l=["gasolio","benzina","HVO","AdBlue"].map(v=>mcost(v)(i)).filter(x=>x!=null);return l.length?l.reduce((a,b)=>a+b,0):null}}
@@ -1370,7 +1374,138 @@ function salvaMese(){
   }catch(err){alert(err.message)}
 }
 
-const VIEWS={pan:[vPan,dPan],conf:[vConf,dConf],el:[vEl,dEl],gas:[vGas,dGas],acq:[vAcq,dAcq],carb:[vCarb,dCarb],fv:[vFv,dFv],flotta:[vFlotta,()=>{}],mon:[vMon,dMon],ins:[vIns,dIns],dati:[vDati,dDati],rif:[vRif,dRif],note:[vNote,()=>{}]};
+
+/* ---------- letture mensili dei contatori (due impianti FV e contatori interni) ---------- */
+const LIMP=[["i20","Impianto 19,95 kWp"],["i30","Impianto 29,75 kWp"]],LGRP=[["prod","Produzione"],["imm","Immissione"],["prel","Prelievo"]];
+const LSUB=[["uffici","Capannone uffici"],["off1","Officina elettrica 1"],["off2","Officina elettrica 2"]];
+const lMese=(A,M)=>D.letture_fv.find(r=>r.anno===A&&r.mese===M)||null;
+const lPrevRec=r=>{const i=r.anno*12+r.mese-2;return lMese(Math.floor(i/12),i%12+1)};
+const ok3=a=>Array.isArray(a)&&a.length===3&&a.every(x=>typeof x==="number");
+function lPrec(r,imp,g){const b=r[imp]&&r[imp][g];if(b&&ok3(b.p))return b.p;const pr=lPrevRec(r),pb=pr&&pr[imp]&&pr[imp][g];return pb&&ok3(pb.a)?pb.a:null}
+function lSomma(r,imp,g){const b=r[imp]&&r[imp][g];if(!b||!ok3(b.a))return null;const p=lPrec(r,imp,g);if(!p)return null;const d=b.a.reduce((x,y)=>x+y,0)-p.reduce((x,y)=>x+y,0);return d>=0?d:null}
+function lCalc(r){
+  const o={};
+  LIMP.forEach(([imp])=>{const pr=lSomma(r,imp,"prod"),im=lSomma(r,imp,"imm"),pl=lSomma(r,imp,"prel");o[imp]={prod:pr,imm:im,prel:pl,auto:pr!=null&&im!=null?Math.max(0,pr-im):null}});
+  o.i20.tot=o.i20.auto!=null&&o.i20.prel!=null?o.i20.auto+o.i20.prel:null;
+  return o;
+}
+function lSub(r,k){const v=r.sub&&r.sub[k];if(typeof v!=="number")return null;const pr=lPrevRec(r),pv=pr&&pr.sub&&pr.sub[k];return typeof pv==="number"&&v>=pv?v-pv:null}
+const lSubMese=(k,i)=>{const r=lMese(Math.floor(i/12),i%12+1);return r?lSub(r,k):null};
+/* confronto delle letture con i dati di E-Distribuzione e con le bollette */
+function lControlli(r){
+  const c=lCalc(r),f=trova("fv",r.anno,r.mese),f3=trova("fv30",r.anno,r.mese),b=trovaV("elettrico",r.anno,r.mese),out=[];
+  const conf=(nome,mis,rif,fonte)=>{if(mis==null||rif==null)return;const d=mis-rif;if(Math.abs(d)>20&&Math.abs(d)>Math.abs(rif)*0.01)out.push({nome,fonte,mis,rif,d})};
+  conf("Produzione 19,95 kWp",c.i20.prod,f&&f.produzione_kwh,"dati del fotovoltaico");
+  conf("Immissione 19,95 kWp",c.i20.imm,f&&f.immissione_kwh,"E-Distribuzione");
+  conf("Prelievo della sede",c.i20.prel,b&&b.quantita,"bolletta");
+  conf("Produzione 29,75 kWp",c.i30.prod,f3&&f3.produzione_kwh,"dati del fotovoltaico");
+  return out;
+}
+/* completa i dati del fotovoltaico dei mesi in cui manca la produzione (senza toccare quelli già presenti) */
+function lRiempi(r){
+  const c=lCalc(r),out=[],f=trova("fv",r.anno,r.mese),f3=trova("fv30",r.anno,r.mese),nt="Produzione da letture dei contatori";
+  if(c.i20.prod!=null&&(!f||f.produzione_kwh==null)){
+    const x=fvMerge(r.anno,r.mese,{produzione_kwh:c.i20.prod,immissione_kwh:f&&f.immissione_kwh!=null?f.immissione_kwh:c.i20.imm,prelievo_kwh:f&&f.prelievo_kwh!=null?f.prelievo_kwh:c.i20.prel,note:((f&&f.note?f.note+" · ":"")+nt).slice(0,300)});
+    out.push({tipo:"fv",chiave:`${r.anno}|${r.mese}`,dati:x});
+  }
+  if(c.i30.prod!=null&&(!f3||f3.produzione_kwh==null))out.push({tipo:"fv30",chiave:`${r.anno}|${r.mese}`,dati:Object.assign({importo_vendita:null,importo_incentivo:null},f3||{},{anno:r.anno,mese:r.mese,produzione_kwh:c.i30.prod,note:nt})});
+  return out;
+}
+let lA=null,lM=null;
+const pnum=t=>{t=String(t==null?"":t).trim();if(!t)return null;const v=parseFloat(t.replace(/\./g,"").replace(",","."));return isNaN(v)?null:v};
+function lAnomalie(){
+  const out=[],ult=D.letture_fv.slice(-3);
+  ult.forEach(r=>LSUB.forEach(([k,nm])=>{
+    const cur=lSub(r,k),pa=lMese(r.anno-1,r.mese),prev=pa?lSub(pa,k):null;
+    if(cur!=null&&prev>0&&cur>=prev*1.5&&cur-prev>=200)out.push(`<div class="alert warn"><b>${nm}</b>: ${NF(cur)} kWh a ${MESI[r.mese-1].toLowerCase()} ${r.anno}, <b>${delta((cur/prev-1)*100)}</b> rispetto allo stesso mese dell'anno prima (${NF(prev)} kWh).</div>`)}));
+  return out.join("");
+}
+function vLett(){
+  const L=D.letture_fv;
+  if(lA==null){const u=L[L.length-1],now=new Date(),cur=now.getFullYear()*12+now.getMonth();let i=u?u.anno*12+u.mese:cur;if(i>cur)i=cur;lA=Math.floor(i/12);lM=i%12+1}
+  const A=lA,M=lM,old=lMese(A,M)||{},pr=lPrevRec({anno:A,mese:M});
+  const cy=new Date().getFullYear(),ya=[];for(let y=cy;y>=2023;y--)ya.push(y);if(!ya.includes(A))ya.push(A);
+  const cella=(imp,g,k)=>{const a=old[imp]&&old[imp][g]&&old[imp][g].a,pb=pr&&pr[imp]&&pr[imp][g]&&pr[imp][g].a;
+    return`<td><input class="lin" id="l_${imp}_${g}_${k}" inputmode="decimal" autocomplete="off" value="${a&&a[k]!=null?a[k]:""}" placeholder="${pb&&pb[k]!=null?"prec. "+pb[k]:""}" style="width:96px"></td>`};
+  const blocchi=LIMP.map(([imp,nm])=>`<h3 style="margin:12px 0 4px">${nm}</h3><div class="scroll"><table><thead><tr><th class="l">Contatore</th><th>A1</th><th>A2</th><th>A3</th></tr></thead><tbody>${LGRP.map(([g,gn])=>`<tr><td class="l">${gn}</td>${[0,1,2].map(k=>cella(imp,g,k)).join("")}</tr>`).join("")}</tbody></table></div>`).join("");
+  const sub=LSUB.map(([k,nm])=>{const v=old.sub&&old.sub[k],pv=pr&&pr.sub&&pr.sub[k];return`<label class="f"><span>${nm}</span><input id="l_s_${k}" inputmode="decimal" autocomplete="off" value="${typeof v==="number"?v:""}" placeholder="${typeof pv==="number"?"prec. "+pv:""}"></label>`}).join("");
+  const righe=L.slice().reverse().map(r=>{
+    const c=lCalc(r),ct=lControlli(r),su=LSUB.map(([k])=>lSub(r,k));
+    const chk=ct.length?`<span class="down" title="${esc(ct.map(x=>x.nome+": letture "+NF(x.mis)+" kWh, "+x.fonte+" "+NF(x.rif,1)+" kWh").join("\n"))}">⚠ ${ct.length} scost.</span>`:(c.i20.prod!=null||c.i20.prel!=null?'<span class="up" style="color:var(--ok)">✓</span>':"");
+    return`<tr><td class="l">${MESI[r.mese-1].slice(0,3)} ${r.anno}</td><td>${NF(c.i20.prod)}</td><td>${NF(c.i30.prod)}</td><td>${NF(c.i20.auto)}</td><td>${NF(c.i20.prel)}</td><td>${NF(su[0])}</td><td>${NF(su[1])}</td><td>${NF(su[2])}</td><td class="l">${chk}</td><td><button class="btn lE" data-a="${r.anno}" data-m="${r.mese}" title="Correggi">✎</button> <button class="btn lX" data-a="${r.anno}" data-m="${r.mese}" title="Elimina">🗑</button></td></tr>`}).join("");
+  return lAnomalie()+`<div class="card"><h2>Lettura del mese</h2>
+    <p class="muted">Inserisci i valori dei contatori come sui fogli di lettura: i valori assoluti letti sul display. La lettura precedente è già registrata e compare nei campi; i consumi del mese si calcolano da soli.</p>
+    <div class="tools"><select id="lAnno">${ya.sort().reverse().map(y=>`<option ${y===A?"selected":""}>${y}</option>`).join("")}</select><select id="lMese">${MESI.map((n,i)=>`<option value="${i+1}" ${i+1===M?"selected":""}>${n}</option>`).join("")}</select>
+    <label class="f" style="display:inline-flex;gap:6px;align-items:center"><span>Data lettura</span><input id="l_data" type="date" value="${old.data||""}"></label></div>
+    ${blocchi}
+    <h3 style="margin:12px 0 4px">Contatori interni</h3><div class="frm">${sub}</div>
+    <div class="frm" style="margin-top:8px"><label class="f"><span>Note</span><input id="l_nota" value="${esc(old.nota||"")}" autocomplete="off"></label></div>
+    <div id="lAnt" style="margin-top:10px"></div>
+    <div class="tools" style="margin-top:10px"><button class="btn primary" id="lSalva">Salva la lettura</button></div></div>
+  <div class="grid wide" style="margin-top:14px">${box("lc1","Consumo dei contatori interni (kWh al mese)","Differenza tra una lettura e la precedente")}${box("lc2","Quota dei consumi della sede misurata dai contatori interni (%)","Contatori interni / (prelievo + autoconsumo FV): il resto non è misurato")}</div>
+  <div class="card" style="margin-top:14px"><h2>Letture registrate (${L.length})</h2><div class="scroll"><table><thead><tr><th class="l">Mese</th><th>Produzione 19,95 kWp</th><th>Produzione 29,75 kWp</th><th>Autoconsumo 19,95 kWp</th><th>Prelievo sede</th><th>Uffici</th><th>Officina 1</th><th>Officina 2</th><th class="l">Confronto con E-Distribuzione e bollette</th><th></th></tr></thead><tbody>${righe||'<tr><td class="l" colspan="10">Nessuna lettura registrata.</td></tr>'}</tbody></table></div>
+  <p class="muted" style="margin-top:8px">kWh. Il confronto segnala uno scarto superiore all'1% (e a 20 kWh) tra le letture e i dati di E-Distribuzione o la bolletta dello stesso mese. Il consumo dei contatori interni si calcola solo se è registrata anche la lettura del mese prima.</p></div>`;
+}
+function lDaForm(){
+  const g=id=>document.getElementById(id).value,A=+g("lAnno"),M=+g("lMese"),old=lMese(A,M)||{};
+  const r={anno:A,mese:M,data:g("l_data")||null,sub:{}},pr=lPrevRec(r);let n=0;
+  LIMP.forEach(([imp,nm])=>{r[imp]={};LGRP.forEach(([gr,gn])=>{
+    const a=[0,1,2].map(k=>pnum(g(`l_${imp}_${gr}_${k}`))),pb=pr&&pr[imp]&&pr[imp][gr]&&ok3(pr[imp][gr].a)?pr[imp][gr].a:null,op=old[imp]&&old[imp][gr]&&ok3(old[imp][gr].p)?old[imp][gr].p:null;
+    if(a.every(x=>x==null))return;
+    if(a.some(x=>x==null))throw new Error(nm+" – "+gn+": inserisci tutte e tre le fasce (A1, A2, A3).");
+    const p=pb||op;
+    if(p&&a.some((x,k)=>x<p[k]))throw new Error(nm+" – "+gn+": una lettura è inferiore alla precedente ("+p.join(" / ")+"). Il contatore non può tornare indietro: controlla le cifre.");
+    r[imp][gr]={a,p:p?p.slice():null};n++})});
+  LSUB.forEach(([k,nm])=>{const v=pnum(g("l_s_"+k));if(v==null)return;const pv=pr&&pr.sub&&pr.sub[k];
+    if(typeof pv==="number"&&v<pv)throw new Error(nm+": la lettura è inferiore alla precedente ("+pv+").");
+    r.sub[k]=v;n++});
+  const nt=g("l_nota").trim();if(nt)r.nota=nt;
+  if(!n)throw new Error("Inserisci almeno una lettura.");
+  return r;
+}
+function lAnteprima(){
+  const el=document.getElementById("lAnt");if(!el)return;
+  try{
+    const r=lDaForm(),c=lCalc(r),ct=lControlli(r),su=LSUB.map(([k,nm])=>[nm,lSub(r,k)]);
+    const parti=[];
+    LIMP.forEach(([imp,nm])=>{const x=c[imp];if(x.prod!=null||x.imm!=null||x.prel!=null)parti.push(`<b>${nm}</b>: produzione ${NF(x.prod)} kWh · immissione ${NF(x.imm)} kWh · autoconsumo ${NF(x.auto)} kWh · prelievo ${NF(x.prel)} kWh`)});
+    if(c.i20.tot!=null)parti.push(`Consumo totale della sede (prelievo + autoconsumo): <b>${NF(c.i20.tot)} kWh</b>`);
+    if(su.some(x=>x[1]!=null))parti.push("Contatori interni: "+su.map(x=>x[0]+" "+NF(x[1])+" kWh").join(" · "));
+    el.innerHTML=(parti.length?`<div class="alert info">${parti.join("<br>")}</div>`:"")+ct.map(x=>`<div class="alert warn">${x.nome}: la lettura dà ${NF(x.mis)} kWh, ${x.fonte} ${NF(x.rif,1)} kWh (${x.d>0?"+":""}${NF(x.d)} kWh). Controlla le cifre.</div>`).join("");
+  }catch(e){el.innerHTML=`<div class="alert err">${esc(e.message)}</div>`}
+}
+function lSalva(){
+  let r;try{r=lDaForm()}catch(e){return alert(e.message)}
+  // valore insolito su un contatore interno: oltre 3 volte la mediana dei mesi precedenti
+  for(const [k,nm] of LSUB){const d=lSub(r,k);if(d==null)continue;
+    const v=D.letture_fv.filter(x=>x!==lMese(r.anno,r.mese)&&x.anno*12+x.mese<r.anno*12+r.mese).map(x=>lSub(x,k)).filter(x=>x!=null).slice(-12).sort((a,b)=>a-b);
+    if(v.length>=6&&d>v[Math.floor(v.length/2)]*3&&!confirm(nm+": il consumo del mese ("+NF(d)+" kWh) è molto più alto del solito. Salvare comunque?"))return}
+  // lettura fatta prima della fine del mese: il mese non è completo, quindi non si toccano i dati del fotovoltaico
+  const parz=!!r.data&&+r.data.slice(8,10)<new Date(r.anno,r.mese,0).getDate()-2;
+  if(parz&&!confirm("La lettura è del "+itd(r.data)+", prima della fine del mese: la salvo, ma i consumi del mese saranno parziali e non completo i dati del fotovoltaico. Continuare?"))return;
+  const arr=D.letture_fv.filter(x=>!(x.anno===r.anno&&x.mese===r.mese)).concat([r]).sort((a,b)=>a.anno-b.anno||a.mese-b.mese);
+  saveVoci([{tipo:"base",chiave:"letture_fv",dati:{v:arr}}]);
+  const ex=parz?[]:lRiempi(r);if(ex.length)saveVoci(ex);
+  toast("Lettura di "+MESI[r.mese-1].toLowerCase()+" "+r.anno+" salvata"+(ex.length?" e dati del fotovoltaico completati":""));
+  const i=r.anno*12+r.mese;lA=Math.floor(i/12);lM=i%12+1;render();
+}
+function dLett(){
+  const sA=document.getElementById("lAnno"),sM=document.getElementById("lMese");
+  sA.onchange=sM.onchange=()=>{lA=+sA.value;lM=+sM.value;render()};
+  document.querySelectorAll(".lin,#l_data,#l_nota,[id^=l_s_]").forEach(i=>i.oninput=lAnteprima);
+  document.getElementById("lSalva").onclick=lSalva;
+  document.querySelectorAll(".lE").forEach(b=>b.onclick=()=>{lA=+b.dataset.a;lM=+b.dataset.m;render();window.scrollTo({top:0,behavior:"smooth"})});
+  document.querySelectorAll(".lX").forEach(b=>b.onclick=()=>{if(confirm("Eliminare la lettura di "+MESI[+b.dataset.m-1].toLowerCase()+" "+b.dataset.a+"? I dati del fotovoltaico già completati restano.")){
+    saveVoci([{tipo:"base",chiave:"letture_fv",dati:{v:D.letture_fv.filter(x=>!(x.anno===+b.dataset.a&&x.mese===+b.dataset.m))}}]);render()}});
+  lAnteprima();
+  if(!D.letture_fv.length)return;
+  const c=COL(),L=D.letture_fv,lab=r=>MESI[r.mese-1].slice(0,3)+" "+String(r.anno).slice(2);
+  const ls=L.filter(r=>LSUB.some(([k])=>lSub(r,k)!=null));
+  chart("lc1",{type:"bar",data:{labels:ls.map(lab),datasets:LSUB.map(([k,nm],j)=>({label:nm,data:ls.map(r=>lSub(r,k)),backgroundColor:c[j]}))},options:{scales:{x:{stacked:true,ticks:{maxTicksLimit:14}},y:{stacked:true,title:{display:true,text:"kWh"}}}}});
+  const q=L.map(r=>{const t=lCalc(r).i20.tot,s=LSUB.map(([k])=>lSub(r,k));return{r,p:t&&s.every(x=>x!=null)?s.reduce((a,b)=>a+b,0)/t*100:null}}).filter(x=>x.p!=null);
+  chart("lc2",{type:"line",data:{labels:q.map(x=>lab(x.r)),datasets:[{label:"% misurata",data:q.map(x=>x.p),borderColor:c[1],backgroundColor:c[1],tension:.25,pointRadius:2}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:14}},y:{min:0,max:100,title:{display:true,text:"%"}}}}});
+}
+const VIEWS={pan:[vPan,dPan],conf:[vConf,dConf],el:[vEl,dEl],gas:[vGas,dGas],acq:[vAcq,dAcq],carb:[vCarb,dCarb],fv:[vFv,dFv],let:[vLett,dLett],flotta:[vFlotta,()=>{}],mon:[vMon,dMon],ins:[vIns,dIns],dati:[vDati,dDati],rif:[vRif,dRif],note:[vNote,()=>{}]};
 function render(){
   charts.forEach(c=>c.destroy());charts=[];
   const [v,d]=VIEWS[tab];
