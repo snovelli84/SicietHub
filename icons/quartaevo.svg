@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Logo QuartaEVO ricreato in forma quadrata: "›quarta" sopra, "EVO" sotto -->
+  <rect x="1.5" y="1.5" width="125" height="125" rx="27" fill="#ffffff" stroke="#dde2ea" stroke-width="3"/>
+  <!-- rete di punti grigi, come nel logo originale -->
+  <g stroke="#c9c9c9" stroke-width="1.5" fill="#bdbdbd">
+    <line x1="34" y1="26" x2="58" y2="18"/>
+    <line x1="58" y1="18" x2="84" y2="28"/>
+    <line x1="84" y1="28" x2="100" y2="20"/>
+    <circle cx="34" cy="26" r="3"/>
+    <circle cx="58" cy="18" r="3"/>
+    <circle cx="84" cy="28" r="3"/>
+    <circle cx="100" cy="20" r="3"/>
+  </g>
+  <!-- freccia e "quarta" -->
+  <path d="M14 50 L22 58 L14 66" fill="none" stroke="#b5121b" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="27" y="65" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="27" fill="#7d7d7d" letter-spacing="-0.5">quarta</text>
+  <!-- EVO -->
+  <text x="64" y="108" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="44" font-weight="600" fill="#b5121b" letter-spacing="1">EVO</text>
+</svg>

@@ -82,11 +82,12 @@ window.SICIET_APPS = [
     verified: false
   },
   {
-    id: "q3",
-    name: "Q3",
-    description: "Applicativo Quarta Q3, sul server interno.",
+    id: "quartaevo",
+    name: "QuartaEVO",
+    description: "Gestionale QuartaEVO, sul server interno.",
     category: "Operatività",
     emoji: "🧩",
+    icon: "icons/quartaevo.svg", // logo QuartaEVO ricreato in forma quadrata
     // Server interno: raggiungibile solo dalla rete aziendale, quindi l'app
     // compare solo da PC e solo in sede.
     web: "http://sicietw19evo1.siciet.it/quarta/q3/home/QPAP/it",

@@ -34,7 +34,7 @@ Tutto si configura in [`apps.js`](apps.js). Esempio:
 
 - `android.package`: è il valore `id=` nell'indirizzo della pagina Play Store dell'app.
 - `ios.store`: l'indirizzo della pagina App Store.
-- `soloSede: true`: l'app compare solo quando si è nella rete aziendale (IP in `SICIET_OFFICE_IPS`); con `soloDesktop: true` solo da PC in sede (es. Q3 sul server interno).
+- `soloSede: true`: l'app compare solo quando si è nella rete aziendale (IP in `SICIET_OFFICE_IPS`); con `soloDesktop: true` solo da PC in sede (es. QuartaEVO e Servizi Quadri sui server interni).
 - `soloMobile: true`: l'app non compare quando il portale è aperto da PC (es. MyPerfetto, AuthPoint, Splashtop SOS). `soloDesktop: true`: compare solo da PC.
 - `web`: da PC si apre direttamente questo indirizzo (es. ZConnect apre il portale HR); senza `web`, da PC compare un pannello con i link agli store.
 - Servizi solo web (es. NinjaOne): basta indicare `web` senza `ios`/`android`; al tocco si apre il sito su qualsiasi dispositivo. Con `webSede` si indica un indirizzo diverso da usare quando si è nella rete aziendale: la sede si riconosce dall'IP pubblico (`SICIET_OFFICE_IPS` in `apps.js`, verificato tramite `api.ipify.org`). Es. MailStore: in sede `https://mailstore.siciet.it:8462`, fuori sede `https://mailstore.siciet.it`. Con `iconStoreId` si può usare l'icona dell'eventuale app sull'App Store.
