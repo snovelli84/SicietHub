@@ -88,7 +88,13 @@
     if (!w || typeof w.temp !== "number") return;
     var look = weatherLook(typeof w.nowCode === "number" ? w.nowCode : w.code, w.isDay !== 0);
     $("meteoIcon").textContent = look[0];
-    $("meteoLabel").textContent = "Meteo · " + cfg.luogo;
+    // "Meteo · " si nasconde sugli schermi stretti (resta il luogo).
+    $("meteoLabel").innerHTML = "";
+    var pre = document.createElement("span");
+    pre.className = "meteo-label-pre";
+    pre.textContent = "Meteo · ";
+    $("meteoLabel").appendChild(pre);
+    $("meteoLabel").appendChild(document.createTextNode(cfg.luogo));
     $("meteoTemp").textContent = Math.round(w.temp) + "°";
     $("meteoDesc").textContent = look[1];
     $("meteoMin").textContent = typeof w.min === "number" ? Math.round(w.min) + "°" : "–";
@@ -127,6 +133,23 @@
       .catch(function () {});
   }
 
+  /* ---------- Foglietto del calendario ---------- */
+
+  function renderCalendar() {
+    var now = new Date();
+    var opt = { timeZone: "Europe/Rome" };
+    function part(o) { return now.toLocaleDateString("it-IT", Object.assign({}, opt, o)); }
+    $("calMonth").textContent = part({ month: "long" });
+    $("calDay").textContent = part({ day: "numeric" });
+    $("calWeekday").textContent = part({ weekday: "long" });
+    $("calendar").setAttribute("aria-label", "Oggi è " + part({ weekday: "long", day: "numeric", month: "long", year: "numeric" }));
+  }
+
   renderGreeting();
+  renderCalendar();
   loadWeather();
+  // Se la pagina resta aperta, al ritorno si aggiornano saluto e data.
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible") { renderGreeting(); renderCalendar(); }
+  });
 })();
