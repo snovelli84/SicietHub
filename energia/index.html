@@ -147,7 +147,7 @@ var ENERGIA_CONFIG={
 };
 const CFG=ENERGIA_CONFIG;
 // Versione della pagina: va aumentata a ogni modifica, così in fondo si vede quale è in uso.
-const VERSIONE="2.6",DATA_VERSIONE="25/11/2026";
+const VERSIONE="2.7",DATA_VERSIONE="25/11/2026";
 const KEY="siciet_energia_data_v1",KP="siciet_energia_pwd",KN="siciet_energia_nome",KQ="siciet_energia_coda";
 const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const ARR={mensile:"mensili",el:"elettrico_dettaglio",gas:"gas_dettaglio",fv:"fv",fv30:"fv30",acqua:"acqua_fatture",carbtx:"carb_tx",km:"km_mensili",scheda:"monitoraggio"};
@@ -846,7 +846,7 @@ const carbMap=(()=>{let key="",m={};return t=>{
 const odoOk=t=>{const f=D.flotta.find(x=>x.targa===t);return!(f&&f.odometro_inaffidabile)};
 /* km GPS (Fleet2Track) per mezzo e mese, indicizzati */
 const gpsMap=(()=>{let ref=null,m={};return(y,mo)=>{
-  if(ref!==D.km_gps){ref=D.km_gps;m={};D.km_gps.forEach(r=>{(m[r.anno+"-"+String(r.mese).padStart(2,"0")]=m[r.anno+"-"+String(r.mese).padStart(2,"0")]||{})[r.targa]=r.km})}
+  if(ref!==D.km_gps){ref=D.km_gps;m={};D.km_gps.filter(r=>!r.parziale).forEach(r=>{(m[r.anno+"-"+String(r.mese).padStart(2,"0")]=m[r.anno+"-"+String(r.mese).padStart(2,"0")]||{})[r.targa]=r.km})}
   return m[y+"-"+String(mo).padStart(2,"0")]||null}})();
 /* km del mese per tipo di carburante: km inseriti a mano; altrimenti, per ogni mezzo, i km GPS (Fleet2Track) se ci sono, o la stima dagli odometri dei rifornimenti (esclusi i mezzi con odometro inaffidabile). gps = parte dei km che viene dal GPS */
 function kmMese(i){
