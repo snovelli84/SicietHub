@@ -125,4 +125,7 @@ Con NinjaOne: **Amministrazione → Libreria → Automazione → Aggiungi script
 
 Opzioni (campo *Parametri preimpostati* dello script):
 - `-ApriAllAvvio`: apre anche hub.siciet.it all'avvio di Chrome ed Edge (`RestoreOnStartup` = 4);
-- `-Rimuovi`: toglie la webapp e l'apertura all'avvio impostate dallo script.
+- `-ApriAlLogin`: apre la webapp SICIET HUB all'accesso a Windows (policy `WebAppSettings`, `run_on_os_login` = `run_windowed`), in un solo browser per non aprire due finestre: `-Browser Chrome` (predefinito) oppure `-Browser Edge`;
+- `-Rimuovi`: toglie la webapp e le aperture automatiche impostate dallo script.
+
+Lo script descrive lo stato voluto: rieseguendolo senza `-ApriAlLogin` l'apertura all'accesso viene tolta.

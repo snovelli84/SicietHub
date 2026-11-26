@@ -13,26 +13,34 @@
   Parametri (in NinjaOne nel campo "Parametri preimpostati" dello script,
   es. -ApriAllAvvio; oppure da riga di comando):
     -ApriAllAvvio  apre anche hub.siciet.it all'avvio di Chrome ed Edge
-    -Rimuovi       toglie la webapp (e l'apertura all'avvio) dalle policy
+    -ApriAlLogin   apre la webapp SICIET HUB all'accesso a Windows
+                   (policy WebAppSettings, run_on_os_login), con un solo
+                   browser per non aprire due finestre:
+    -Browser       Chrome (predefinito) oppure Edge, per -ApriAlLogin
+    -Rimuovi       toglie la webapp e le aperture automatiche dalle policy
 
   Tocca solo i valori di SICIET HUB: le altre voci di WebAppInstallForceList
-  e le altre policy dei browser restano come sono.
+  e WebAppSettings e le altre policy dei browser restano come sono.
 #>
 param(
   [switch]$ApriAllAvvio,
+  [switch]$ApriAlLogin,
+  [ValidateSet("Chrome", "Edge")]
+  [string]$Browser = "Chrome",
   [switch]$Rimuovi
 )
 
 $ErrorActionPreference = "Stop"
 $Url = "https://hub.siciet.it/"
 
-$Browser = @(
+$Browsers = @(
   @{ Nome = "Chrome"; Chiave = "HKLM:\SOFTWARE\Policies\Google\Chrome" },
   @{ Nome = "Edge";   Chiave = "HKLM:\SOFTWARE\Policies\Microsoft\Edge" }
 )
 
-function Get-ForceList([string]$Chiave) {
-  $v = (Get-ItemProperty -Path $Chiave -Name "WebAppInstallForceList" -ErrorAction SilentlyContinue).WebAppInstallForceList
+# Legge una policy che contiene un elenco JSON (WebAppInstallForceList, WebAppSettings).
+function Get-JsonList([string]$Chiave, [string]$Nome) {
+  $v = (Get-ItemProperty -Path $Chiave -Name $Nome -ErrorAction SilentlyContinue).$Nome
   if (-not $v) { return @() }
   # In PowerShell 5.1 ConvertFrom-Json restituisce l'elenco come un unico
   # oggetto: assegnarlo e poi restituirlo lo "srotola" voce per voce.
@@ -40,11 +48,20 @@ function Get-ForceList([string]$Chiave) {
   return @($p)
 }
 
-foreach ($b in $Browser) {
+function Set-JsonList([string]$Chiave, [string]$Nome, $Lista) {
+  if (@($Lista).Count -gt 0) {
+    $json = ConvertTo-Json -InputObject @($Lista) -Compress -Depth 4
+    Set-ItemProperty -Path $Chiave -Name $Nome -Value $json -Type String
+  } else {
+    Remove-ItemProperty -Path $Chiave -Name $Nome -ErrorAction SilentlyContinue
+  }
+}
+
+foreach ($b in $Browsers) {
   if (-not (Test-Path $b.Chiave)) { New-Item -Path $b.Chiave -Force | Out-Null }
 
   # Elenco attuale senza SICIET HUB, poi (se non si rimuove) SICIET HUB in coda.
-  $lista = @(Get-ForceList $b.Chiave | Where-Object { $_.url -ne $Url })
+  $lista = @(Get-JsonList $b.Chiave "WebAppInstallForceList" | Where-Object { $_.url -ne $Url })
   if (-not $Rimuovi) {
     $lista += [pscustomobject]@{
       url = $Url
@@ -53,12 +70,18 @@ foreach ($b in $Browser) {
     }
   }
 
-  if ($lista.Count -gt 0) {
-    $json = ConvertTo-Json -InputObject $lista -Compress -Depth 4
-    Set-ItemProperty -Path $b.Chiave -Name "WebAppInstallForceList" -Value $json -Type String
-  } else {
-    Remove-ItemProperty -Path $b.Chiave -Name "WebAppInstallForceList" -ErrorAction SilentlyContinue
+  Set-JsonList $b.Chiave "WebAppInstallForceList" $lista
+
+  # Apertura all'accesso a Windows: solo nel browser scelto con -Browser.
+  $impostazioni = @(Get-JsonList $b.Chiave "WebAppSettings" | Where-Object { $_.manifest_id -ne $Url })
+  $login = $ApriAlLogin -and -not $Rimuovi -and $b.Nome -eq $Browser
+  if ($login) {
+    $impostazioni += [pscustomobject]@{
+      manifest_id = $Url
+      run_on_os_login = "run_windowed"
+    }
   }
+  Set-JsonList $b.Chiave "WebAppSettings" $impostazioni
 
   # Apertura all'avvio: RestoreOnStartup = 4 ("apri pagine specifiche").
   $urls = Join-Path $b.Chiave "RestoreOnStartupURLs"
@@ -75,5 +98,8 @@ foreach ($b in $Browser) {
   }
 
   $stato = if ($Rimuovi) { "rimossa" } else { "installata" }
-  Write-Output ("{0}: SICIET HUB {1}{2}" -f $b.Nome, $stato, $(if ($ApriAllAvvio -and -not $Rimuovi) { ", apertura all'avvio attiva" } else { "" }))
+  $extra = ""
+  if ($ApriAllAvvio -and -not $Rimuovi) { $extra += ", apertura all'avvio del browser attiva" }
+  if ($login) { $extra += ", apertura all'accesso a Windows attiva" }
+  Write-Output ("{0}: SICIET HUB {1}{2}" -f $b.Nome, $stato, $extra)
 }
