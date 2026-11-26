@@ -5,7 +5,7 @@ from datetime import date
 
 RADICE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RADICE))
-from pipeline import parse_prospetti, parse_elenco, parse_ordini, regole, riconcilia  # noqa: E402
+from pipeline import parse_prospetti, parse_elenco, parse_lista, parse_ordini, regole, riconcilia  # noqa: E402
 
 
 def _cache(nome, files, fn):
@@ -16,7 +16,7 @@ def _cache(nome, files, fn):
         st = Path(f).stat()
         h.update(f"{f}{st.st_size}{st.st_mtime_ns}".encode())
     h.update(Path(__file__).read_bytes() if False else b"v1")
-    for m in ("parse_prospetti", "parse_elenco", "parse_ordini"):
+    for m in ("parse_prospetti", "parse_elenco", "parse_lista", "parse_ordini"):
         h.update((Path(__file__).parent / f"{m}.py").read_bytes())
     cf = RADICE / "data" / ".cache" / f"{nome}-{h.hexdigest()[:12]}.pkl"
     if cf.exists():
@@ -35,12 +35,14 @@ def main():
     prospetti = _cache("prospetti", fp, lambda: [parse_prospetti.leggi(f) for f in fp])
     fe = str(inp / "Elenco Commesse per Tipologia.pdf")
     elenco = _cache("elenco", [fe], lambda: parse_elenco.leggi(fe))
+    fl = sorted(glob.glob(str(inp / "Lista commesse*.pdf")))
+    lista = _cache("lista", fl, lambda: parse_lista.leggi(fl[-1])) if fl else []
     fo = str(inp / "Ordini da cliente.pdf")
     righe_pag = _cache("ordini", [fo], lambda: parse_ordini.leggi_righe(fo))
     ordini = [r for p in righe_pag for r in p["righe"]]
-    dentro, fuori = regole.costruisci(prospetti, elenco, ordini, cfg, ov)
+    dentro, fuori, escluse = regole.costruisci(prospetti, elenco, ordini, cfg, ov, lista=lista)
     (RADICE / "data").mkdir(exist_ok=True)
-    json.dump(dict(commesse=dentro, fuori_perimetro=fuori), open(RADICE / "data/commesse.json", "w", encoding="utf-8"),
+    json.dump(dict(commesse=dentro, fuori_perimetro=fuori, escluse=escluse), open(RADICE / "data/commesse.json", "w", encoding="utf-8"),
               ensure_ascii=False, indent=1)
     # --- riconciliazione ---
     rec = dict(

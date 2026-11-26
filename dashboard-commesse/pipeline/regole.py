@@ -12,7 +12,7 @@ def e_economia(codice, prefissi):
     return codice.startswith(tuple(prefissi))
 
 
-def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None):
+def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=None):
     """Ritorna (commesse, scartate). Una commessa = gruppo code[:5] (padre + varianti)."""
     oggi = oggi or date.today()
     pref = cfg["prefissi_economia"]
@@ -38,18 +38,45 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None):
             if not e_economia(r["codice"], pref):
                 righe_g[gruppo(r["codice"])].append(r)
 
-    # Commesse aperte nell'Elenco ma senza righe nel Prospetto (nessun movimento): importi a zero
-    interni = set(cfg.get("clienti_interni", []))
+    # Commesse aperte nell'Elenco ma senza righe nel Prospetto (nessun movimento): importi a zero.
+    # Escluse (decisione del titolare): commesse interne (cliente SICIET) e commesse Sospese.
+    interni = set(cfg.get("clienti_interni_codici", []))
+    lista = lista or []
+    resp = {x["codice"]: x for x in lista}
+    nomi_cli = {e["cliente_codice"]: e["cliente"] for e in elenco}
+    for p in prospetti:
+        for r in p["righe"]:
+            if r.get("cliente_codice") and r.get("cliente"):
+                nomi_cli[r["cliente_codice"]] = r["cliente"]
+    escluse = {"interne": [], "sospese": []}
     for g, L in el_per_gruppo.items():
         if g in righe_g or e_economia(g, pref):
             continue
         std = next((e for e in L if e["sezione"] == "Standard"), None)
-        if not std or std["cliente"] in interni:
+        if not std:
+            continue
+        if std["cliente_codice"] in interni:
+            escluse["interne"].append(g)
             continue
         if any(e["stato"] != "Chiusa" for e in L):
-            righe_g[g] = [dict(codice=std["codice"], descrizione=std["descrizione"], capo="(non assegnato)",
+            if all(e["stato"] in ("Chiusa", "Sospesa") for e in L):
+                escluse["sospese"].append(g)
+                continue
+            capo = (resp.get(g) or {}).get("nome") or "(non assegnato)"
+            righe_g[g] = [dict(codice=std["codice"], descrizione=std["descrizione"], capo=capo,
                                cliente=std["cliente"], cliente_codice=std["cliente_codice"], ricavi=0.0, costi=0.0,
                                fatturato=0.0, stato=std["stato"], senza_prospetto=True)]
+    # Commesse presenti nella lista più recente ma non ancora nell'Elenco con Stato: nuove, in avvio
+    for x in lista:
+        g = x["codice"][:5]
+        if g in righe_g or g in el_per_gruppo or e_economia(g, pref) or x["codice"] != g:
+            continue
+        if x["cliente_codice"] in interni:
+            continue
+        righe_g[g] = [dict(codice=g, descrizione="(nuova commessa, non ancora nell'Elenco con Stato)",
+                           capo=x["nome"] or "(non assegnato)", cliente=nomi_cli.get(x["cliente_codice"], x["cliente_codice"]),
+                           cliente_codice=x["cliente_codice"], ricavi=0.0, costi=0.0, fatturato=0.0,
+                           stato="In Progress", senza_prospetto=True, nuova=True, creazione=x["creazione"])]
 
     commesse = []
     for g, righe in sorted(righe_g.items()):
@@ -75,7 +102,8 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None):
         # nome cliente: preferisci quello del prospetto (non spezzato dal PDF)
         cl_pr = next((r["cliente"] for r in righe if r.get("cliente")), "")
         cliente = cl_pr or cliente
-        apertura = (std or {}).get("creazione") or next((e["creazione"] for e in gruppo_el if e["creazione"]), None)
+        apertura = (std or {}).get("creazione") or next((e["creazione"] for e in gruppo_el if e["creazione"]), None) \
+            or next((r.get("creazione") for r in righe if r.get("creazione")), None)
         chiusura = None
         if not aperta:
             chiusura = (base or {}).get("consegna")
@@ -136,4 +164,5 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None):
             (dentro if a <= int(c["chiusura"][:4]) <= b else fuori).append(c)
         else:
             (dentro if cfg["perimetro"]["includi_chiuse_senza_data"] else fuori).append(c)
-    return dentro, fuori
+    fuori_extra = escluse
+    return dentro, fuori, fuori_extra

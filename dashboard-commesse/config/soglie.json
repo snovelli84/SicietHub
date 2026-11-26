@@ -7,10 +7,10 @@
   "perimetro": {
     "chiuse_dal_anno": 2025,
     "chiuse_al_anno": 2026,
-    "includi_chiuse_senza_data": false,
+    "includi_chiuse_senza_data": true,
     "capi_esclusi": ["BENEDETTI LORENZO"]
   },
-  "clienti_interni": ["S.I.C.I.E.T. srl"],
+  "clienti_interni_codici": ["00010"],
   "prefissi_economia": ["SM", "SL", "SF"],
   "tolleranza_riconciliazione_euro": 0.05
 }
