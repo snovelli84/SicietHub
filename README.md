@@ -123,7 +123,7 @@ Lo script [`desktop/installa-webapp-siciethub.ps1`](desktop/installa-webapp-sici
 
 Con NinjaOne: **Amministrazione → Libreria → Automazione → Aggiungi script**, linguaggio PowerShell, esecuzione come **Sistema**, incollando il contenuto del file; poi eseguirlo sui dispositivi o inserirlo in una policy. Il browser applica la policy al riavvio successivo (o subito da `chrome://policy` / `edge://policy` → *Ricarica criteri*).
 
-Così com'è, **senza parametri**, lo script installa la webapp in Chrome ed Edge e la apre **con Chrome all'accesso a Windows**, tramite un collegamento "SICIET HUB" (`chrome.exe --app=https://hub.siciet.it/`) nella cartella Esecuzione automatica comune a tutti gli utenti (`C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp`). La policy `WebAppSettings`/`run_on_os_login` di Chrome è stata provata ma non apriva la webapp in modo affidabile: lo script ne toglie la voce di SICIET HUB.
+Così com'è, **senza parametri**, lo script installa la webapp in Chrome ed Edge e la apre **con Chrome all'accesso a Windows di qualsiasi utente**, tramite l'attività pianificata "SICIET HUB - apertura all'accesso" (20 secondi dopo l'accesso, `chrome.exe --app=https://hub.siciet.it/`, gruppo Utenti senza privilegi elevati). Sono stati provati e scartati, perché sui PC aziendali non aprivano la webapp, la policy `WebAppSettings`/`run_on_os_login` di Chrome e un collegamento nella cartella Esecuzione automatica comune: lo script li toglie.
 
 Parametri facoltativi (campo *Parametri preimpostati* dello script), solo se serve cambiare il comportamento:
 - `-NonAprireAlLogin`: installa la webapp ma non la apre all'accesso a Windows;

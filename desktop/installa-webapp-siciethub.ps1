@@ -5,12 +5,13 @@
   - installa SICIET HUB come app in Chrome ed Edge per tutti gli utenti del
     PC (icona nel menu Start e sul desktop, finestra senza barra degli
     indirizzi; policy WebAppInstallForceList);
-  - la apre con Chrome all'accesso a Windows, con un collegamento
-    "SICIET HUB" nella cartella Esecuzione automatica comune a tutti gli
-    utenti (C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp).
-    La policy WebAppSettings/run_on_os_login di Chrome non si apriva in modo
-    affidabile: lo script toglie la voce di SICIET HUB da WebAppSettings, cosi'
-    non si aprono due finestre.
+  - la apre con Chrome all'accesso a Windows di qualsiasi utente, con
+    un'attivita' pianificata "SICIET HUB - apertura all'accesso" (20 secondi
+    dopo l'accesso, in finestra app).
+    Provati e scartati perche' non aprivano la webapp sui PC aziendali: la
+    policy WebAppSettings/run_on_os_login di Chrome e il collegamento nella
+    cartella Esecuzione automatica comune. Lo script li toglie, cosi' non si
+    aprono due finestre.
 
   Uso con NinjaOne: Amministrazione > Libreria > Automazione > Aggiungi script
   (PowerShell, esegui come "Sistema"), poi eseguirlo sui dispositivi o in una
@@ -102,9 +103,12 @@ foreach ($b in $Browsers) {
   Write-Output ("{0}: SICIET HUB {1}{2}" -f $b.Nome, $stato, $extra)
 }
 
-# --- Apertura all'accesso a Windows: collegamento in Esecuzione automatica ---
+# --- Apertura all'accesso a Windows: attivita' pianificata ---
 
+$NomeAttivita = "SICIET HUB - apertura all'accesso"
+# Collegamento usato da una versione precedente dello script: si toglie.
 $Collegamento = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\StartUp\SICIET HUB.lnk"
+if (Test-Path $Collegamento) { Remove-Item -Path $Collegamento -Force }
 
 function Find-BrowserExe([string]$Nome) {
   $exe = if ($Nome -eq "Edge") { "msedge.exe" } else { "chrome.exe" }
@@ -121,22 +125,25 @@ function Find-BrowserExe([string]$Nome) {
   return $null
 }
 
+$esistente = Get-ScheduledTask -TaskName $NomeAttivita -ErrorAction SilentlyContinue
+
 if ($ApriAlLogin -and -not $Rimuovi) {
   $exePath = Find-BrowserExe $Browser
   if ($exePath) {
-    $sh = New-Object -ComObject WScript.Shell
-    $lnk = $sh.CreateShortcut($Collegamento)
-    $lnk.TargetPath = $exePath
-    $lnk.Arguments = "--app=" + $Url
-    $lnk.WorkingDirectory = Split-Path $exePath
-    $lnk.IconLocation = $exePath + ",0"
-    $lnk.Description = "SICIET HUB"
-    $lnk.Save()
-    Write-Output ("Apertura all'accesso a Windows attiva con {0} ({1})" -f $Browser, $Collegamento)
+    $azione = New-ScheduledTaskAction -Execute $exePath -Argument ("--app=" + $Url) -WorkingDirectory (Split-Path $exePath)
+    # All'accesso di qualsiasi utente, 20 secondi dopo (desktop gia' pronto).
+    $avvio = New-ScheduledTaskTrigger -AtLogOn
+    $avvio.Delay = "PT20S"
+    # Gruppo "Utenti" (SID valido in ogni lingua di Windows), senza privilegi elevati:
+    # il browser si apre nella sessione dell'utente che ha fatto l'accesso.
+    $chi = New-ScheduledTaskPrincipal -GroupId "S-1-5-32-545" -RunLevel Limited
+    $opzioni = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)
+    Register-ScheduledTask -TaskName $NomeAttivita -Action $azione -Trigger $avvio -Principal $chi -Settings $opzioni -Description "Apre SICIET HUB all'accesso a Windows" -Force | Out-Null
+    Write-Output ("Apertura all'accesso a Windows attiva con {0} (attivita' pianificata '{1}')" -f $Browser, $NomeAttivita)
   } else {
     Write-Warning ("{0} non trovato su questo PC: apertura all'accesso non impostata." -f $Browser)
   }
-} elseif (Test-Path $Collegamento) {
-  Remove-Item -Path $Collegamento -Force
+} elseif ($esistente) {
+  Unregister-ScheduledTask -TaskName $NomeAttivita -Confirm:$false
   Write-Output "Apertura all'accesso a Windows tolta."
 }
