@@ -79,9 +79,62 @@ header p{margin-top:12px;opacity:.9}
 
 /* Riquadro meteo */
 .meteo[hidden]{display:none}
-.meteo{
-  justify-self:center;
+/* Riga "oggi": foglietto del calendario + meteo */
+.today{
   margin-top:10px;
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  align-items:stretch;
+  gap:10px;
+}
+
+/* Foglietto del calendario da tavolo */
+.calendar{
+  width:84px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  background:#fffdf8;
+  color:#1d2430;
+  border-radius:10px;
+  overflow:hidden;
+  /* fogli successivi che si intravedono sotto */
+  box-shadow:0 3px 0 -1px #e9e4da, 0 6px 0 -2px #d6d0c4, 0 8px 14px rgba(0,0,0,.22);
+  margin-bottom:6px;
+}
+.calendar-top{
+  position:relative;
+  width:100%;
+  background:#c62828;
+  color:#fff;
+  text-align:center;
+  padding:9px 4px 4px;
+}
+/* anelli */
+.calendar-top::before,.calendar-top::after{
+  content:"";
+  position:absolute;
+  top:3px;
+  width:7px;height:7px;
+  border-radius:50%;
+  background:#fffdf8;
+  box-shadow:inset 0 1px 1px rgba(0,0,0,.35);
+}
+.calendar-top::before{left:20px}
+.calendar-top::after{right:20px}
+.calendar-month{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.calendar-day{
+  font-family:Georgia,"Times New Roman",serif;
+  font-size:40px;
+  font-weight:700;
+  line-height:1;
+  padding-top:6px;
+  font-variant-numeric:lining-nums;
+}
+.calendar-weekday{font-size:12px;color:#5d6878;padding:2px 4px 8px;text-transform:capitalize}
+
+.meteo{
   display:flex;
   align-items:center;
   gap:14px;
@@ -107,6 +160,25 @@ header p{margin-top:12px;opacity:.9}
 .meteo-range div{display:flex;gap:8px;justify-content:space-between}
 .meteo-range dt{opacity:.8}
 .meteo-range dd{margin:0;font-weight:600}
+
+/* Schermi stretti: foglietto e meteo più compatti, sulla stessa riga */
+@media (max-width:480px){
+  .today{gap:8px;flex-wrap:nowrap}
+  .calendar{width:76px}
+  .calendar-top{padding:9px 2px 4px}
+  .calendar-month{font-size:9.5px;letter-spacing:.3px}
+  .calendar-day{font-size:32px}
+  .calendar-weekday{font-size:11px}
+  .calendar-top::before{left:16px}
+  .calendar-top::after{right:16px}
+  .meteo{gap:10px;padding:10px 12px;min-width:0}
+  .meteo-icon{font-size:30px}
+  .meteo-temp{font-size:26px}
+  .meteo-desc{font-size:13px;line-height:1.2}
+  .meteo-main{min-width:0}
+  .meteo-label-pre{display:none}
+  .meteo-range{padding-left:10px;font-size:13px}
+}
 .greeting-form{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;font-size:15px}
 .greeting-form input{
   font:inherit;font-size:16px;padding:6px 10px;border-radius:8px;border:0;
@@ -284,17 +356,24 @@ footer{text-align:center;padding:24px 16px calc(24px + env(safe-area-inset-botto
       <input type="text" id="greetingName" autocomplete="given-name" maxlength="40">
       <button type="submit">Salva</button>
     </form>
-    <div class="meteo" id="meteo" hidden>
-      <div class="meteo-icon" id="meteoIcon" aria-hidden="true"></div>
-      <div class="meteo-main">
-        <div class="meteo-label" id="meteoLabel">Meteo</div>
-        <div class="meteo-temp" id="meteoTemp"></div>
-        <div class="meteo-desc" id="meteoDesc"></div>
+    <div class="today">
+      <div class="calendar" id="calendar" role="img" aria-label="">
+        <div class="calendar-top"><span class="calendar-month" id="calMonth"></span></div>
+        <div class="calendar-day" id="calDay"></div>
+        <div class="calendar-weekday" id="calWeekday"></div>
       </div>
-      <dl class="meteo-range">
-        <div><dt>Min</dt><dd id="meteoMin"></dd></div>
-        <div><dt>Max</dt><dd id="meteoMax"></dd></div>
-      </dl>
+      <div class="meteo" id="meteo" hidden>
+        <div class="meteo-icon" id="meteoIcon" aria-hidden="true"></div>
+        <div class="meteo-main">
+          <div class="meteo-label" id="meteoLabel">Meteo</div>
+          <div class="meteo-temp" id="meteoTemp"></div>
+          <div class="meteo-desc" id="meteoDesc"></div>
+        </div>
+        <dl class="meteo-range">
+          <div><dt>Min</dt><dd id="meteoMin"></dd></div>
+          <div><dt>Max</dt><dd id="meteoMax"></dd></div>
+        </dl>
+      </div>
     </div>
   </div>
 </header>
