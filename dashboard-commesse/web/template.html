@@ -120,6 +120,7 @@ body.bloccato header,body.bloccato main,body.bloccato footer{display:none}
     <form id="gate-form"><label for="gate-pw" class="nota">Password</label>
       <input type="password" id="gate-pw" autocomplete="current-password" required autofocus>
       <button class="btn" type="submit">Entra</button><div class="err" id="gate-err" role="alert"></div></form>
+    <p class="nota" style="margin:.5rem 0 0">Versione __VERSIONE__</p>
   </div>
 </div>
 <header>
@@ -220,7 +221,7 @@ body.bloccato header,body.bloccato main,body.bloccato footer{display:none}
   <div id="qual"></div>
 </section>
 </main>
-<footer class="nota" style="max-width:1400px;margin:0 auto;padding:1rem">Fonte: esportazioni Mago4 (Prospetto Margine Economico, Elenco Commesse, Ordini da cliente). Commesse in economia (SM, SL, SF) escluse. Costi diretti dal Prospetto Margine Economico.</footer>
+<footer class="nota" style="max-width:1400px;margin:0 auto;padding:1rem">Fonte: esportazioni Mago4 (Prospetto Margine Economico, Elenco Commesse, Ordini da cliente). Commesse in economia (SM, SL, SF) escluse. Costi diretti dal Prospetto Margine Economico.<br><strong>Versione __VERSIONE__</strong> · dati aggiornati al <span id="ver-agg"></span></footer>
 
 <script>/*CHART*/</script>
 <script>/*XLSX*/</script>
@@ -280,7 +281,7 @@ const stMargine = p => p==null ? ["neutro","—","Nessun dato"] : p<S.margine_mi
 const badge = ([cl,ic,tx]) => `<span class="badge ${cl}">${ic} ${tx}</span>`;
 const tag = (t,cl="") => `<span class="tag ${cl}">${esc(t)}</span>`;
 
-$("#agg").textContent = DATI.aggiornato_al;
+$("#agg").textContent = DATI.aggiornato_al; $("#ver-agg").textContent = DATI.aggiornato_al;
 
 /* ---------- navigazione ---------- */
 const sezioni = ["cruscotto","passato","futuro","capi","dettaglio","qualita"];
@@ -425,7 +426,7 @@ function serie(modo){
     const da = (()=>{const [y,m]=mo.split("-").map(Number); const d=new Date(y,m-1-17,1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");})();
     labels=[...tutti].filter(m=>m>=da).sort();
     pas=labels.map(m=>m<=mo?(P[m]||0):null); fut=labels.map(m=>m>=mo?(F[m]||0):null);
-    $("#nota-serie").textContent="Ultimi 18 mesi e mesi futuri. Passato: fatturato sugli ordini, per data di consegna. Futuro: residuo delle commesse aperte distribuito in parti uguali fino all'ultima consegna prevista (o 6 mesi): è una stima.";
+    $("#nota-serie").textContent="Ultimi 18 mesi e mesi futuri. Passato: fatturato per data di fattura (dove la lista fatture coincide col Prospetto), altrimenti per data di consegna degli ordini. Futuro: residuo delle commesse aperte distribuito in parti uguali fino all'ultima consegna prevista (o 6 mesi): è una stima.";
   } else {
     const ag={p:{},f:{}}; Object.entries(P).forEach(([m,v])=>ag.p[m.slice(0,4)]=(ag.p[m.slice(0,4)]||0)+v);
     Object.entries(F).forEach(([m,v])=>ag.f[m.slice(0,4)]=(ag.f[m.slice(0,4)]||0)+v);
@@ -546,10 +547,11 @@ function esporta(){
 
 /* ---------- QUALITA' ---------- */
 const ANOM = {
-  chiusa_senza_data:["Chiuse senza data di chiusura","Mago4 non riporta la data: non sono escluse, compaiono come «n.d.» (con una stima dall'ultima attività, se esiste)."],
+  chiusa_senza_data:["Chiuse senza data di chiusura","Mago4 non riporta la data: non sono escluse, compaiono come «n.d.» (con una stima dalla data dell'ultima fattura emessa o, in mancanza, dell'ultimo ordine)."],
   in_perdita:["In perdita","Costi diretti maggiori dei ricavi."],
   aperta_senza_ordini:["Aperte senza ordini cliente","Nessun ordine nel file «Ordini da cliente»: residuo non calcolabile."],
   fatturato_oltre_ordini:["Fatturato oltre gli ordini","Fatturato registrato sugli ordini maggiore del totale ordinato (oltre la soglia): può essere legittimo se ci sono fatture non coperte da ordine."],
+  fatture_discordanti:["Fatturato del Prospetto diverso dalle fatture emesse in lista","La «Lista fatture emesse» contiene solo le fatture immediate: differenze possono dipendere da altri tipi di fattura, note di credito o fatture registrate su altre commesse. Non è necessariamente un errore."],
   dato_da_verificare:["Dato da verificare","Segnalato a mano in config/override.json."],
 };
 function qualita(){

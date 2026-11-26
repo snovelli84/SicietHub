@@ -14,11 +14,16 @@ def capo_attivo(nome, attivi):
     return any(a.upper().replace("'", "") in n for a in attivi)
 
 
+def fatturabili_discordanti(fatt_prospetto, fg):
+    tot = fg["tot"] if fg else 0.0
+    return abs(tot - fatt_prospetto) > 1.0
+
+
 def e_economia(codice, prefissi):
     return codice.startswith(tuple(prefissi))
 
 
-def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=None):
+def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=None, fatture=None):
     """Ritorna (commesse, scartate). Una commessa = gruppo code[:5] (padre + varianti)."""
     oggi = oggi or date.today()
     pref = cfg["prefissi_economia"]
@@ -40,6 +45,15 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=
         g["ordine"] += r["ordine"] or 0.0
         g["fatt"] += r["fatturato"] or 0.0
         g["n"] += 1
+
+    fat_g = defaultdict(lambda: {"tot": 0.0, "fm": defaultdict(float), "ult": None, "n": 0})
+    for f in fatture or []:
+        if f.get("commessa") and f.get("imponibile") is not None:
+            g = fat_g[gruppo(f["commessa"])]
+            g["tot"] += f["imponibile"]; g["n"] += 1
+            g["fm"][f["data"][:7]] += f["imponibile"]
+            if g["ult"] is None or f["data"] > g["ult"]:
+                g["ult"] = f["data"]
 
     righe_g = defaultdict(list)
     for p in prospetti:
@@ -166,9 +180,21 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=
                 c["anomalie"].append("aperta_senza_ordini")
             if res < -cfg["soglia_da_chiudere_euro"]:
                 c["anomalie"].append("fatturato_oltre_ordini")
+        fg = fat_g.get(g)
+        c["fatture_totale"] = round(fg["tot"], 2) if fg else 0.0
+        c["ultima_fattura"] = fg["ult"] if fg else None
+        # fatturato nel tempo: se le fatture emesse in lista coincidono con il fatturato del Prospetto (±1 €)
+        # si usano le DATE DELLE FATTURE, altrimenti la data di consegna delle righe d'ordine (stima)
+        if fg and abs(fg["tot"] - fatt) <= 1.0:
+            c["fm"] = {k: round(v, 2) for k, v in sorted(fg["fm"].items())}
+            c["fm_fonte"] = "fatture"
+        else:
+            c["fm_fonte"] = "ordini"
+        if fatturabili_discordanti(fatt, fg):
+            c["anomalie"].append("fatture_discordanti")
         c["chiusura_stimata"] = None
         if aperta is False and not chiusura:
-            c["chiusura_stimata"] = c["ultima_attivita"]      # stima: ultima consegna/ordine nel PDF Ordini
+            c["chiusura_stimata"] = c["ultima_fattura"] or c["ultima_attivita"]   # stima: ultima fattura, altrimenti ultimo ordine/consegna
         # anomalie comuni
         if aperta is False and not chiusura:
             c["anomalie"].append("chiusa_senza_data")

@@ -61,6 +61,16 @@ def cifra(testo, password):
     return dict(salt=b(salt), iv=b(iv), iter=ITER, dati=b(ct))
 
 
+def _versione():
+    """Numero di versione: major.minor da config/versione.json, build incrementale a ogni generazione."""
+    from datetime import datetime
+    f = RADICE / "config/versione.json"
+    v = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {"major": 1, "minor": 0, "build": 0}
+    v["build"] += 1
+    f.write_text(json.dumps(v, indent=2) + "\n", encoding="utf-8")
+    return f"{v['major']}.{v['minor']}.{v['build']} · generata il {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+
+
 def main():
     cfg = json.load(open(RADICE / "config/soglie.json", encoding="utf-8"))
     d = json.load(open(RADICE / "data/commesse.json", encoding="utf-8"))
@@ -76,11 +86,13 @@ def main():
         capi_senza_prospetto=rec.get("capi_senza_prospetto", []), responsabili=rec.get("responsabili"))
     dati = dict(aggiornato_al=agg.strftime("%d/%m/%Y"), oggi=oggi.isoformat(), soglie=cfg, commesse=commesse,
                 riconciliazione=rec_sint, escluse={k: len(v) for k, v in d.get("escluse", {}).items()})
+    ver = _versione()
+    dati["versione"] = ver
     web = RADICE / "web"
     html = (web / "template.html").read_text(encoding="utf-8")
     js = lambda f: (web / "lib" / f).read_text(encoding="utf-8").replace("</script", "<\\/script")
     def pagina(blocco):
-        return (html.replace("/*CHART*/", js("chart.umd.js")).replace("/*XLSX*/", js("xlsx.mini.min.js"))
+        return (html.replace("__VERSIONE__", ver).replace("/*CHART*/", js("chart.umd.js")).replace("/*XLSX*/", js("xlsx.mini.min.js"))
                 .replace("/*DATI*/", blocco.replace("</", "<\\/")))
     raw = json.dumps(dati, ensure_ascii=False)
     out = pagina("const DATI_CHIARI = " + raw + ";")
