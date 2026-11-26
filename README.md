@@ -116,3 +116,19 @@ La cartella [`hr/`](hr/) contiene **SICIET HR** (comunicazione delle nuove assun
 La cartella [`inventrack/`](inventrack/) contiene **SICIET InvenTrack** (inventario del magazzino generale e dei magazzini di commessa: report del gestionale, conteggio dal telefono, Excel delle differenze), all'indirizzo `https://hub.siciet.it/inventrack/` e protetta da password: vedi [`inventrack/README.md`](inventrack/README.md). Non compare nel portale.
 
 La cartella [`energia/`](energia/) contiene **SICIET Energia** (dashboard dei consumi di elettricità, gas, carburanti, fotovoltaico e flotta, con la scheda di monitoraggio degli indicatori e l'inserimento mese per mese), all'indirizzo `https://hub.siciet.it/energia/`. Non compare nel portale. I dati **non sono nel repository**: stanno nel database di un servizio Cloudflare protetto da password, oppure (finché il servizio non è attivato) solo nel browser del dispositivo: vedi [`energia/README.md`](energia/README.md).
+
+## Webapp installata sui PC (NinjaOne)
+
+Lo script [`desktop/installa-webapp-siciethub.ps1`](desktop/installa-webapp-siciethub.ps1) imposta la policy `WebAppInstallForceList` di Chrome ed Edge: il browser installa SICIET HUB come app per tutti gli utenti del PC (icona nel menu Start e sul desktop, finestra senza barra degli indirizzi). Tocca solo la voce di SICIET HUB: le altre app e policy restano come sono.
+
+Con NinjaOne: **Amministrazione → Libreria → Automazione → Aggiungi script**, linguaggio PowerShell, esecuzione come **Sistema**, incollando il contenuto del file; poi eseguirlo sui dispositivi o inserirlo in una policy. Il browser applica la policy al riavvio successivo (o subito da `chrome://policy` / `edge://policy` → *Ricarica criteri*).
+
+Così com'è, **senza parametri**, lo script installa la webapp in Chrome ed Edge e la apre **con Chrome all'accesso a Windows** (policy `WebAppSettings`, `run_on_os_login` = `run_windowed`).
+
+Parametri facoltativi (campo *Parametri preimpostati* dello script), solo se serve cambiare il comportamento:
+- `-NonAprireAlLogin`: installa la webapp ma non la apre all'accesso a Windows;
+- `-Browser Edge`: all'accesso la apre con Edge invece che con Chrome;
+- `-ApriAllAvvio`: apre anche hub.siciet.it come scheda all'avvio di Chrome ed Edge (`RestoreOnStartup` = 4);
+- `-Rimuovi`: toglie la webapp e le aperture automatiche impostate dallo script.
+
+Lo script descrive lo stato voluto: rieseguendolo con `-NonAprireAlLogin` l'apertura all'accesso viene tolta.
