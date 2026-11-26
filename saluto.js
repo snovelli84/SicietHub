@@ -12,7 +12,7 @@
 
   var NAME_KEY = "siciet-nome";
   var FORM_NAME_KEY = "siciet-richieste-nome"; // salvato da richieste.html
-  var WEATHER_KEY = "siciet-meteo";
+  var WEATHER_KEY = "siciet-meteo-v2";
   var WEATHER_TTL = 30 * 60 * 1000;
 
   var $ = function (id) { return document.getElementById(id); };
@@ -83,6 +83,34 @@
     return "";
   }
 
+  // Codice meteo WMO -> [icona, descrizione breve]; di notte sereno = luna.
+  function weatherLook(code, isDay) {
+    if (code === 0) return [isDay ? "☀️" : "🌙", "Sereno"];
+    if (code === 1) return [isDay ? "🌤️" : "🌙", "Poco nuvoloso"];
+    if (code === 2) return ["⛅", "Parzialmente nuvoloso"];
+    if (code === 3) return ["☁️", "Nuvoloso"];
+    if (code === 45 || code === 48) return ["🌫️", "Nebbia"];
+    if (code >= 51 && code <= 57) return ["🌦️", "Pioviggine"];
+    if (code >= 61 && code <= 67) return ["🌧️", "Pioggia"];
+    if (code >= 71 && code <= 77) return ["❄️", "Neve"];
+    if (code >= 80 && code <= 82) return ["🌦️", "Rovesci"];
+    if (code === 85 || code === 86) return ["🌨️", "Rovesci di neve"];
+    if (code >= 95) return ["⛈️", "Temporale"];
+    return ["🌡️", ""];
+  }
+
+  function renderBox(w) {
+    var cfg = window.SICIET_METEO;
+    var look = weatherLook(typeof w.nowCode === "number" ? w.nowCode : w.code, w.isDay !== 0);
+    $("meteoIcon").textContent = look[0];
+    $("meteoLabel").textContent = "Meteo · " + cfg.luogo;
+    $("meteoTemp").textContent = Math.round(w.temp) + "°";
+    $("meteoDesc").textContent = look[1];
+    $("meteoMin").textContent = typeof w.min === "number" ? Math.round(w.min) + "°" : "–";
+    $("meteoMax").textContent = typeof w.max === "number" ? Math.round(w.max) + "°" : "–";
+    $("meteo").hidden = false;
+  }
+
   function renderWeather(w) {
     var cfg = window.SICIET_METEO;
     if (!w || typeof w.temp !== "number") return;
@@ -92,6 +120,7 @@
     $("greetingWeather").textContent = prep + cfg.luogo + " ci sono " + Math.round(w.temp) + "°" +
       (f ? " e oggi " + f : "") + ". Buon lavoro!";
     $("greetingWeather").hidden = false;
+    renderBox(w);
   }
 
   function loadWeather() {
@@ -103,12 +132,22 @@
       return;
     }
     var url = "https://api.open-meteo.com/v1/forecast?latitude=" + cfg.lat + "&longitude=" + cfg.lon +
-      "&current=temperature_2m&daily=weather_code&timezone=Europe%2FRome&forecast_days=1";
+      "&current=temperature_2m,weather_code,is_day" +
+      "&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Europe%2FRome&forecast_days=1";
     fetch(url)
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
         if (!d || !d.current || !d.daily) return;
-        var w = { t: Date.now(), luogo: cfg.luogo, temp: d.current.temperature_2m, code: (d.daily.weather_code || [])[0] };
+        var w = {
+          t: Date.now(),
+          luogo: cfg.luogo,
+          temp: d.current.temperature_2m,
+          nowCode: d.current.weather_code,
+          isDay: d.current.is_day,
+          code: (d.daily.weather_code || [])[0],
+          min: (d.daily.temperature_2m_min || [])[0],
+          max: (d.daily.temperature_2m_max || [])[0]
+        };
         save(WEATHER_KEY, w);
         renderWeather(w);
       })

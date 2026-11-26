@@ -77,6 +77,37 @@ header p{margin-top:12px;opacity:.9}
 .greeting-edit:hover{opacity:1}
 .greeting-edit:focus-visible{outline:2px solid #fff}
 .greeting-form[hidden]{display:none}
+
+/* Riquadro meteo */
+.meteo[hidden]{display:none}
+.meteo{
+  justify-self:center;
+  margin-top:10px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:12px 18px;
+  border-radius:16px;
+  background:rgba(255,255,255,.14);
+  border:1px solid rgba(255,255,255,.28);
+  text-align:left;
+}
+.meteo-icon{font-size:40px;line-height:1}
+.meteo-label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;opacity:.85}
+.meteo-temp{font-size:30px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.meteo-desc{font-size:14px;opacity:.95}
+.meteo-range{
+  margin:0;
+  padding-left:14px;
+  border-left:1px solid rgba(255,255,255,.3);
+  display:grid;
+  gap:4px;
+  font-size:14px;
+  font-variant-numeric:tabular-nums;
+}
+.meteo-range div{display:flex;gap:8px;justify-content:space-between}
+.meteo-range dt{opacity:.8}
+.meteo-range dd{margin:0;font-weight:600}
 .greeting-form{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;font-size:15px}
 .greeting-form input{
   font:inherit;font-size:16px;padding:6px 10px;border-radius:8px;border:0;
@@ -255,6 +286,18 @@ footer{text-align:center;padding:24px 16px calc(24px + env(safe-area-inset-botto
       <button type="submit">Salva</button>
     </form>
     <p class="greeting-weather" id="greetingWeather" hidden></p>
+    <div class="meteo" id="meteo" hidden>
+      <div class="meteo-icon" id="meteoIcon" aria-hidden="true"></div>
+      <div class="meteo-main">
+        <div class="meteo-label" id="meteoLabel">Meteo</div>
+        <div class="meteo-temp" id="meteoTemp"></div>
+        <div class="meteo-desc" id="meteoDesc"></div>
+      </div>
+      <dl class="meteo-range">
+        <div><dt>Min</dt><dd id="meteoMin"></dd></div>
+        <div><dt>Max</dt><dd id="meteoMax"></dd></div>
+      </dl>
+    </div>
   </div>
 </header>
 
