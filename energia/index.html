@@ -147,13 +147,13 @@ var ENERGIA_CONFIG={
 };
 const CFG=ENERGIA_CONFIG;
 // Versione della pagina: va aumentata a ogni modifica, così in fondo si vede quale è in uso.
-const VERSIONE="2.5",DATA_VERSIONE="25/11/2026";
+const VERSIONE="2.7",DATA_VERSIONE="25/11/2026";
 const KEY="siciet_energia_data_v1",KP="siciet_energia_pwd",KN="siciet_energia_nome",KQ="siciet_energia_coda";
 const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const ARR={mensile:"mensili",el:"elettrico_dettaglio",gas:"gas_dettaglio",fv:"fv",fv30:"fv30",acqua:"acqua_fatture",carbtx:"carb_tx",km:"km_mensili",scheda:"monitoraggio"};
 const KEYOF={mensile:r=>`${r.anno}|${r.mese}|${r.vettore}`,el:r=>`${r.anno}|${r.mese}`,gas:r=>`${r.anno}|${r.mese}`,fv:r=>`${r.anno}|${r.mese}`,fv30:r=>`${r.anno}|${r.mese}`,acqua:r=>r.numero,carbtx:r=>`${r.anno}|${r.mese}|${r.fonte}`,km:r=>`${r.anno}|${r.mese}`,scheda:r=>`${r.pos}|${r.anno}`};
-const BASE=["siti","flotta","carburanti_per_mezzo_mese","note","fv_storico","fv_simulazione","fv_impianti","fv_ricavi","interventi","riferimenti","gse_pagamenti","km_gps","acqua_letture","letture_fv","fv_riferimento","gradi_giorno","fattori_emissione"];
-function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],fv30:[],acqua_fatture:[],carb_tx:[],fv_storico:[],fv_simulazione:{},fv_impianti:[],fv_ricavi:[],interventi:[],riferimenti:[],gse_pagamenti:[],km_gps:[],acqua_letture:[],letture_fv:[],fv_riferimento:{},gradi_giorno:[],fattori_emissione:{},flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
+const BASE=["siti","flotta","carburanti_per_mezzo_mese","note","fv_storico","fv_simulazione","fv_impianti","fv_ricavi","interventi","riferimenti","gse_pagamenti","km_gps","acqua_letture","letture_fv","fv_riferimento","gradi_giorno","fattori_emissione","pod_misure"];
+function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],fv30:[],acqua_fatture:[],carb_tx:[],fv_storico:[],fv_simulazione:{},fv_impianti:[],fv_ricavi:[],interventi:[],riferimenti:[],gse_pagamenti:[],km_gps:[],acqua_letture:[],letture_fv:[],fv_riferimento:{},gradi_giorno:[],fattori_emissione:{},pod_misure:[],flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
 function norm(o){const v=vuoto(),d=Object.assign({},o);for(const k in v)if(d[k]==null)d[k]=v[k];return d}
 function applyVoce(v){
   if(v.tipo==="base"){if(!v.dati)return false;const a=JSON.stringify(D[v.chiave]);D[v.chiave]=v.dati.v;return a!==JSON.stringify(v.dati.v)}
@@ -268,7 +268,7 @@ function importa(obj){
   if(patch||CFG.api){
     if(!patch&&D&&D.mensili.length&&!confirm("I dati del file sostituiranno quelli già presenti per gli stessi mesi. Continuare?"))return;
     // le letture dei contatori e i km GPS si uniscono a quelli già presenti
-    [["km_gps",r=>r.anno+"|"+r.mese+"|"+r.targa],["acqua_letture",r=>r.data],["letture_fv",r=>r.anno+"|"+r.mese],["gradi_giorno",r=>r.anno+"|"+r.mese]].forEach(([k,kf])=>{
+    [["km_gps",r=>r.anno+"|"+r.mese+"|"+r.targa],["acqua_letture",r=>r.data],["letture_fv",r=>r.anno+"|"+r.mese],["gradi_giorno",r=>r.anno+"|"+r.mese],["pod_misure",r=>r.pod+"|"+r.anno+"|"+r.mese]].forEach(([k,kf])=>{
       if(patch&&Array.isArray(obj[k])){const m=new Map(((D&&D[k])||[]).map(r=>[kf(r),r]));obj[k].forEach(r=>m.set(kf(r),r));obj=Object.assign({},obj,{[k]:[...m.values()]})}
     });
     const v=vociDa(obj);saveVoci(v);
@@ -397,9 +397,10 @@ function dPan(){
 }
 function vEl(){
   return`<div class="grid wide">${box("e1","Prelievo mensile per anno (kWh)")}${box("e2","Fasce F1/F2/F3 (kWh)")}${box("e3","Potenza fatturata (kW)","Linea tratteggiata: 30 kW disponibili")}${box("e4","Costo annuo (€)")}${box("e5","Costo medio €/kWh")}${box("e6","Energia reattiva e cos φ")}</div>
+  ${altriPod()}
   <p class="muted" style="margin-top:10px">Contratto: Enel Energia, prezzo fisso a fasce, ${esc((((D.siti[0]||{}).punti_fornitura||[]).find(p=>p.tipo==="elettrico")||{}).codice||"")}. Superficie ${NF((D.siti[0]||{}).superficie_mq)} m².</p>`;
 }
-function dEl(){
+function dEl(){altriPodChart();
   yearLines("e1","elettrico","kWh");
   const c=COL(),r=D.elettrico_dettaglio.filter(x=>x.F1!=null).slice(-24),lab=x=>MESI[x.mese-1]+" "+String(x.anno).slice(2);
   chart("e2",{type:"bar",data:{labels:r.map(lab),datasets:["F1","F2","F3"].map((k,i)=>({label:k,data:r.map(x=>x[k]),backgroundColor:c[i]}))},options:{scales:{x:{stacked:true},y:{stacked:true}}}});
@@ -845,7 +846,7 @@ const carbMap=(()=>{let key="",m={};return t=>{
 const odoOk=t=>{const f=D.flotta.find(x=>x.targa===t);return!(f&&f.odometro_inaffidabile)};
 /* km GPS (Fleet2Track) per mezzo e mese, indicizzati */
 const gpsMap=(()=>{let ref=null,m={};return(y,mo)=>{
-  if(ref!==D.km_gps){ref=D.km_gps;m={};D.km_gps.forEach(r=>{(m[r.anno+"-"+String(r.mese).padStart(2,"0")]=m[r.anno+"-"+String(r.mese).padStart(2,"0")]||{})[r.targa]=r.km})}
+  if(ref!==D.km_gps){ref=D.km_gps;m={};D.km_gps.filter(r=>!r.parziale).forEach(r=>{(m[r.anno+"-"+String(r.mese).padStart(2,"0")]=m[r.anno+"-"+String(r.mese).padStart(2,"0")]||{})[r.targa]=r.km})}
   return m[y+"-"+String(mo).padStart(2,"0")]||null}})();
 /* km del mese per tipo di carburante: km inseriti a mano; altrimenti, per ogni mezzo, i km GPS (Fleet2Track) se ci sono, o la stima dagli odometri dei rifornimenti (esclusi i mezzi con odometro inaffidabile). gps = parte dei km che viene dal GPS */
 function kmMese(i){
@@ -1604,6 +1605,22 @@ function dEmi(){
   if(!document.getElementById("e1"))return;
   const dati=anni.map(y=>emiAnno(y,F)),V=[["el","Elettricità"],["gas","Gas"],["gasolio","Gasolio"],["benzina","Benzina"]];
   chart("e1",{type:"bar",data:{labels:anni,datasets:V.map(([k,nm],j)=>({label:nm,data:dati.map(e=>e.find(x=>x.k===k).t),backgroundColor:c[j]}))},options:{scales:{x:{stacked:true},y:{stacked:true,title:{display:true,text:"tCO₂"}}}}});
+}
+
+/* ---------- altri punti di prelievo (Sesto Fiorentino) ---------- */
+const podSiti=()=>[...new Set(D.pod_misure.map(r=>r.pod))].map(pod=>({pod,nome:D.pod_misure.find(r=>r.pod===pod).nome,r:D.pod_misure.filter(r=>r.pod===pod).sort((a,b)=>a.anno*12+a.mese-b.anno*12-b.mese)}));
+const podTot=r=>r.prel_kwh.reduce((a,b)=>a+b,0);
+function altriPod(){
+  const S=podSiti();if(!S.length)return"";
+  return`<h2 class="sec">Altri punti di prelievo</h2><div class="grid wide">${S.map((x,i)=>{
+    const ult=x.r[x.r.length-1],p12=x.r.filter(r=>!r.parziale).slice(-6),prima=x.r.filter(r=>!r.parziale&&r.anno*12+r.mese<=2026*12+2).slice(-4);
+    const mp=a=>a.length?a.reduce((s,r)=>s+podTot(r),0)/a.length:0;
+    const avv=prima.length>=3&&mp(p12)>mp(prima)*2&&mp(p12)-mp(prima)>40?`<div class="alert warn">Da marzo 2026 il consumo è circa <b>${NF(mp(p12)/mp(prima),1)} volte</b> quello dei mesi prima (${NF(mp(p12))} kWh al mese contro ${NF(mp(prima))}): controlla se è stato acceso qualcosa di nuovo.</div>`:"";
+    return`<div class="card"><h2>${esc(x.nome)}</h2><p class="muted">POD ${esc(x.pod)} · ${NF(ult.potenza_kw,1)} kW · solo prelievo${ult.parziale?" · ultimo mese parziale":""}</p>${avv}<div class="chartbox"><canvas id="pp${i}"></canvas></div></div>`}).join("")}</div>`;
+}
+function altriPodChart(){
+  const c=COL();podSiti().forEach((x,i)=>{if(!document.getElementById("pp"+i))return;
+    chart("pp"+i,{type:"bar",data:{labels:x.r.map(r=>MESI[r.mese-1].slice(0,3)+" "+String(r.anno).slice(2)+(r.parziale?"*":"")),datasets:["F1","F2","F3"].map((k,j)=>({label:k,data:x.r.map(r=>r.prel_kwh[j]),backgroundColor:c[j]}))},options:{scales:{x:{stacked:true,ticks:{maxTicksLimit:12}},y:{stacked:true,title:{display:true,text:"kWh"}}}}})});
 }
 const VIEWS={pan:[vPan,dPan],conf:[vConf,dConf],el:[vEl,dEl],gas:[vGas,dGas],acq:[vAcq,dAcq],carb:[vCarb,dCarb],fv:[vFv,dFv],let:[vLett,dLett],emi:[vEmi,dEmi],flotta:[vFlotta,()=>{}],mon:[vMon,dMon],ins:[vIns,dIns],dati:[vDati,dDati],rif:[vRif,dRif],note:[vNote,()=>{}]};
 function render(){
