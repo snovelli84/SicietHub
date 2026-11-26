@@ -41,5 +41,5 @@
     "SF"
   ],
   "tolleranza_riconciliazione_euro": 0.05,
-  "api_url": ""
+  "api_url": "https://commesse.amministrazione-c44.workers.dev"
 }
