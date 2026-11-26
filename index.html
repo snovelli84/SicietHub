@@ -277,6 +277,7 @@ footer{text-align:center;padding:24px 16px calc(24px + env(safe-area-inset-botto
   }catch(e){}
 
   var platform, apps;
+  var inSede = false; // diventa true quando il controllo dell'IP conferma la sede
   function autoView(){ return realPlatform === "desktop" ? "pc" : "mobile"; }
   function applyView(){
     var eff = view === "auto" ? autoView() : view;
@@ -286,6 +287,7 @@ footer{text-align:center;padding:24px 16px calc(24px + env(safe-area-inset-botto
       if(a.nascosta) return false;
       if(a.soloMobile && eff === "pc") return false;
       if(a.soloDesktop && eff !== "pc") return false;
+      if(a.soloSede && !inSede) return false;
       return true;
     });
   }
@@ -645,6 +647,18 @@ footer{text-align:center;padding:24px 16px calc(24px + env(safe-area-inset-botto
       if(platform === "desktop") L.isOfficeNetwork();
     });
   });
+
+  // App solo per la sede: compaiono quando il controllo dell'IP la conferma.
+  if((window.SICIET_APPS || []).some(function(a){ return a.soloSede; })){
+    L.isOfficeNetwork().then(function(v){
+      if(!v) return;
+      inSede = true;
+      applyView();
+      renderChips();
+      renderList();
+      loadStoreIcons();
+    });
+  }
 
   qEl.addEventListener("input", renderList);
   renderViewSwitch();

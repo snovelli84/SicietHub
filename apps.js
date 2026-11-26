@@ -42,6 +42,9 @@
  *   nascosta     (opzionale) true per togliere temporaneamente l'app dal portale.
  *   soloMobile   (opzionale) true per le app pensate solo per lo smartphone:
  *                da PC non vengono mostrate.
+ *   soloSede     (opzionale) true per le app raggiungibili solo dalla rete
+ *                aziendale: compaiono solo quando si è in sede (vedi
+ *                SICIET_OFFICE_IPS).
  *   soloDesktop  (opzionale) true per le app che esistono solo sul PC:
  *                su smartphone non vengono mostrate.
  *
@@ -77,6 +80,33 @@ window.SICIET_APPS = [
     },
     soloMobile: true,
     verified: false
+  },
+  {
+    id: "quartaevo",
+    name: "QuartaEVO",
+    description: "Gestionale QuartaEVO, sul server interno.",
+    category: "Operatività",
+    emoji: "🧩",
+    icon: "icons/quartaevo.svg", // logo QuartaEVO ricreato in forma quadrata
+    // Server interno: raggiungibile solo dalla rete aziendale, quindi l'app
+    // compare solo da PC e solo in sede.
+    web: "http://sicietw19evo1.siciet.it/quarta/q3/home/QPAP/it",
+    soloDesktop: true,
+    soloSede: true,
+    verified: true
+  },
+  {
+    id: "servizi",
+    name: "Servizi Quadri",
+    description: "Gestione della realizzazione dei nuovi quadri elettrici.",
+    category: "Operatività",
+    emoji: "⚡",
+    icon: "icons/servizi-quadri.svg",
+    // Server interno: compare solo da PC e solo in sede.
+    web: "http://servizi.siciet.it/",
+    soloDesktop: true,
+    soloSede: true,
+    verified: true
   },
   {
     id: "zconnect",
