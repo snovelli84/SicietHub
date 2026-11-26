@@ -134,7 +134,7 @@ const SCADENZE=[
   {txt:"Offerta gas «Anno Sicuro Gas» (0,70 €/Smc materia prima)",data:"2026-11-30"},
   {txt:"Condizioni contratto elettrico (prezzo fisso F1/F2/F3)",data:"2027-01-31"}
 ];
-const TABS=[["pan","Panoramica"],["conf","Confronto"],["el","Elettricità"],["gas","Gas"],["acq","Acqua"],["carb","Carburanti"],["fv","Fotovoltaico"],["let","Letture contatori"],["flotta","Flotta"],["mon","Monitoraggio"],["ins","＋ Inserisci mese"],["dati","Dati"],["rif","Riferimenti"],["note","Note e dubbi"]];
+const TABS=[["pan","Panoramica"],["conf","Confronto"],["el","Elettricità"],["gas","Gas"],["acq","Acqua"],["carb","Carburanti"],["emi","Emissioni"],["fv","Fotovoltaico"],["let","Letture contatori"],["flotta","Flotta"],["mon","Monitoraggio"],["ins","＋ Inserisci mese"],["dati","Dati"],["rif","Riferimenti"],["note","Note e dubbi"]];
 
 /* ---------- archivio e sincronizzazione ---------- */
 var ENERGIA_CONFIG={
@@ -147,13 +147,13 @@ var ENERGIA_CONFIG={
 };
 const CFG=ENERGIA_CONFIG;
 // Versione della pagina: va aumentata a ogni modifica, così in fondo si vede quale è in uso.
-const VERSIONE="2.4",DATA_VERSIONE="25/11/2026";
+const VERSIONE="2.5",DATA_VERSIONE="25/11/2026";
 const KEY="siciet_energia_data_v1",KP="siciet_energia_pwd",KN="siciet_energia_nome",KQ="siciet_energia_coda";
 const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const ARR={mensile:"mensili",el:"elettrico_dettaglio",gas:"gas_dettaglio",fv:"fv",fv30:"fv30",acqua:"acqua_fatture",carbtx:"carb_tx",km:"km_mensili",scheda:"monitoraggio"};
 const KEYOF={mensile:r=>`${r.anno}|${r.mese}|${r.vettore}`,el:r=>`${r.anno}|${r.mese}`,gas:r=>`${r.anno}|${r.mese}`,fv:r=>`${r.anno}|${r.mese}`,fv30:r=>`${r.anno}|${r.mese}`,acqua:r=>r.numero,carbtx:r=>`${r.anno}|${r.mese}|${r.fonte}`,km:r=>`${r.anno}|${r.mese}`,scheda:r=>`${r.pos}|${r.anno}`};
-const BASE=["siti","flotta","carburanti_per_mezzo_mese","note","fv_storico","fv_simulazione","fv_impianti","fv_ricavi","interventi","riferimenti","gse_pagamenti","km_gps","acqua_letture","letture_fv"];
-function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],fv30:[],acqua_fatture:[],carb_tx:[],fv_storico:[],fv_simulazione:{},fv_impianti:[],fv_ricavi:[],interventi:[],riferimenti:[],gse_pagamenti:[],km_gps:[],acqua_letture:[],letture_fv:[],flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
+const BASE=["siti","flotta","carburanti_per_mezzo_mese","note","fv_storico","fv_simulazione","fv_impianti","fv_ricavi","interventi","riferimenti","gse_pagamenti","km_gps","acqua_letture","letture_fv","fv_riferimento","gradi_giorno","fattori_emissione"];
+function vuoto(){return{siti:[],mensili:[],fv:[],elettrico_dettaglio:[],gas_dettaglio:[],km_mensili:[],monitoraggio:[],fv30:[],acqua_fatture:[],carb_tx:[],fv_storico:[],fv_simulazione:{},fv_impianti:[],fv_ricavi:[],interventi:[],riferimenti:[],gse_pagamenti:[],km_gps:[],acqua_letture:[],letture_fv:[],fv_riferimento:{},gradi_giorno:[],fattori_emissione:{},flotta:[],carburanti_per_mezzo_mese:[],note:{}}}
 function norm(o){const v=vuoto(),d=Object.assign({},o);for(const k in v)if(d[k]==null)d[k]=v[k];return d}
 function applyVoce(v){
   if(v.tipo==="base"){if(!v.dati)return false;const a=JSON.stringify(D[v.chiave]);D[v.chiave]=v.dati.v;return a!==JSON.stringify(v.dati.v)}
@@ -268,7 +268,7 @@ function importa(obj){
   if(patch||CFG.api){
     if(!patch&&D&&D.mensili.length&&!confirm("I dati del file sostituiranno quelli già presenti per gli stessi mesi. Continuare?"))return;
     // le letture dei contatori e i km GPS si uniscono a quelli già presenti
-    [["km_gps",r=>r.anno+"|"+r.mese+"|"+r.targa],["acqua_letture",r=>r.data],["letture_fv",r=>r.anno+"|"+r.mese]].forEach(([k,kf])=>{
+    [["km_gps",r=>r.anno+"|"+r.mese+"|"+r.targa],["acqua_letture",r=>r.data],["letture_fv",r=>r.anno+"|"+r.mese],["gradi_giorno",r=>r.anno+"|"+r.mese]].forEach(([k,kf])=>{
       if(patch&&Array.isArray(obj[k])){const m=new Map(((D&&D[k])||[]).map(r=>[kf(r),r]));obj[k].forEach(r=>m.set(kf(r),r));obj=Object.assign({},obj,{[k]:[...m.values()]})}
     });
     const v=vociDa(obj);saveVoci(v);
@@ -411,9 +411,10 @@ function dEl(){
 }
 function vGas(){
   return`<div class="grid wide">${box("g1","Consumo mensile per anno (Smc)")}${box("g2","Consumo annuo (Smc)")}${box("g3","Costo annuo (€)")}${box("g4","Costo medio €/Smc")}</div>
+  ${gasGG()}
   <p class="muted" style="margin-top:10px">Uso: riscaldamento uffici e acqua calda sanitaria. Il 2024 proviene dalla Diagnosi energetica (nessuna fattura nel progetto).</p>`;
 }
-function dGas(){yearLines("g1","gas","Smc");annualBars("g2","gas","Smc");costBars("g3","gas");unitCost("g4","gas","Smc")}
+function dGas(){gasGGChart();yearLines("g1","gas","Smc");annualBars("g2","gas","Smc");costBars("g3","gas");unitCost("g4","gas","Smc")}
 const CARB=["gasolio","benzina","HVO","AdBlue"];
 function vCarb(){
   const lm=lastMonth("gasolio");
@@ -505,11 +506,12 @@ function vFv(){
   ${D.fv_impianti.length?`<div class="card" style="margin-top:14px"><h2>Impianti</h2><div class="scroll"><table><thead><tr><th class="l">Codice GSE</th><th>kWp</th><th>In esercizio dal</th><th class="l">Convenzioni</th><th>Tariffa €/kWh</th><th>Fine incentivo</th><th class="l">POD</th><th class="l">Indirizzo</th></tr></thead><tbody>${D.fv_impianti.map(i=>`<tr><td class="l"><b>${esc(i.codice)}</b></td><td>${NF(i.potenza_kw,2)}</td><td>${itd(i.entrata_esercizio)}</td><td class="l" style="white-space:normal;min-width:260px">${esc(i.convenzione)}</td><td>${i.tariffa_eur_kwh!=null?NF(i.tariffa_eur_kwh,3):"n.d."}</td><td>${i.scadenza_incentivo?itd(i.scadenza_incentivo)+(i.scadenza_calcolata?' <span class="muted">(calcolata)</span>':""):'<span class="muted">n.d.</span>'}</td><td class="l">${esc(i.pod||"")}</td><td class="l" style="white-space:normal">${esc(i.indirizzo||"")}</td></tr>`).join("")}</tbody></table></div><p class="muted" style="margin-top:6px">${D.fv_impianti.map(i=>i.note?esc(i.codice)+": "+esc(i.note):"").filter(Boolean).join(" · ")}</p></div>`:""}
   ${D.interventi.length?`<div class="card" style="margin-top:14px"><h2>Interventi sugli impianti</h2><div class="scroll"><table><thead><tr><th class="l">Periodo</th><th class="l">Impianto</th><th class="l">Descrizione</th><th>Costo €</th></tr></thead><tbody>${D.interventi.map(i=>`<tr><td class="l">${esc(i.da)}${i.a&&i.a!==i.da?" – "+esc(i.a):""}</td><td class="l">${esc(i.impianto||"")}</td><td class="l" style="white-space:normal">${esc(i.descrizione)}</td><td>${i.costo!=null?NF(i.costo,2):"n.d."}</td></tr>`).join("")}</tbody></table></div></div>`:""}
   ${gseRiepilogo()}
+  ${fvRend()}
   ${sim?`<div class="card" style="margin-top:14px"><h2>Simulazione nuovo impianto con accumulo</h2><p class="muted" style="margin-bottom:8px">${esc(sim.descrizione||"")}</p>
     <div class="grid" style="margin-bottom:10px">${Object.entries(sim.indici_autoconsumo||{}).map(([n,v])=>k("Indice di autoconsumo – "+n,NF(v*100,0),"%","")).join("")}</div>
     <div class="scroll"><table><thead><tr><th class="l">Mese</th><th>Produzione nuovo impianto</th><th>Consumo totale</th><th>Autoconsumo</th><th>Immissione</th><th>Da accumulo</th><th>Totale autoconsumo</th></tr></thead><tbody>${sim.mesi.map(m=>`<tr><td class="l">${esc(m.mese)}</td><td>${NF(m.produzione)}</td><td>${NF(m.consumo_totale)}</td><td>${NF(m.autoconsumo)}</td><td>${NF(m.immissione)}</td><td>${NF(m.autoconsumo_accumulo)}</td><td>${NF(m.totale_autoconsumo)}</td></tr>`).join("")}</tbody></table></div></div>`:""}`;
 }
-function dFv(){
+function dFv(){fvRendChart();
   const c=COL(),lab=r=>MESI[r.mese-1]+" "+String(r.anno).slice(2);
   const pr=D.fv.filter(r=>r.produzione_kwh!=null);
   const ys=a=>[...new Set(a.map(r=>r.anno))].sort().slice(-5);
@@ -1505,7 +1507,105 @@ function dLett(){
   const q=L.map(r=>{const t=lCalc(r).i20.tot,s=LSUB.map(([k])=>lSub(r,k));return{r,p:t&&s.every(x=>x!=null)?s.reduce((a,b)=>a+b,0)/t*100:null}}).filter(x=>x.p!=null);
   chart("lc2",{type:"line",data:{labels:q.map(x=>lab(x.r)),datasets:[{label:"% misurata",data:q.map(x=>x.p),borderColor:c[1],backgroundColor:c[1],tension:.25,pointRadius:2}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:14}},y:{min:0,max:100,title:{display:true,text:"%"}}}}});
 }
-const VIEWS={pan:[vPan,dPan],conf:[vConf,dConf],el:[vEl,dEl],gas:[vGas,dGas],acq:[vAcq,dAcq],carb:[vCarb,dCarb],fv:[vFv,dFv],let:[vLett,dLett],flotta:[vFlotta,()=>{}],mon:[vMon,dMon],ins:[vIns,dIns],dati:[vDati,dDati],rif:[vRif,dRif],note:[vNote,()=>{}]};
+
+/* ---------- rendimento dei due impianti rispetto a PVGIS ---------- */
+const KWP20=19.95,KWP30=29.75;let FVR=20;
+const fvKwp=(imp,i)=>{const y=Math.floor(i/12),m=i%12+1;
+  if(imp===20){const r=D.fv.find(x=>x.anno===y&&x.mese===m);return r&&r.produzione_kwh!=null?r.produzione_kwh/KWP20:null}
+  const r=D.fv30.find(x=>x.anno===y&&x.mese===m);return r&&r.produzione_kwh!=null?r.produzione_kwh/KWP30:null};
+const pvgisRef=i=>{const e=D.fv_riferimento&&D.fv_riferimento["E"+FVR];return e?e[i%12]:null};
+function fvRend(){
+  const rf=D.fv_riferimento;if(!rf||!rf.E20)return"";
+  const anni=[...new Set(D.fv.map(r=>r.anno))].sort(),tot=a=>a.reduce((s,x)=>s+x,0);
+  const righe=anni.map(y=>{const mm=[...Array(12).keys()].map(m=>y*12+m);
+    if(!mm.every(i=>fvKwp(20,i)!=null&&fvKwp(30,i)!=null))return"";
+    const a=tot(mm.map(i=>fvKwp(20,i))),b=tot(mm.map(i=>fvKwp(30,i))),r=tot(mm.map(pvgisRef));
+    return`<tr><td class="l">${y}</td><td>${NF(a)}</td><td>${NF(a/r*100)}%</td><td>${NF(b)}</td><td>${NF(b/r*100)}%</td><td>${NF(r)}</td></tr>`}).join("");
+  return`<div class="card" style="margin-top:14px"><h2>Rendimento rispetto a PVGIS</h2>
+    <div class="tools"><label class="muted">Riferimento PVGIS: inclinazione <select id="fvRef"><option value="20" ${FVR===20?"selected":""}>20°</option><option value="10" ${FVR===10?"selected":""}>10°</option></select>, sud</label></div>
+    <div class="grid wide" style="margin-top:8px">${box("fr1","Produzione per kWp / media PVGIS (%)","100% = produzione media attesa dal PVGIS per quel mese; sotto: nuvolosità, ombre, sporco, guasti")}${box("fr2","Rapporto tra i due impianti per kWp","19,95 kWp diviso 29,75 kWp: se cambia, è cambiato uno dei due impianti (il meteo è lo stesso)")}</div>
+    <div class="scroll" style="margin-top:8px"><table><thead><tr><th class="l">Anno completo</th><th>19,95 kWp kWh/kWp</th><th>% PVGIS</th><th>29,75 kWp kWh/kWp</th><th>% PVGIS</th><th>PVGIS kWh/kWp</th></tr></thead><tbody>${righe||'<tr><td class="l" colspan="6">Servono 12 mesi di produzione di entrambi gli impianti.</td></tr>'}</tbody></table></div>
+    <p class="muted" style="margin-top:8px">${esc(rf.fonte||"")} Riferimento a ${FVR}° e sud: i due tetti guardano circa a sud-sud-est (25° a est del sud), che per una falda bassa vale circa -1% e non è applicato. L'inclinazione reale non è nota: con 10° il riferimento è più basso.</p></div>`;
+}
+function fvRendChart(){
+  const sel=document.getElementById("fvRef");if(!sel)return;
+  sel.onchange=()=>{FVR=+sel.value;render()};
+  const c=COL(),idx=[];D.fv.forEach(r=>idx.push(r.anno*12+r.mese-1));D.fv30.forEach(r=>idx.push(r.anno*12+r.mese-1));
+  const is=[...new Set(idx)].sort((a,b)=>a-b).filter(i=>fvKwp(20,i)!=null||fvKwp(30,i)!=null).slice(-30),lab=i=>MESI[i%12].slice(0,3)+" "+String(Math.floor(i/12)).slice(2);
+  const pc=(imp,i)=>{const v=fvKwp(imp,i),r=pvgisRef(i);return v!=null&&r?v/r*100:null};
+  chart("fr1",{type:"line",data:{labels:is.map(lab),datasets:[{label:"19,95 kWp",data:is.map(i=>pc(20,i)),borderColor:c[0],backgroundColor:c[0],tension:.2,pointRadius:2},{label:"29,75 kWp",data:is.map(i=>pc(30,i)),borderColor:c[1],backgroundColor:c[1],tension:.2,pointRadius:2}]},options:{scales:{x:{ticks:{maxTicksLimit:12}},y:{title:{display:true,text:"% della media PVGIS"}}}}});
+  chart("fr2",{type:"line",data:{labels:is.map(lab),datasets:[{label:"19,95 / 29,75 kWp",data:is.map(i=>{const a=fvKwp(20,i),b=fvKwp(30,i);return a!=null&&b>20?a/b:null}),borderColor:c[2],backgroundColor:c[2],tension:.2,pointRadius:2}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:12}},y:{title:{display:true,text:"rapporto per kWp"}}}}});
+}
+/* ---------- gas e gradi giorno ---------- */
+function ggDati(){
+  const gg={};D.gradi_giorno.forEach(r=>{gg[r.anno*12+r.mese-1]=r});
+  const pts=rows("gas").filter(m=>m.quantita!=null&&gg[m.anno*12+m.mese-1]&&!gg[m.anno*12+m.mese-1].parziale).map(m=>({i:m.anno*12+m.mese-1,y:m.quantita,x:gg[m.anno*12+m.mese-1].gg,anno:m.anno,mese:m.mese}));
+  if(pts.length<6)return null;
+  const n=pts.length,mx=pts.reduce((s,p)=>s+p.x,0)/n,my=pts.reduce((s,p)=>s+p.y,0)/n,sxx=pts.reduce((s,p)=>s+(p.x-mx)**2,0);
+  const b=sxx?pts.reduce((s,p)=>s+(p.x-mx)*(p.y-my),0)/sxx:0,a=my-b*mx,sst=pts.reduce((s,p)=>s+(p.y-my)**2,0),ssr=pts.reduce((s,p)=>s+(p.y-(a+b*p.x))**2,0);
+  return{pts,a,b,r2:sst?1-ssr/sst:0};
+}
+function gasGG(){
+  const m=ggDati();if(!m)return"";
+  const anni=[...new Set(m.pts.map(p=>p.anno))].sort();
+  const righe=anni.map(y=>{const q=m.pts.filter(p=>p.anno===y),g=q.reduce((s,p)=>s+p.y,0),h=q.reduce((s,p)=>s+p.x,0);return`<tr><td class="l">${y}</td><td>${q.length}</td><td>${NF(g)}</td><td>${NF(h)}</td><td>${h?NF(g/h,2):"n.d."}</td></tr>`}).join("");
+  const dev=m.pts.map(p=>({p,att:m.a+m.b*p.x})).filter(x=>x.p.y-x.att>Math.max(30,x.att*0.25)).slice(-6)
+    .map(x=>`<div class="alert warn"><b>${MESI[x.p.mese-1]} ${x.p.anno}</b>: consumo ${NF(x.p.y)} Smc contro ${NF(x.att)} attesi con ${NF(x.p.x)} gradi giorno (${delta((x.p.y/x.att-1)*100)}).</div>`).join("");
+  return`<div class="card" style="margin-top:14px"><h2>Gas e gradi giorno</h2>
+    <p class="muted">Consumo atteso = ${NF(m.a,0)} + ${NF(m.b,2)} × gradi giorno del mese (R² ${NF(m.r2,2)}, ${m.pts.length} mesi). Un mese molto sopra la retta segnala un consumo anomalo (perdite, guasti, impianto lasciato acceso).</p>
+    ${dev}<div class="grid wide" style="margin-top:8px">${box("g5","Consumo di gas e consumo atteso (Smc)")}</div>
+    <div class="scroll" style="margin-top:8px"><table><thead><tr><th class="l">Anno</th><th>Mesi</th><th>Smc</th><th>Gradi giorno</th><th>Smc per grado giorno</th></tr></thead><tbody>${righe}</tbody></table></div>
+    <p class="muted" style="margin-top:8px">Gradi giorno calcolati dalla temperatura media giornaliera ERA5 (punto di Orbetello, base 20 °C): rianalisi, non una stazione. Orbetello è in zona climatica C (1.260 gradi giorno di riferimento).</p></div>`;
+}
+function gasGGChart(){
+  const m=ggDati();if(!m||!document.getElementById("g5"))return;
+  const c=COL(),lab=p=>MESI[p.mese-1].slice(0,3)+" "+String(p.anno).slice(2);
+  chart("g5",{type:"bar",data:{labels:m.pts.map(lab),datasets:[{label:"Smc",data:m.pts.map(p=>p.y),backgroundColor:c[0],order:2},{type:"line",label:"Atteso",data:m.pts.map(p=>m.a+m.b*p.x),borderColor:c[1],pointRadius:0,borderDash:[6,4],order:1}]},options:{scales:{x:{ticks:{maxTicksLimit:14}},y:{title:{display:true,text:"Smc"}}}}});
+}
+/* ---------- emissioni di CO2 ---------- */
+const FATT0={gas:2.026,gasolio:2.66,benzina:2.29,el:{2023:234.7,2024:192.6,2025:199.6}};
+const fatt=()=>{const f=D.fattori_emissione||{},e=Object.assign({},FATT0.el,f.elettricita_g_kwh||{});return{gas:f.gas_kg_smc??FATT0.gas,gasolio:f.gasolio_kg_l??FATT0.gasolio,benzina:f.benzina_kg_l??FATT0.benzina,el:e}};
+const fEl=(F,y)=>{if(F.el[y]!=null)return F.el[y];const k=Object.keys(F.el).map(Number).sort((a,b)=>a-b);return F.el[k.filter(x=>x<=y).pop()||k[0]]};
+function emiAnno(y,F){
+  const sm=v=>{const r=rows(v).filter(m=>m.anno===y&&m.quantita!=null);return{q:r.reduce((s,m)=>s+m.quantita,0),n:new Set(r.map(m=>m.mese)).size}};
+  const el=sm("elettrico"),gas=sm("gas"),gd=sm("gasolio"),bz=sm("benzina"),hv=sm("HVO");
+  const au=D.fv.filter(r=>r.anno===y&&r.autoconsumo_kwh!=null).reduce((s,r)=>s+r.autoconsumo_kwh,0);
+  return[{k:"el",nome:"Elettricità prelevata dalla rete",q:el.q,u:"kWh",f:fEl(F,y)/1000,fu:"kg CO₂/kWh",n:el.n},
+    {k:"gas",nome:"Gas naturale",q:gas.q,u:"Smc",f:F.gas,fu:"kg CO₂/Smc",n:gas.n},
+    {k:"gasolio",nome:"Gasolio",q:gd.q,u:"litri",f:F.gasolio,fu:"kg CO₂/l",n:gd.n},
+    {k:"benzina",nome:"Benzina",q:bz.q,u:"litri",f:F.benzina,fu:"kg CO₂/l",n:bz.n},
+    {k:"hvo",nome:"HVO (biocarburante, emissioni fossili nulle)",q:hv.q,u:"litri",f:0,fu:"",n:hv.n}].map(x=>Object.assign(x,{t:x.q*x.f/1000}))
+    .concat([{evitate:au*fEl(F,y)/1e6}]);
+}
+function vEmi(){
+  const F=fatt(),anni=[...new Set(D.mensili.map(m=>m.anno))].filter(y=>y>=2024).sort();
+  if(!anni.length)return`<div class="alert warn">Non ci sono ancora dati di consumo.</div>`;
+  const ult=anni[anni.length-1],mu=D.mensili.filter(m=>m.anno===ult).reduce((a,m)=>Math.max(a,m.mese),0);
+  const blocchi=anni.slice().reverse().map(y=>{
+    const e=emiAnno(y,F),ev=e.pop().evitate,righe=e.filter(x=>x.q>0),tot=righe.reduce((s,x)=>s+x.t,0);
+    const bzN=(righe.find(x=>x.k==="benzina")||{}).n||0,senzaBz=bzN===0&&anni.some(z=>z>y&&emiAnno(z,F).find(x=>x.k==="benzina").n>0);
+    const parz=righe.some(x=>["el","gas","gasolio"].includes(x.k)&&x.n<12)||y===ult&&mu<12,carb=righe.filter(x=>x.k==="gasolio"||x.k==="benzina").reduce((s,x)=>s+x.t,0);
+    return`<div class="card" style="margin-top:14px"><h2>${y}${parz?" (dati incompleti)":senzaBz?" (carburanti da Diagnosi)":""}: ${NF(tot,1)} tCO₂</h2>
+      <div class="scroll"><table><thead><tr><th class="l">Vettore</th><th>Consumo</th><th>Mesi con dati</th><th>Fattore</th><th>tCO₂</th><th>Quota</th></tr></thead><tbody>${righe.map(x=>`<tr><td class="l">${x.nome}</td><td>${NF(x.q)} ${x.u}</td><td>${x.n}</td><td>${x.f?NF(x.f,x.k==="el"?4:3)+" "+x.fu:"–"}</td><td>${NF(x.t,1)}</td><td>${tot?NF(x.t/tot*100)+"%":""}</td></tr>`).join("")}</tbody></table></div>
+      <p class="muted" style="margin-top:6px">${tot?`I carburanti sono il ${NF(carb/tot*100)}% delle emissioni. `:""}Autoconsumo FV: ${NF(ev,1)} tCO₂ evitate (non sottratte dal totale).${parz?" Anno con mesi mancanti: il totale è sottostimato e non confrontabile con gli altri.":""}${senzaBz?" I carburanti di questo anno vengono dalla Diagnosi energetica (solo gasolio, senza benzina): il confronto con gli anni dopo non è affidabile.":""}</p></div>`}).join("");
+  const el=anni.map(y=>`<label class="f"><span>Elettricità ${y} g/kWh</span><input class="fe" data-y="${y}" inputmode="decimal" value="${num2(fEl(F,y),1)}"></label>`).join("");
+  return`<div class="grid wide">${box("e1","Emissioni per anno e vettore (tCO₂)","Gli anni con mesi mancanti o carburanti incompleti sono segnalati nel titolo di ogni anno")}</div>${blocchi}
+  <div class="card" style="margin-top:14px"><h2>Fattori di emissione</h2><div class="frm">${fld("e_gas","Gas kg CO₂/Smc",F.gas)}${fld("e_gd","Gasolio kg CO₂/l",F.gasolio)}${fld("e_bz","Benzina kg CO₂/l",F.benzina)}${el}</div>
+    <div class="tools" style="margin-top:10px"><button class="btn primary" id="e_salva">Salva i fattori</button></div>
+    <p class="muted" style="margin-top:8px">${esc((D.fattori_emissione&&D.fattori_emissione.fonte)||"ISPRA, Rapporto 430/2026: elettricità al consumo (2025 preliminare), gas 2024, gasolio e benzina IPCC convertiti in litri con densità convenzionali (0,835 e 0,745 kg/l). Per un bilancio ufficiale usare i parametri standard nazionali del MASE.")} Le emissioni dell'elettricità sono calcolate sul solo prelievo dalla rete (metodo location-based).</p></div>`;
+}
+function dEmi(){
+  const sv=document.getElementById("e_salva");
+  if(sv)sv.onclick=()=>{
+    const n=id=>pnum(document.getElementById(id).value),el={};document.querySelectorAll(".fe").forEach(i=>{const v=pnum(i.value);if(v>0)el[i.dataset.y]=v});
+    const o=Object.assign({},D.fattori_emissione,{gas_kg_smc:n("e_gas"),gasolio_kg_l:n("e_gd"),benzina_kg_l:n("e_bz"),elettricita_g_kwh:Object.assign({},(D.fattori_emissione||{}).elettricita_g_kwh,el)});
+    saveVoci([{tipo:"base",chiave:"fattori_emissione",dati:{v:o}}]);toast("Fattori salvati");render()};
+  const F=fatt(),anni=[...new Set(D.mensili.map(m=>m.anno))].filter(y=>y>=2024).sort(),c=COL();
+  if(!document.getElementById("e1"))return;
+  const dati=anni.map(y=>emiAnno(y,F)),V=[["el","Elettricità"],["gas","Gas"],["gasolio","Gasolio"],["benzina","Benzina"]];
+  chart("e1",{type:"bar",data:{labels:anni,datasets:V.map(([k,nm],j)=>({label:nm,data:dati.map(e=>e.find(x=>x.k===k).t),backgroundColor:c[j]}))},options:{scales:{x:{stacked:true},y:{stacked:true,title:{display:true,text:"tCO₂"}}}}});
+}
+const VIEWS={pan:[vPan,dPan],conf:[vConf,dConf],el:[vEl,dEl],gas:[vGas,dGas],acq:[vAcq,dAcq],carb:[vCarb,dCarb],fv:[vFv,dFv],let:[vLett,dLett],emi:[vEmi,dEmi],flotta:[vFlotta,()=>{}],mon:[vMon,dMon],ins:[vIns,dIns],dati:[vDati,dDati],rif:[vRif,dRif],note:[vNote,()=>{}]};
 function render(){
   charts.forEach(c=>c.destroy());charts=[];
   const [v,d]=VIEWS[tab];
