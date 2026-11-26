@@ -95,6 +95,19 @@ window.SICIET_APPS = [
     verified: true
   },
   {
+    id: "servizi",
+    name: "Servizi Quadri",
+    description: "Gestione della realizzazione dei nuovi quadri elettrici.",
+    category: "Operatività",
+    emoji: "⚡",
+    icon: "icons/servizi-quadri.svg",
+    // Server interno: compare solo da PC e solo in sede.
+    web: "http://servizi.siciet.it/",
+    soloDesktop: true,
+    soloSede: true,
+    verified: true
+  },
+  {
     id: "zconnect",
     name: "ZConnect",
     description: "Visualizzazione Cedolini Buste Paga",
