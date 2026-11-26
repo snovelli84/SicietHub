@@ -73,7 +73,7 @@ def main():
         prospetti_diff=[x for x in rec["prospetti"] if not x["ok"]],
         ordini_diff=rec["ordini"]["differenze"], ordini_senza_importi=len(rec["ordini"]["avvisi"]),
         ordini_totali=rec["ordini"]["n_totali"], v6=rec["v6"],
-        capi_senza_prospetto=rec.get("capi_senza_prospetto", []))
+        capi_senza_prospetto=rec.get("capi_senza_prospetto", []), responsabili=rec.get("responsabili"))
     dati = dict(aggiornato_al=agg.strftime("%d/%m/%Y"), oggi=oggi.isoformat(), soglie=cfg, commesse=commesse,
                 riconciliazione=rec_sint, escluse={k: len(v) for k, v in d.get("escluse", {}).items()})
     web = RADICE / "web"

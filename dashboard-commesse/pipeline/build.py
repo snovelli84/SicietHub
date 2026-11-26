@@ -5,7 +5,7 @@ from datetime import date
 
 RADICE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RADICE))
-from pipeline import parse_prospetti, parse_elenco, parse_lista, parse_ordini, regole, riconcilia  # noqa: E402
+from pipeline import parse_prospetti, parse_elenco, parse_lista, parse_ordini, parse_resp, regole, riconcilia  # noqa: E402
 
 
 def _cache(nome, files, fn):
@@ -50,6 +50,8 @@ def main():
         ordini=riconcilia.ordini_righe_vs_totali(fo, righe_pag),
         totali_pagina_ordini=riconcilia.totali_pagina(righe_pag),
         v6=_confronta_v6(inp, dentro),
+        responsabili=(riconcilia.prospetti_vs_responsabili(prospetti, parse_resp.leggi(inp / "Totali responsabili.html"), cfg["tolleranza_riconciliazione_euro"])
+                      if (inp / "Totali responsabili.html").exists() else None),
         capi_senza_prospetto=[a for a in cfg["perimetro"]["capi_attivi"]
                               if not any(regole.capo_attivo(p["capo"], [a]) for p in prospetti)],
         capi_prospetti=[p["capo"] for p in prospetti],
