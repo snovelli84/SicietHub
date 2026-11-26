@@ -1,0 +1,16 @@
+{
+  "_nota": "Parametri modificabili senza toccare il codice. Valori provvisori, da confermare con il titolare.",
+  "margine_minimo_pct": 5.0,
+  "margine_verde_pct": 15.0,
+  "soglia_da_chiudere_euro": 5.0,
+  "ritardo_fatturazione": {"attenzione_sotto_pct": 70, "critico_sotto_pct": 50},
+  "perimetro": {
+    "chiuse_dal_anno": 2025,
+    "chiuse_al_anno": 2026,
+    "includi_chiuse_senza_data": false,
+    "capi_esclusi": ["BENEDETTI LORENZO"]
+  },
+  "clienti_interni": ["S.I.C.I.E.T. srl"],
+  "prefissi_economia": ["SM", "SL", "SF"],
+  "tolleranza_riconciliazione_euro": 0.05
+}

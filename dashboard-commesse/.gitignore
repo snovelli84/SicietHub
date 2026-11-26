@@ -1,0 +1,6 @@
+# Dati aziendali riservati: non vanno mai pubblicati (questa repository è servita come sito web)
+input/
+data/
+dist/
+__pycache__/
+*.pyc
