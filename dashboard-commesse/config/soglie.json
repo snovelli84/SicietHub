@@ -11,6 +11,8 @@
     "capi_esclusi": ["BENEDETTI LORENZO"]
   },
   "clienti_interni_codici": ["00010"],
+  "pubblicazione": {"cartella": "../commesse"},
+  "futuro": {"mesi_default": 6},
   "prefissi_economia": ["SM", "SL", "SF"],
   "tolleranza_riconciliazione_euro": 0.05
 }

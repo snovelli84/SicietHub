@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
 <title>SICIET · Andamento commesse</title>
 <style>
 :root{
@@ -88,9 +89,23 @@ details{margin:.5rem 0} summary{cursor:pointer;font-weight:600}
   .griglia{gap:.4rem}
   main{padding:.25rem}
 }
+#gate{max-width:420px;margin:12vh auto;padding:0 1rem}
+#gate form{display:flex;flex-direction:column;gap:.6rem}
+#gate input{min-width:0;width:100%}
+#gate .err{color:var(--crit);min-height:1.4em;font-size:.9rem}
+body.bloccato header,body.bloccato main,body.bloccato footer{display:none}
 </style>
 </head>
 <body>
+<div id="gate" hidden>
+  <div class="card">
+    <h1 style="margin-bottom:.5rem">SICIET · Andamento commesse</h1>
+    <p class="nota">Area riservata. Inserisci la password per vedere i dati.</p>
+    <form id="gate-form"><label for="gate-pw" class="nota">Password</label>
+      <input type="password" id="gate-pw" autocomplete="current-password" required autofocus>
+      <button class="btn" type="submit">Entra</button><div class="err" id="gate-err" role="alert"></div></form>
+  </div>
+</div>
 <header>
   <div class="top">
     <h1>SICIET · Andamento commesse</h1>
@@ -191,6 +206,7 @@ details{margin:.5rem 0} summary{cursor:pointer;font-weight:600}
 /*DATI*/
 </script>
 <script>
+function avvia(DATI){
 "use strict";
 const S = DATI.soglie, C = DATI.commesse;
 const nf2 = new Intl.NumberFormat("it-IT",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -493,6 +509,26 @@ function qualita(){
 /* ---------- avvio ---------- */
 const render={cruscotto,passato,futuro,capi,dettaglio,qualita};
 vai((location.hash||"#cruscotto").slice(1));
+}
+</script>
+<script>
+(function(){
+  if(typeof DATI_CHIARI!=="undefined"){ avvia(DATI_CHIARI); return; }
+  document.body.classList.add("bloccato"); document.getElementById("gate").hidden=false;
+  const X=DATI_CIFRATI, b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+  async function sblocca(pw){
+    const k0=await crypto.subtle.importKey("raw",new TextEncoder().encode(pw),"PBKDF2",false,["deriveKey"]);
+    const k=await crypto.subtle.deriveKey({name:"PBKDF2",salt:b64(X.salt),iterations:X.iter,hash:"SHA-256"},k0,{name:"AES-GCM",length:256},false,["decrypt"]);
+    const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64(X.iv)},k,b64(X.dati));
+    return JSON.parse(new TextDecoder().decode(pt));
+  }
+  document.getElementById("gate-form").addEventListener("submit",async e=>{
+    e.preventDefault(); const err=document.getElementById("gate-err"); err.textContent="Controllo…";
+    try{ const d=await sblocca(document.getElementById("gate-pw").value);
+      document.getElementById("gate").hidden=true; document.body.classList.remove("bloccato"); avvia(d);
+    }catch(x){ err.textContent="Password non corretta."; }
+  });
+})();
 </script>
 </body>
 </html>

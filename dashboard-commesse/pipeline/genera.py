@@ -1,6 +1,6 @@
 """Genera dist/index.html: pagina unica, tutto incorporato (dati, grafici, esportazione Excel).
 Nessun servizio esterno: si apre anche con doppio clic (file://) o da una cartella di rete."""
-import json, re, sys
+import base64, json, os, re, sys
 from collections import defaultdict
 from datetime import date
 from pathlib import Path
@@ -47,6 +47,20 @@ def serie_mensile(commesse, oggi, mesi_default):
                 futuro={k: round(v, 2) for k, v in sorted(futuro.items())}, mese_oggi=mese_oggi)
 
 
+ITER = 600_000
+
+
+def cifra(testo, password):
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    salt, iv = os.urandom(16), os.urandom(12)
+    chiave = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=ITER).derive(password.encode())
+    ct = AESGCM(chiave).encrypt(iv, testo.encode("utf-8"), None)
+    b = lambda x: base64.b64encode(x).decode()
+    return dict(salt=b(salt), iv=b(iv), iter=ITER, dati=b(ct))
+
+
 def main():
     cfg = json.load(open(RADICE / "config/soglie.json", encoding="utf-8"))
     d = json.load(open(RADICE / "data/commesse.json", encoding="utf-8"))
@@ -67,11 +81,25 @@ def main():
     web = RADICE / "web"
     html = (web / "template.html").read_text(encoding="utf-8")
     js = lambda f: (web / "lib" / f).read_text(encoding="utf-8").replace("</script", "<\\/script")
-    out = (html.replace("/*CHART*/", js("chart.umd.js")).replace("/*XLSX*/", js("xlsx.mini.min.js"))
-           .replace("/*DATI*/", "const DATI = " + json.dumps(dati, ensure_ascii=False).replace("</", "<\\/") + ";"))
+    def pagina(blocco):
+        return (html.replace("/*CHART*/", js("chart.umd.js")).replace("/*XLSX*/", js("xlsx.mini.min.js"))
+                .replace("/*DATI*/", blocco.replace("</", "<\\/")))
+    raw = json.dumps(dati, ensure_ascii=False)
+    out = pagina("const DATI_CHIARI = " + raw + ";")
     (RADICE / "dist").mkdir(exist_ok=True)
     (RADICE / "dist/index.html").write_text(out, encoding="utf-8")
     print(f"dist/index.html generato ({len(out)//1024} KB), dati aggiornati al {dati['aggiornato_al']}")
+    # Versione per il sito pubblico: dati cifrati (AES-256-GCM, chiave da password con PBKDF2)
+    pw = os.environ.get("SICIET_DASHBOARD_PASSWORD") or (
+        (RADICE / "config/password.txt").read_text(encoding="utf-8").strip() if (RADICE / "config/password.txt").exists() else "")
+    cartella = cfg.get("pubblicazione", {}).get("cartella")
+    if pw and cartella:
+        dest = (RADICE / cartella).resolve()
+        dest.mkdir(parents=True, exist_ok=True)
+        (dest / "index.html").write_text(pagina("const DATI_CIFRATI = " + json.dumps(cifra(raw, pw)) + ";"), encoding="utf-8")
+        print(f"Versione protetta da password scritta in {dest / 'index.html'}")
+    elif cartella:
+        print("Password non impostata (config/password.txt o SICIET_DASHBOARD_PASSWORD): versione pubblica NON generata.")
 
 
 if __name__ == "__main__":
