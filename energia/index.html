@@ -1607,7 +1607,7 @@ function dEmi(){
   chart("e1",{type:"bar",data:{labels:anni,datasets:V.map(([k,nm],j)=>({label:nm,data:dati.map(e=>e.find(x=>x.k===k).t),backgroundColor:c[j]}))},options:{scales:{x:{stacked:true},y:{stacked:true,title:{display:true,text:"tCO₂"}}}}});
 }
 
-/* ---------- altri punti di prelievo (Saline Breschi, Sesto Fiorentino) ---------- */
+/* ---------- altri punti di prelievo (Sesto Fiorentino) ---------- */
 const podSiti=()=>[...new Set(D.pod_misure.map(r=>r.pod))].map(pod=>({pod,nome:D.pod_misure.find(r=>r.pod===pod).nome,r:D.pod_misure.filter(r=>r.pod===pod).sort((a,b)=>a.anno*12+a.mese-b.anno*12-b.mese)}));
 const podTot=r=>r.prel_kwh.reduce((a,b)=>a+b,0);
 function altriPod(){
