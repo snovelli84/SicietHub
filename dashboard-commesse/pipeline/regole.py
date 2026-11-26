@@ -8,6 +8,12 @@ def gruppo(codice):
     return codice[:5]
 
 
+def capo_attivo(nome, attivi):
+    """True se il capo commessa è tra quelli oggi in azienda (confronto per parti del nome)."""
+    n = (nome or "").upper().replace("\u00ec", "I").replace("'", "")
+    return any(a.upper().replace("'", "") in n for a in attivi)
+
+
 def e_economia(codice, prefissi):
     return codice.startswith(tuple(prefissi))
 
@@ -37,7 +43,7 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=
 
     righe_g = defaultdict(list)
     for p in prospetti:
-        if p["capo"] in cfg["perimetro"]["capi_esclusi"]:
+        if not capo_attivo(p["capo"], cfg["perimetro"]["capi_attivi"]):
             continue
         for r in p["righe"]:
             if not e_economia(r["codice"], pref):
@@ -53,7 +59,8 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=
         for r in p["righe"]:
             if r.get("cliente_codice") and r.get("cliente"):
                 nomi_cli[r["cliente_codice"]] = r["cliente"]
-    escluse = {"interne": [], "sospese": []}
+    attivi = cfg["perimetro"]["capi_attivi"]
+    escluse = {"interne": [], "sospese": [], "capi_non_attivi": []}
     for g, L in el_per_gruppo.items():
         if g in righe_g or e_economia(g, pref):
             continue
@@ -68,6 +75,9 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=
                 escluse["sospese"].append(g)
                 continue
             capo = (resp.get(g) or {}).get("nome") or "(non assegnato)"
+            if capo != "(non assegnato)" and not capo_attivo(capo, attivi):
+                escluse["capi_non_attivi"].append(g)
+                continue
             righe_g[g] = [dict(codice=std["codice"], descrizione=std["descrizione"], capo=capo,
                                cliente=std["cliente"], cliente_codice=std["cliente_codice"], ricavi=0.0, costi=0.0,
                                fatturato=0.0, stato=std["stato"], senza_prospetto=True)]
@@ -77,6 +87,9 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=
         if g in righe_g or g in el_per_gruppo or e_economia(g, pref) or x["codice"] != g:
             continue
         if x["cliente_codice"] in interni:
+            continue
+        if x["nome"] and not capo_attivo(x["nome"], attivi):
+            escluse["capi_non_attivi"].append(g)
             continue
         righe_g[g] = [dict(codice=g, descrizione="(nuova commessa, non ancora nell'Elenco con Stato)",
                            capo=x["nome"] or "(non assegnato)", cliente=nomi_cli.get(x["cliente_codice"], x["cliente_codice"]),

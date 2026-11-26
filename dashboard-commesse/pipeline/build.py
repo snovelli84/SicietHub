@@ -50,6 +50,9 @@ def main():
         ordini=riconcilia.ordini_righe_vs_totali(fo, righe_pag),
         totali_pagina_ordini=riconcilia.totali_pagina(righe_pag),
         v6=_confronta_v6(inp, dentro),
+        capi_senza_prospetto=[a for a in cfg["perimetro"]["capi_attivi"]
+                              if not any(regole.capo_attivo(p["capo"], [a]) for p in prospetti)],
+        capi_prospetti=[p["capo"] for p in prospetti],
     )
     json.dump(rec, open(RADICE / "data/riconciliazione.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     _scrivi_report(rec, dentro, fuori)

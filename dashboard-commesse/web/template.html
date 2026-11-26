@@ -491,6 +491,7 @@ function qualita(){
   out.push(`<div class="card"><h3>Riconciliazione dei totali</h3><ul class="liste">
     <li>${r.prospetti_diff.length?badge(["crit","■","Differenze"]):badge(["ok","●","Quadra"])} Prospetti: ${r.prospetti_ok}/${r.prospetti_tot} controlli (ricavi, costi, fatturato per capo commessa) coincidono con le intestazioni dei prospetti.</li>
     <li>${r.ordini_diff.length?badge(["crit","■","Differenze"]):badge(["ok","●","Quadra"])} Ordini: ${r.ordini_totali} righe «Totale Commessa» controllate contro la somma delle righe d'ordine${r.ordini_diff.length?`: ${r.ordini_diff.length} differenze (${r.ordini_diff.map(d=>esc(d.codice)).join(", ")})`:""}. ${r.ordini_senza_importi} totali sono stampati senza importi e valgono zero.</li>
+    ${r.capi_senza_prospetto.length?`<li>${badge(["att","▲","Dati mancanti"])} Nessun Prospetto Margine Economico per: <strong>${r.capi_senza_prospetto.map(esc).join(", ")}</strong>. Le loro commesse con movimenti non sono nella dashboard finché non viene esportato il prospetto.</li>`:""}
     <li>${r.v6.stato==="presente"?badge(["att","▲","Da completare"]):badge(["att","▲","Non disponibile"])} Confronto con l'Excel v6: ${esc(r.v6.nota)}</li></ul></div>`);
   Object.entries(ANOM).forEach(([k,[tit,desc]])=>{
     const L=C.filter(c=>c.anomalie.includes(k)); if(!L.length) return;
@@ -501,7 +502,7 @@ function qualita(){
     <li><strong>Costi:</strong> derivano sempre dal Prospetto Margine Economico, non dalla Cronostoria.</li>
     ${dv.map(c=>`<li><strong>${esc(c.codice)}</strong> (${esc(c.cliente)}): ${esc(c.note)}</li>`).join("")}
     <li><strong>Fatture fuori ordine:</strong> lo scostamento tra ricavi e ordini può essere legittimo.</li>
-    <li><strong>Escluse dalla dashboard:</strong> ${DATI.escluse.interne||0} commesse interne e ${DATI.escluse.sospese||0} sospese senza movimenti; commesse in economia (SM, SL, SF) sempre escluse.</li></ul></div>`);
+    <li><strong>Escluse dalla dashboard:</strong> ${DATI.escluse.interne||0} commesse interne, ${DATI.escluse.sospese||0} sospese senza movimenti e ${DATI.escluse.capi_non_attivi||0} senza movimenti di capi commessa non più in azienda; commesse in economia (SM, SL, SF) sempre escluse.</li></ul></div>`);
   $("#qual").innerHTML=out.join("");
   Object.keys(ANOM).forEach(k=>{ const L=C.filter(c=>c.anomalie.includes(k)); if(L.length) tab("q-"+k,L,["codice","descrizione","cliente","capo","stato","ricavi","costi","mlc_pct","ordine","residuo"],{ordina:"ricavi"}); });
 }
