@@ -68,9 +68,6 @@ def main():
     agg = _aggiornato_al(RADICE / "input")
     oggi = max(agg, date.today()) if False else agg
     commesse = d["commesse"]
-    serie = serie_mensile(commesse, oggi, cfg.get("futuro", {}).get("mesi_default", 6))
-    for c in commesse:
-        c.pop("fatt_righe", None)
     rec_sint = dict(
         prospetti_ok=sum(1 for x in rec["prospetti"] if x["ok"]), prospetti_tot=len(rec["prospetti"]),
         prospetti_diff=[x for x in rec["prospetti"] if not x["ok"]],
@@ -78,7 +75,7 @@ def main():
         ordini_totali=rec["ordini"]["n_totali"], v6=rec["v6"],
         capi_senza_prospetto=rec.get("capi_senza_prospetto", []))
     dati = dict(aggiornato_al=agg.strftime("%d/%m/%Y"), oggi=oggi.isoformat(), soglie=cfg, commesse=commesse,
-                serie=serie, riconciliazione=rec_sint, escluse={k: len(v) for k, v in d.get("escluse", {}).items()})
+                riconciliazione=rec_sint, escluse={k: len(v) for k, v in d.get("escluse", {}).items()})
     web = RADICE / "web"
     html = (web / "template.html").read_text(encoding="utf-8")
     js = lambda f: (web / "lib" / f).read_text(encoding="utf-8").replace("</script", "<\\/script")

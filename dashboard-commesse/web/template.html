@@ -37,7 +37,9 @@ section[hidden]{display:none}
 h2{font-size:1.25rem;margin:.25rem 0 .75rem}
 h3{font-size:1rem;margin:0 0 .5rem}
 .griglia{display:grid;gap:1rem}
-.kpi5{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.kpi5{display:flex;flex-wrap:wrap}
+.kpi5>.card{flex:1 1 200px;min-width:0}
+.tre{grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
 .due{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1rem}
 .kpi .et{color:var(--muted);font-size:.85rem;text-transform:uppercase;letter-spacing:.03em}
@@ -46,8 +48,8 @@ h3{font-size:1rem;margin:0 0 .5rem}
 .badge{display:inline-flex;align-items:center;gap:.35rem;border-radius:999px;padding:.15rem .6rem;font-size:.8rem;font-weight:600;margin-top:.4rem}
 .badge.ok{background:var(--ok-bg);color:var(--ok)} .badge.att{background:var(--att-bg);color:var(--att)}
 .badge.crit{background:var(--crit-bg);color:var(--crit)} .badge.neutro{background:var(--neutro-bg);color:var(--neutro)}
-.chart{position:relative;height:320px}
-.chart.alto{height:420px}
+.chart{position:relative;height:340px}
+.chart.alto{height:340px}
 .nota{color:var(--muted);font-size:.85rem}
 .avviso{border-left:4px solid var(--att);background:var(--att-bg);padding:.6rem .9rem;border-radius:6px;font-size:.9rem;margin:.75rem 0}
 .tab-wrap{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:8px}
@@ -56,7 +58,14 @@ th,td{padding:.45rem .6rem;border-bottom:1px solid var(--line);text-align:left;w
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 thead th{position:sticky;top:0;background:var(--card);cursor:pointer;z-index:1}
 thead th[aria-sort="ascending"]::after{content:" ▲"} thead th[aria-sort="descending"]::after{content:" ▼"}
-td.desc{white-space:normal;min-width:240px;max-width:380px}
+td.desc{white-space:normal;min-width:220px;max-width:340px}
+.tab-wrap{max-height:460px}
+.vista{background:var(--neutro-bg);border-top:1px solid var(--line)}
+.vista .in{max-width:1400px;margin:0 auto;padding:.5rem 1rem;display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;font-size:.88rem}
+.vista label{display:inline-flex;gap:.3rem;align-items:center}
+.vista select,.vista input[type=number]{min-width:0;padding:.25rem .35rem}
+.vista input[type=number]{width:4.2rem}
+#v-sint{margin-left:auto;font-weight:600}
 tr:hover td{background:var(--neutro-bg)}
 .neg{color:var(--crit)} .pos{color:var(--ok)}
 .tag{display:inline-block;border-radius:4px;padding:0 .4rem;font-size:.75rem;font-weight:600;margin-right:.25rem;background:var(--neutro-bg);color:var(--neutro)}
@@ -73,13 +82,20 @@ select,input[type=search],input[type=number]{font:inherit;padding:.4rem .5rem;bo
 ul.liste{margin:.25rem 0 0;padding-left:1.1rem} ul.liste li{margin:.15rem 0}
 details{margin:.5rem 0} summary{cursor:pointer;font-weight:600}
 .toolbar{display:flex;gap:.5rem;flex-wrap:wrap;margin-left:auto}
-@media (max-width:640px){.kpi .val{font-size:1.5rem}.agg{margin-left:0}}
+@media (max-width:900px){
+  .tab-wrap:not(.completa) .col-capo,.tab-wrap:not(.completa) [data-c="capo"],
+  .tab-wrap:not(.completa) .col-apertura,.tab-wrap:not(.completa) [data-c="apertura"],
+  .tab-wrap:not(.completa) .col-costi,.tab-wrap:not(.completa) [data-c="costi"],
+  .tab-wrap:not(.completa) .col-scostamento,.tab-wrap:not(.completa) [data-c="scostamento"]{display:none}
+}
+@media (max-width:640px){
+  .tab-wrap:not(.completa) .col-cliente,.tab-wrap:not(.completa) [data-c="cliente"]{display:none}.kpi .val{font-size:1.5rem}.agg{margin-left:0}}
 
 /* Stampa: una pagina A4 orizzontale con il solo cruscotto */
 @media print{
   @page{size:A4 landscape;margin:8mm}
   body{background:#fff;color:#000;font-size:10px}
-  header nav,.toolbar,.no-print,footer{display:none!important}
+  header nav,.toolbar,.no-print,footer,.vista .ctrl{display:none!important}
   header{position:static;border:0}
   section{display:none!important}
   section#p-cruscotto{display:block!important}
@@ -120,6 +136,18 @@ body.bloccato header,body.bloccato main,body.bloccato footer{display:none}
     <button role="tab" data-p="dettaglio" aria-selected="false">Dettaglio commesse</button>
     <button role="tab" data-p="qualita" aria-selected="false">Qualità dati</button>
   </nav>
+  <div class="vista"><div class="in">
+    <strong>Mostra:</strong>
+    <span class="ctrl" style="display:contents">
+    <label><input type="checkbox" id="v-ap" checked> commesse aperte oggi</label>
+    <label><input type="checkbox" id="v-ch" checked> chiuse dal <select id="v-da" aria-label="Chiuse dall'anno"></select> al <select id="v-a" aria-label="Chiuse fino all'anno"></select></label>
+    <label><input type="checkbox" id="v-nd"> anche chiuse senza data</label>
+    <label>capo <select id="v-capo" aria-label="Capo commessa"></select></label>
+    <label>margine minimo <input type="number" id="v-sg" min="0" max="100" step="1" aria-label="Soglia margine minimo in percentuale"> %</label>
+    <button class="btn sec" id="v-reset" type="button">Ripristina</button>
+    </span>
+    <span id="v-sint" aria-live="polite"></span>
+  </div></div>
 </header>
 <main>
 <section id="p-cruscotto">
@@ -144,17 +172,13 @@ body.bloccato header,body.bloccato main,body.bloccato footer{display:none}
 <section id="p-passato" hidden>
   <h2>Passato: commesse chiuse</h2>
   <div class="avviso" id="avv-passato"></div>
-  <div class="filtri no-print">
-    <label>Anno di chiusura <select id="f-pa-anno"></select></label>
-    <label>Capo commessa <select id="f-pa-capo"></select></label>
-  </div>
   <div class="griglia kpi5" id="kpi-passato"></div>
-  <div class="griglia due" style="margin-top:1rem">
+  <div class="griglia tre" style="margin-top:1rem">
     <div class="card"><h3>Distribuzione dei margini (n° commesse per fascia di MLC %)</h3><div class="chart"><canvas id="ch-distr" role="img" aria-label="Distribuzione dei margini percentuali"></canvas></div></div>
     <div class="card"><h3>Margine per capo commessa</h3><div class="chart"><canvas id="ch-capo-m" role="img" aria-label="Margine per capo commessa"></canvas></div></div>
     <div class="card"><h3>Margine per cliente (primi 12 per margine €)</h3><div class="chart alto"><canvas id="ch-cli-m" role="img" aria-label="Margine per cliente"></canvas></div></div>
-    <div class="card"><h3>Classifica per margine €: migliori 15</h3><div id="top-m"></div></div>
   </div>
+  <div class="card" style="margin-top:1rem"><h3>Classifica per margine €: migliori 15</h3><div id="top-m"></div></div>
   <div class="card" style="margin-top:1rem"><h3>Sotto soglia e in perdita</h3><div id="sotto"></div></div>
 </section>
 
@@ -166,10 +190,8 @@ body.bloccato header,body.bloccato main,body.bloccato footer{display:none}
     <div class="card"><h3>Residuo da fatturare per cliente (primi 12)</h3><div class="chart alto"><canvas id="ch-res-cli" role="img" aria-label="Residuo per cliente"></canvas></div></div>
   </div>
   <div class="card" style="margin-top:1rem"><h3>Commesse aperte ordinate per residuo</h3><div id="t-res"></div></div>
-  <div class="griglia due" style="margin-top:1rem">
-    <div class="card"><h3>Da chiudere (ordine = fatturato)</h3><p class="nota">Probabilmente concluse ma ancora aperte a gestionale: ordine e residuo sono lasciati vuoti.</p><div id="t-chiudere"></div></div>
-    <div class="card"><h3>Senza ordini o in avvio / senza movimenti</h3><div id="t-zero"></div></div>
-  </div>
+  <div class="card" style="margin-top:1rem"><h3>Da chiudere (ordine = fatturato)</h3><p class="nota">Probabilmente concluse ma ancora aperte a gestionale: ordine e residuo sono lasciati vuoti.</p><div id="t-chiudere"></div></div>
+  <div class="card" style="margin-top:1rem"><h3>Senza ordini o in avvio / senza movimenti</h3><div id="t-zero"></div></div>
 </section>
 
 <section id="p-capi" hidden>
@@ -208,7 +230,8 @@ body.bloccato header,body.bloccato main,body.bloccato footer{display:none}
 <script>
 function avvia(DATI){
 "use strict";
-const S = DATI.soglie, C = DATI.commesse;
+const S = DATI.soglie, TUTTE = DATI.commesse;
+let C = [], aperte = [], chiuse = [], corrente = "cruscotto";
 const nf2 = new Intl.NumberFormat("it-IT",{minimumFractionDigits:2,maximumFractionDigits:2});
 const nf0 = new Intl.NumberFormat("it-IT",{maximumFractionDigits:0});
 const eur = n => n==null ? "—" : nf2.format(n)+" €";
@@ -221,8 +244,37 @@ const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">"
 const sum = (L,k) => L.reduce((a,c)=>a+(c[k]||0),0);
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
-const aperte = C.filter(c=>c.stato==="Aperta"), chiuse = C.filter(c=>c.stato==="Chiusa");
 const annoChiusura = c => anno(c.chiusura) || anno(c.chiusura_stimata) || "";
+/* Vista: di default commesse aperte oggi + chiuse nel 2025-2026 (da config/soglie.json); modificabile in alto */
+const V0 = {ap:true, ch:true, da:S.perimetro.chiuse_dal_anno, a:S.perimetro.chiuse_al_anno, nd:false, capo:"", sg:S.margine_minimo_pct};
+const V = {...V0};
+function applica(){
+  if(V.da>V.a){ const t=V.da; V.da=V.a; V.a=t; }
+  S.margine_minimo_pct = V.sg;
+  C = TUTTE.filter(c=>{
+    if(V.capo && c.capo!==V.capo) return false;
+    if(c.stato==="Aperta") return V.ap;
+    if(!V.ch) return false;
+    const y = +annoChiusura(c);
+    return y ? (y>=V.da && y<=V.a) : V.nd;
+  });
+  aperte = C.filter(c=>c.stato==="Aperta"); chiuse = C.filter(c=>c.stato==="Chiusa");
+  $("#v-sint").textContent = `${C.length} commesse in vista (${aperte.length} aperte, ${chiuse.length} chiuse)`;
+  dettaglio.stale = true;
+}
+function initVista(){
+  const anni = [...new Set(TUTTE.map(annoChiusura).filter(Boolean))].sort();
+  const lim = Math.max(+DATI.oggi.slice(0,4), ...anni.map(Number));
+  const lista = []; for(let y=Math.min(...anni.map(Number)); y<=lim; y++) lista.push(y);
+  ["#v-da","#v-a"].forEach(id=>{ $(id).innerHTML = lista.map(y=>`<option>${y}</option>`).join(""); });
+  $("#v-capo").innerHTML = `<option value="">tutti</option>`+unici(TUTTE,c=>c.capo).map(v=>`<option>${esc(v)}</option>`).join("");
+  const scrivi = () => { $("#v-ap").checked=V.ap; $("#v-ch").checked=V.ch; $("#v-da").value=V.da; $("#v-a").value=V.a; $("#v-nd").checked=V.nd; $("#v-capo").value=V.capo; $("#v-sg").value=V.sg; };
+  const leggi = () => { V.ap=$("#v-ap").checked; V.ch=$("#v-ch").checked; V.da=+$("#v-da").value; V.a=+$("#v-a").value; V.nd=$("#v-nd").checked; V.capo=$("#v-capo").value; V.sg=Math.max(0,+$("#v-sg").value||0);
+    applica(); scrivi(); visti.clear(); vai(corrente); };
+  ["#v-ap","#v-ch","#v-da","#v-a","#v-nd","#v-capo","#v-sg"].forEach(id=>$(id).addEventListener("change",leggi));
+  $("#v-reset").addEventListener("click",()=>{ Object.assign(V,V0); applica(); scrivi(); visti.clear(); vai(corrente); });
+  scrivi();
+}
 const mlcPct = (L) => { const r=sum(L,"ricavi"); return r? (r-sum(L,"costi"))/r*100 : null; };
 const stMargine = p => p==null ? ["neutro","—","Nessun dato"] : p<S.margine_minimo_pct ? ["crit","■","Critico"] : p<S.margine_verde_pct ? ["att","▲","Attenzione"] : ["ok","●","In linea"];
 const badge = ([cl,ic,tx]) => `<span class="badge ${cl}">${ic} ${tx}</span>`;
@@ -235,6 +287,7 @@ const sezioni = ["cruscotto","passato","futuro","capi","dettaglio","qualita"];
 const visti=new Set();
 function vai(p){
   if(!sezioni.includes(p)) p="cruscotto";
+  corrente=p;
   sezioni.forEach(s=>{ $("#p-"+s).hidden = s!==p; });
   if(p==="cruscotto"||!visti.has(p)){ visti.add(p); render[p](); }
   document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-selected", b.dataset.p===p));
@@ -252,13 +305,15 @@ function grafico(id, cfg){
   Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
   charts[id] = new Chart($("#"+id), cfg);
 }
-const asseEur = {ticks:{callback:v=>nf0.format(v/1000)+" k€"}};
+const fmtK = v => Math.abs(v)>=2e6 ? new Intl.NumberFormat("it-IT",{maximumFractionDigits:1}).format(v/1e6)+" M€" : nf0.format(v/1000)+" k€";
+const asseEur = {ticks:{callback:fmtK}};
 const tipEur = {callbacks:{label:c=>` ${c.dataset.label}: ${eur0(c.parsed.y ?? c.parsed.x)}`}};
 function barreOrizz(id, etichette, valori, extra){
-  const corte = etichette.map(e=>e.length>26?e.slice(0,25)+"…":e);
+  const maxL = innerWidth<700?16:innerWidth<1000?20:26;
+  const corte = etichette.map(e=>e.length>maxL?e.slice(0,maxL-1)+"…":e);
   grafico(id,{type:"bar",data:{labels:corte,datasets:[{data:valori,backgroundColor:css("--serie")}]},
     options:{indexAxis:"y",maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{title:c=>etichette[c[0].dataIndex],label:c=>" "+eur0(c.parsed.x),afterLabel:c=>extra?extra[c.dataIndex]:""}}},
-      scales:{x:{ticks:{callback:v=>nf0.format(v/1000)+" k€"}}}}});
+      scales:{x:{ticks:{callback:fmtK,maxTicksLimit:6}}}}});
 }
 
 /* ---------- tabelle ---------- */
@@ -295,14 +350,15 @@ function tabella(el, righe, cols, opz={}){
     let L=[...righe];
     if(ord.k) L.sort((a,b)=>{const x=a[ord.k],y=b[ord.k]; if(x==null) return 1; if(y==null) return -1; return (typeof x==="string"?x.localeCompare(y,"it"):x-y)*ord.dir;});
     if(opz.max) L=L.slice(0,opz.max);
-    el.innerHTML = `<table><thead><tr>${cols.map(k=>`<th scope="col" class="${["e","p"].includes(COL[k][1])?"n":""}" data-k="${k}" ${ord.k===k?`aria-sort="${ord.dir>0?"ascending":"descending"}"`:""}>${COL[k][0]}</th>`).join("")}</tr></thead>
-      <tbody>${L.map(c=>`<tr>${cols.map(k=>cella(c,k,COL[k][1])).join("")}</tr>`).join("")||`<tr><td colspan="${cols.length}">Nessuna commessa.</td></tr>`}</tbody></table>`;
+    el.innerHTML = `<table><thead><tr>${cols.map(k=>`<th scope="col" class="col-${k} ${["e","p"].includes(COL[k][1])?"n":""}" data-k="${k}" ${ord.k===k?`aria-sort="${ord.dir>0?"ascending":"descending"}"`:""}>${COL[k][0]}</th>`).join("")}</tr></thead>
+      <tbody>${L.map(c=>`<tr>${cols.map(k=>cella(c,k,COL[k][1]).replace("<td",`<td data-c="${k}"`)).join("")}</tr>`).join("")||`<tr><td colspan="${cols.length}">Nessuna commessa.</td></tr>`}</tbody></table>`;
     el.querySelectorAll("th").forEach(th=>th.addEventListener("click",()=>{const k=th.dataset.k; ord.dir = ord.k===k ? -ord.dir : (typeof righe[0]?.[k]==="string"?1:-1); ord.k=k; draw();}));
   };
   draw();
 }
 const wrap = html => `<div class="tab-wrap">${html}</div>`;
-function tab(id, righe, cols, opz){ const el=$("#"+id); el.innerHTML=""; const d=document.createElement("div"); d.className="tab-wrap"; el.appendChild(d); tabella(d,righe,cols,opz); }
+function tab(id, righe, cols, opz){ const el=$("#"+id); el.innerHTML=""; const d=document.createElement("div"); d.className="tab-wrap"; el.appendChild(d); tabella(d,righe,cols,opz);
+  const p=document.createElement("p"); p.className="nota"; p.textContent=righe.length>8?`${righe.length} commesse: scorri la tabella per vederle tutte.`:`${righe.length} commesse.`; el.appendChild(p); }
 function opzioni(sel, valori, tutti="Tutti"){ sel.innerHTML = `<option value="">${tutti}</option>`+valori.map(v=>`<option>${esc(v)}</option>`).join(""); }
 const unici = (L,f) => [...new Set(L.map(f).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"it"));
 const raggruppa = (L,f) => { const m={}; L.forEach(c=>{const k=f(c)||"(n.d.)"; (m[k]??=[]).push(c);}); return m; };
@@ -348,8 +404,21 @@ function cruscotto(){
   document.querySelectorAll("[data-vai]").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();vai(a.dataset.vai);}));
   serie("mese");
 }
+function serieDati(){
+  const mo=DATI.oggi.slice(0,7), y=+mo.slice(0,4), m0=+mo.slice(5,7), P={}, F={};
+  const nDef=(S.futuro&&S.futuro.mesi_default)||6;
+  C.forEach(c=>{
+    Object.entries(c.fm||{}).forEach(([m,v])=>{ if(m<=mo) P[m]=(P[m]||0)+v; });
+    if(c.stato==="Aperta" && c.residuo>0){
+      let n=nDef; const u=c.ultima_attivita;
+      if(u && u.slice(0,7)>mo) n=Math.max(1,(+u.slice(0,4)-y)*12+(+u.slice(5,7))-m0+1);
+      for(let i=0;i<n;i++){ const mm=m0-1+i, k=(y+Math.floor(mm/12))+"-"+String(mm%12+1).padStart(2,"0"); F[k]=(F[k]||0)+c.residuo/n; }
+    }
+  });
+  return {P,F,mo};
+}
 function serie(modo){
-  const P=DATI.serie.passato, F=DATI.serie.futuro, mo=DATI.serie.mese_oggi;
+  const {P,F,mo}=serieDati();
   let labels, pas, fut;
   if(modo==="mese"){
     const tutti = new Set([...Object.keys(P),...Object.keys(F)]);
@@ -374,15 +443,9 @@ $("#g-mese").addEventListener("click",()=>serie("mese")); $("#g-anno").addEventL
 
 /* ---------- PASSATO ---------- */
 function passato(){
-  const aa=$("#f-pa-anno"), cc=$("#f-pa-capo");
-  if(!aa.options.length){
-    opzioni(aa, unici(chiuse,annoChiusura).reverse(), "Tutti gli anni");
-    opzioni(cc, unici(chiuse,c=>c.capo), "Tutti i capi");
-    aa.onchange=cc.onchange=passato;
-  }
-  const L = chiuse.filter(c=>(!aa.value||annoChiusura(c)===aa.value)&&(!cc.value||c.capo===cc.value));
-  const nd = L.filter(c=>!c.chiusura).length;
-  $("#avv-passato").innerHTML = `<strong>Attenzione ai tempi.</strong> Per ${nd} commesse chiuse su ${L.length} Mago4 non riporta la data di chiusura: l'anno è <em>stimato</em> dall'ultima consegna/ordine (dove disponibile), altrimenti resta «n.d.». Le commesse senza alcuna data compaiono solo con «Tutti gli anni».`;
+  const L = chiuse;
+  const nd = L.filter(c=>!c.chiusura).length, st = L.filter(c=>!c.chiusura&&c.chiusura_stimata).length;
+  $("#avv-passato").innerHTML = `<strong>Periodo mostrato:</strong> chiuse ${V.ch?`dal ${V.da} al ${V.a}`:"— nessuna (disattivate in alto)"}${V.nd?", comprese quelle senza data":""}. Per ${nd} delle ${L.length} commesse chiuse in vista Mago4 non riporta la data di chiusura: ${st} hanno l'anno <em>stimato</em> dall'ultima consegna/ordine. Puoi cambiare il periodo nella barra «Mostra» in alto.`;
   const ric=sum(L,"ricavi"), mlc=ric-sum(L,"costi");
   const sotto=L.filter(c=>c.ricavi>0&&c.mlc_pct<S.margine_minimo_pct), perd=L.filter(c=>c.mlc<0);
   kpi($("#kpi-passato"),[
@@ -451,9 +514,12 @@ function capi(){
 /* ---------- DETTAGLIO ---------- */
 let dettaglioInit=false;
 function dettaglio(){
-  if(!dettaglioInit){
+  if(dettaglio.stale!==false){
     opzioni($("#d-capo"),unici(C,c=>c.capo),"Tutti"); opzioni($("#d-cli"),unici(C,c=>c.cliente),"Tutti");
     opzioni($("#d-aa"),unici(C,c=>anno(c.apertura)).reverse(),"Tutti"); opzioni($("#d-ac"),unici(C,annoChiusura).reverse(),"Tutti");
+    dettaglio.stale=false;
+  }
+  if(!dettaglioInit){
     ["#d-q","#d-capo","#d-cli","#d-stato","#d-aa","#d-ac"].forEach(s=>$(s).addEventListener("input",dettaglio));
     $("#d-xls").addEventListener("click",esporta);
     dettaglioInit=true;
@@ -462,7 +528,7 @@ function dettaglio(){
   dettaglio.L = C.filter(c=>(!q||(c.codice+" "+c.descrizione+" "+c.cliente).toLowerCase().includes(q))&&(!capo||c.capo===capo)&&(!cli||c.cliente===cli)
     &&(!st||(st==="dc"?c.da_chiudere:st==="av"?c.in_avvio:c.stato===st))&&(!aa||anno(c.apertura)===aa)&&(!ac||annoChiusura(c)===ac));
   $("#d-conta").textContent=`${dettaglio.L.length} commesse su ${C.length}. Clic sull'intestazione per ordinare.`;
-  const el=$("#d-tab").parentElement; const t=document.createElement("div"); el.innerHTML=""; el.appendChild(t);
+  const el=$("#d-tab").parentElement; const t=document.createElement("div"); t.className="completa"; el.innerHTML=""; el.appendChild(t);
   tabella(t,dettaglio.L,["codice","descrizione","capo","cliente","apertura","chiusura","stato","ricavi","costi","mlc","mlc_pct","fatturato","scostamento","ordine","residuo"],{ordina:"ricavi",dir:-1});
   t.querySelector("table").id="d-tab";
 }
@@ -509,6 +575,7 @@ function qualita(){
 
 /* ---------- avvio ---------- */
 const render={cruscotto,passato,futuro,capi,dettaglio,qualita};
+initVista(); applica();
 vai((location.hash||"#cruscotto").slice(1));
 }
 </script>

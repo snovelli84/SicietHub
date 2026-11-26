@@ -148,7 +148,11 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=
 
         o = ord_g.get(g)
         c["ultima_attivita"] = o["ult"] if o else None
-        c["fatt_righe"] = [list(x) for x in o["righe"]] if o else []
+        fm = defaultdict(float)
+        for d_, v_ in (o["righe"] if o else []):
+            if d_:
+                fm[d_[:7]] += v_
+        c["fm"] = {k: round(v, 2) for k, v in sorted(fm.items())}   # fatturato sugli ordini per mese
         c["ordine_totale_pdf"] = round(o["ordine"], 2) if o else 0.0
         c["fatt_su_ordini"] = round(o["fatt"], 2) if o else 0.0
         if aperta:
