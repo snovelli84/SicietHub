@@ -8,11 +8,22 @@ def gruppo(codice):
     return codice[:5]
 
 
+def capo_attivo(nome, attivi):
+    """True se il capo commessa è tra quelli oggi in azienda (confronto per parti del nome)."""
+    n = (nome or "").upper().replace("\u00ec", "I").replace("'", "")
+    return any(a.upper().replace("'", "") in n for a in attivi)
+
+
+def fatturabili_discordanti(fatt_prospetto, fg):
+    tot = fg["tot"] if fg else 0.0
+    return abs(tot - fatt_prospetto) > 1.0
+
+
 def e_economia(codice, prefissi):
     return codice.startswith(tuple(prefissi))
 
 
-def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=None):
+def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=None, fatture=None):
     """Ritorna (commesse, scartate). Una commessa = gruppo code[:5] (padre + varianti)."""
     oggi = oggi or date.today()
     pref = cfg["prefissi_economia"]
@@ -35,9 +46,18 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=
         g["fatt"] += r["fatturato"] or 0.0
         g["n"] += 1
 
+    fat_g = defaultdict(lambda: {"tot": 0.0, "fm": defaultdict(float), "ult": None, "n": 0})
+    for f in fatture or []:
+        if f.get("commessa") and f.get("imponibile") is not None:
+            g = fat_g[gruppo(f["commessa"])]
+            g["tot"] += f["imponibile"]; g["n"] += 1
+            g["fm"][f["data"][:7]] += f["imponibile"]
+            if g["ult"] is None or f["data"] > g["ult"]:
+                g["ult"] = f["data"]
+
     righe_g = defaultdict(list)
     for p in prospetti:
-        if p["capo"] in cfg["perimetro"]["capi_esclusi"]:
+        if not capo_attivo(p["capo"], cfg["perimetro"]["capi_attivi"]):
             continue
         for r in p["righe"]:
             if not e_economia(r["codice"], pref):
@@ -53,7 +73,8 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=
         for r in p["righe"]:
             if r.get("cliente_codice") and r.get("cliente"):
                 nomi_cli[r["cliente_codice"]] = r["cliente"]
-    escluse = {"interne": [], "sospese": []}
+    attivi = cfg["perimetro"]["capi_attivi"]
+    escluse = {"interne": [], "sospese": [], "capi_non_attivi": []}
     for g, L in el_per_gruppo.items():
         if g in righe_g or e_economia(g, pref):
             continue
@@ -68,6 +89,9 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=
                 escluse["sospese"].append(g)
                 continue
             capo = (resp.get(g) or {}).get("nome") or "(non assegnato)"
+            if capo != "(non assegnato)" and not capo_attivo(capo, attivi):
+                escluse["capi_non_attivi"].append(g)
+                continue
             righe_g[g] = [dict(codice=std["codice"], descrizione=std["descrizione"], capo=capo,
                                cliente=std["cliente"], cliente_codice=std["cliente_codice"], ricavi=0.0, costi=0.0,
                                fatturato=0.0, stato=std["stato"], senza_prospetto=True)]
@@ -77,6 +101,9 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=
         if g in righe_g or g in el_per_gruppo or e_economia(g, pref) or x["codice"] != g:
             continue
         if x["cliente_codice"] in interni:
+            continue
+        if x["nome"] and not capo_attivo(x["nome"], attivi):
+            escluse["capi_non_attivi"].append(g)
             continue
         righe_g[g] = [dict(codice=g, descrizione="(nuova commessa, non ancora nell'Elenco con Stato)",
                            capo=x["nome"] or "(non assegnato)", cliente=nomi_cli.get(x["cliente_codice"], x["cliente_codice"]),
@@ -135,7 +162,11 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=
 
         o = ord_g.get(g)
         c["ultima_attivita"] = o["ult"] if o else None
-        c["fatt_righe"] = [list(x) for x in o["righe"]] if o else []
+        fm = defaultdict(float)
+        for d_, v_ in (o["righe"] if o else []):
+            if d_:
+                fm[d_[:7]] += v_
+        c["fm"] = {k: round(v, 2) for k, v in sorted(fm.items())}   # fatturato sugli ordini per mese
         c["ordine_totale_pdf"] = round(o["ordine"], 2) if o else 0.0
         c["fatt_su_ordini"] = round(o["fatt"], 2) if o else 0.0
         if aperta:
@@ -149,9 +180,21 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=
                 c["anomalie"].append("aperta_senza_ordini")
             if res < -cfg["soglia_da_chiudere_euro"]:
                 c["anomalie"].append("fatturato_oltre_ordini")
+        fg = fat_g.get(g)
+        c["fatture_totale"] = round(fg["tot"], 2) if fg else 0.0
+        c["ultima_fattura"] = fg["ult"] if fg else None
+        # fatturato nel tempo: se le fatture emesse in lista coincidono con il fatturato del Prospetto (±1 €)
+        # si usano le DATE DELLE FATTURE, altrimenti la data di consegna delle righe d'ordine (stima)
+        if fg and abs(fg["tot"] - fatt) <= 1.0:
+            c["fm"] = {k: round(v, 2) for k, v in sorted(fg["fm"].items())}
+            c["fm_fonte"] = "fatture"
+        else:
+            c["fm_fonte"] = "ordini"
+        if fatturabili_discordanti(fatt, fg):
+            c["anomalie"].append("fatture_discordanti")
         c["chiusura_stimata"] = None
         if aperta is False and not chiusura:
-            c["chiusura_stimata"] = c["ultima_attivita"]      # stima: ultima consegna/ordine nel PDF Ordini
+            c["chiusura_stimata"] = c["ultima_fattura"] or c["ultima_attivita"]   # stima: ultima fattura, altrimenti ultimo ordine/consegna
         # anomalie comuni
         if aperta is False and not chiusura:
             c["anomalie"].append("chiusa_senza_data")
@@ -164,15 +207,8 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=
             c["anomalie"].append("dato_da_verificare")
         commesse.append(c)
 
-    # perimetro
-    a, b = cfg["perimetro"]["chiuse_dal_anno"], cfg["perimetro"]["chiuse_al_anno"]
-    dentro, fuori = [], []
-    for c in commesse:
-        if c["stato"] == "Aperta":
-            dentro.append(c)
-        elif c["chiusura"]:
-            (dentro if a <= int(c["chiusura"][:4]) <= b else fuori).append(c)
-        else:
-            (dentro if cfg["perimetro"]["includi_chiuse_senza_data"] else fuori).append(c)
+    # Il perimetro (aperte + chiuse 2025-2026 di default) è una VISTA modificabile nella dashboard:
+    # il dataset contiene tutte le commesse dei capi attivi.
+    dentro, fuori = commesse, []
     fuori_extra = escluse
     return dentro, fuori, fuori_extra

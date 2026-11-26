@@ -18,9 +18,9 @@ def prospetti_vs_intestazione(prospetti, tol):
     return out
 
 
-def ordini_righe_vs_totali(path, righe_pag):
+def ordini_righe_vs_totali(tot_avvisi, righe_pag):
     """Somma delle righe d'ordine per codice vs righe 'Totale Commessa' stampate nel PDF."""
-    tot, avvisi = parse_ordini.leggi(path)
+    tot, avvisi = tot_avvisi
     somma = defaultdict(lambda: [0.0, 0.0])
     for p in righe_pag:
         for r in p["righe"]:
@@ -55,3 +55,21 @@ def totali_pagina(righe_pag):
         if d != (0, 0):
             out.append(dict(pagina=p["pagina"], diff_ordine=d[0], diff_fatturato=d[1]))
     return out
+
+
+def prospetti_vs_responsabili(prospetti, resp, tol=0.05):
+    """Ogni prospetto deve coincidere con una riga del 'Prospetto Margine Responsabili Commessa'
+    (stessi ricavi, costi, fatturato). Così si verifica che l'esportazione per capo sia completa."""
+    out, usate = [], set()
+    for p in prospetti:
+        h = p["intestazione"]
+        trovata = next((i for i, r in enumerate(resp["righe"]) if i not in usate
+                        and abs(r["ricavi"] - h["ricavi"]) <= tol and abs(r["costi"] - h["costi"]) <= tol
+                        and abs(r["fatturato"] - h["fatturato"]) <= tol), None)
+        if trovata is not None:
+            usate.add(trovata)
+        out.append(dict(capo=p["capo"], ricavi=h["ricavi"], ok=trovata is not None,
+                        responsabile=(resp["righe"][trovata]["codice"] + " " + resp["righe"][trovata]["nome"]).strip() if trovata is not None else None))
+    altri = [r for i, r in enumerate(resp["righe"]) if i not in usate]
+    return dict(controlli=out, non_esportati=altri, totale=resp["totale"],
+                somma_righe=round(sum(r["ricavi"] for r in resp["righe"]), 2))

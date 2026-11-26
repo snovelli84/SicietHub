@@ -50,15 +50,29 @@ def serie_mensile(commesse, oggi, mesi_default):
 ITER = 600_000
 
 
-def cifra(testo, password):
+def cifra(testo, password, comprimi=False):
+    import gzip
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     salt, iv = os.urandom(16), os.urandom(12)
     chiave = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=ITER).derive(password.encode())
-    ct = AESGCM(chiave).encrypt(iv, testo.encode("utf-8"), None)
+    dati = testo.encode("utf-8")
+    if comprimi:
+        dati = gzip.compress(dati, 6)
+    ct = AESGCM(chiave).encrypt(iv, dati, None)
     b = lambda x: base64.b64encode(x).decode()
-    return dict(salt=b(salt), iv=b(iv), iter=ITER, dati=b(ct))
+    return dict(salt=b(salt), iv=b(iv), iter=ITER, dati=b(ct), compresso=bool(comprimi))
+
+
+def _versione():
+    """Numero di versione: major.minor da config/versione.json, build incrementale a ogni generazione."""
+    from datetime import datetime
+    f = RADICE / "config/versione.json"
+    v = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {"major": 1, "minor": 0, "build": 0}
+    v["build"] += 1
+    f.write_text(json.dumps(v, indent=2) + "\n", encoding="utf-8")
+    return f"{v['major']}.{v['minor']}.{v['build']} · generata il {datetime.now().strftime('%d/%m/%Y %H:%M')}"
 
 
 def main():
@@ -68,23 +82,29 @@ def main():
     agg = _aggiornato_al(RADICE / "input")
     oggi = max(agg, date.today()) if False else agg
     commesse = d["commesse"]
-    serie = serie_mensile(commesse, oggi, cfg.get("futuro", {}).get("mesi_default", 6))
-    for c in commesse:
-        c.pop("fatt_righe", None)
     rec_sint = dict(
         prospetti_ok=sum(1 for x in rec["prospetti"] if x["ok"]), prospetti_tot=len(rec["prospetti"]),
         prospetti_diff=[x for x in rec["prospetti"] if not x["ok"]],
         ordini_diff=rec["ordini"]["differenze"], ordini_senza_importi=len(rec["ordini"]["avvisi"]),
-        ordini_totali=rec["ordini"]["n_totali"], v6=rec["v6"])
+        ordini_totali=rec["ordini"]["n_totali"], v6=rec["v6"],
+        capi_senza_prospetto=rec.get("capi_senza_prospetto", []), responsabili=rec.get("responsabili"))
     dati = dict(aggiornato_al=agg.strftime("%d/%m/%Y"), oggi=oggi.isoformat(), soglie=cfg, commesse=commesse,
-                serie=serie, riconciliazione=rec_sint, escluse={k: len(v) for k, v in d.get("escluse", {}).items()})
+                riconciliazione=rec_sint, escluse={k: len(v) for k, v in d.get("escluse", {}).items()})
+    ver = _versione()
+    dati["versione"] = ver
+    ov = {k: v for k, v in json.load(open(RADICE / "config/override.json", encoding="utf-8")).items() if not k.startswith("_")}
+    dati["override"] = ov
+    sorgenti = json.load(open(RADICE / "data/sorgenti.json", encoding="utf-8"))
+    from datetime import datetime as _dt
+    payload = dict(dati=dati, sorgenti=sorgenti, generato=_dt.now().isoformat(timespec="seconds"))
     web = RADICE / "web"
     html = (web / "template.html").read_text(encoding="utf-8")
     js = lambda f: (web / "lib" / f).read_text(encoding="utf-8").replace("</script", "<\\/script")
     def pagina(blocco):
-        return (html.replace("/*CHART*/", js("chart.umd.js")).replace("/*XLSX*/", js("xlsx.mini.min.js"))
+        return (html.replace("__VERSIONE__", ver).replace("/*CHART*/", js("chart.umd.js")).replace("/*XLSX*/", js("xlsx.mini.min.js"))
+                .replace("/*MOTORE*/", (web / "js" / "motore.js").read_text(encoding="utf-8").replace("</script", "<\\/script"))
                 .replace("/*DATI*/", blocco.replace("</", "<\\/")))
-    raw = json.dumps(dati, ensure_ascii=False)
+    raw = json.dumps(payload, ensure_ascii=False)
     out = pagina("const DATI_CHIARI = " + raw + ";")
     (RADICE / "dist").mkdir(exist_ok=True)
     (RADICE / "dist/index.html").write_text(out, encoding="utf-8")
@@ -96,7 +116,10 @@ def main():
     if pw and cartella:
         dest = (RADICE / cartella).resolve()
         dest.mkdir(parents=True, exist_ok=True)
-        (dest / "index.html").write_text(pagina("const DATI_CIFRATI = " + json.dumps(cifra(raw, pw)) + ";"), encoding="utf-8")
+        (dest / "index.html").write_text(pagina("const DATI_CIFRATI = " + json.dumps(cifra(raw, pw, comprimi=True)) + ";"), encoding="utf-8")
+        (dest / "lib").mkdir(exist_ok=True)
+        for f in ("pdf.min.mjs", "pdf.worker.min.mjs"):
+            (dest / "lib" / f).write_bytes((web / "lib" / f).read_bytes())
         print(f"Versione protetta da password scritta in {dest / 'index.html'}")
     elif cartella:
         print("Password non impostata (config/password.txt o SICIET_DASHBOARD_PASSWORD): versione pubblica NON generata.")

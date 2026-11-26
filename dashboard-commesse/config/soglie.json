@@ -3,16 +3,43 @@
   "margine_minimo_pct": 5.0,
   "margine_verde_pct": 15.0,
   "soglia_da_chiudere_euro": 5.0,
-  "ritardo_fatturazione": {"attenzione_sotto_pct": 70, "critico_sotto_pct": 50},
+  "ritardo_fatturazione": {
+    "attenzione_sotto_pct": 70,
+    "critico_sotto_pct": 50
+  },
   "perimetro": {
     "chiuse_dal_anno": 2025,
     "chiuse_al_anno": 2026,
     "includi_chiuse_senza_data": true,
-    "capi_esclusi": ["BENEDETTI LORENZO"]
+    "capi_attivi": [
+      "BENNI",
+      "DEL VECCHIO",
+      "CENSINI",
+      "DESSI",
+      "ORSINI",
+      "MORESCHI",
+      "BENEDETTI",
+      "GALATOLO",
+      "PENNISI",
+      "MOTTOLA",
+      "PICCIOLINI GIACOMO"
+    ],
+    "_capi_attivi_nota": "Capi commessa oggi in azienda (basta una parte del nome). Le commesse degli altri capi sono escluse."
   },
-  "clienti_interni_codici": ["00010"],
-  "pubblicazione": {"cartella": "../commesse"},
-  "futuro": {"mesi_default": 6},
-  "prefissi_economia": ["SM", "SL", "SF"],
-  "tolleranza_riconciliazione_euro": 0.05
+  "clienti_interni_codici": [
+    "00010"
+  ],
+  "pubblicazione": {
+    "cartella": "../commesse"
+  },
+  "futuro": {
+    "mesi_default": 6
+  },
+  "prefissi_economia": [
+    "SM",
+    "SL",
+    "SF"
+  ],
+  "tolleranza_riconciliazione_euro": 0.05,
+  "api_url": "https://commesse.amministrazione-c44.workers.dev"
 }

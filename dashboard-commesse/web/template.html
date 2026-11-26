@@ -37,7 +37,14 @@ section[hidden]{display:none}
 h2{font-size:1.25rem;margin:.25rem 0 .75rem}
 h3{font-size:1rem;margin:0 0 .5rem}
 .griglia{display:grid;gap:1rem}
-.kpi5{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.kpi5{display:flex;flex-wrap:wrap}
+.kpi5>.card{flex:1 1 200px;min-width:0}
+.tre{grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
+.slots{grid-template-columns:repeat(auto-fill,minmax(270px,1fr))}
+.slot h4{margin:0 0 .25rem;font-size:.95rem}
+.slot .st{font-size:.82rem;color:var(--muted);margin:.25rem 0;min-height:2.6em}
+.slot .st.ok{color:var(--ok)} .slot .st.err{color:var(--crit)}
+.slot input[type=file]{font-size:.8rem;width:100%}
 .due{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1rem}
 .kpi .et{color:var(--muted);font-size:.85rem;text-transform:uppercase;letter-spacing:.03em}
@@ -46,8 +53,8 @@ h3{font-size:1rem;margin:0 0 .5rem}
 .badge{display:inline-flex;align-items:center;gap:.35rem;border-radius:999px;padding:.15rem .6rem;font-size:.8rem;font-weight:600;margin-top:.4rem}
 .badge.ok{background:var(--ok-bg);color:var(--ok)} .badge.att{background:var(--att-bg);color:var(--att)}
 .badge.crit{background:var(--crit-bg);color:var(--crit)} .badge.neutro{background:var(--neutro-bg);color:var(--neutro)}
-.chart{position:relative;height:320px}
-.chart.alto{height:420px}
+.chart{position:relative;height:340px}
+.chart.alto{height:340px}
 .nota{color:var(--muted);font-size:.85rem}
 .avviso{border-left:4px solid var(--att);background:var(--att-bg);padding:.6rem .9rem;border-radius:6px;font-size:.9rem;margin:.75rem 0}
 .tab-wrap{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:8px}
@@ -56,7 +63,14 @@ th,td{padding:.45rem .6rem;border-bottom:1px solid var(--line);text-align:left;w
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 thead th{position:sticky;top:0;background:var(--card);cursor:pointer;z-index:1}
 thead th[aria-sort="ascending"]::after{content:" ▲"} thead th[aria-sort="descending"]::after{content:" ▼"}
-td.desc{white-space:normal;min-width:240px;max-width:380px}
+td.desc{white-space:normal;min-width:220px;max-width:340px}
+.tab-wrap{max-height:460px}
+.vista{background:var(--neutro-bg);border-top:1px solid var(--line)}
+.vista .in{max-width:1400px;margin:0 auto;padding:.5rem 1rem;display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;font-size:.88rem}
+.vista label{display:inline-flex;gap:.3rem;align-items:center}
+.vista select,.vista input[type=number]{min-width:0;padding:.25rem .35rem}
+.vista input[type=number]{width:4.2rem}
+#v-sint{margin-left:auto;font-weight:600}
 tr:hover td{background:var(--neutro-bg)}
 .neg{color:var(--crit)} .pos{color:var(--ok)}
 .tag{display:inline-block;border-radius:4px;padding:0 .4rem;font-size:.75rem;font-weight:600;margin-right:.25rem;background:var(--neutro-bg);color:var(--neutro)}
@@ -73,13 +87,20 @@ select,input[type=search],input[type=number]{font:inherit;padding:.4rem .5rem;bo
 ul.liste{margin:.25rem 0 0;padding-left:1.1rem} ul.liste li{margin:.15rem 0}
 details{margin:.5rem 0} summary{cursor:pointer;font-weight:600}
 .toolbar{display:flex;gap:.5rem;flex-wrap:wrap;margin-left:auto}
-@media (max-width:640px){.kpi .val{font-size:1.5rem}.agg{margin-left:0}}
+@media (max-width:900px){
+  .tab-wrap:not(.completa) .col-capo,.tab-wrap:not(.completa) [data-c="capo"],
+  .tab-wrap:not(.completa) .col-apertura,.tab-wrap:not(.completa) [data-c="apertura"],
+  .tab-wrap:not(.completa) .col-costi,.tab-wrap:not(.completa) [data-c="costi"],
+  .tab-wrap:not(.completa) .col-scostamento,.tab-wrap:not(.completa) [data-c="scostamento"]{display:none}
+}
+@media (max-width:640px){
+  .tab-wrap:not(.completa) .col-cliente,.tab-wrap:not(.completa) [data-c="cliente"]{display:none}.kpi .val{font-size:1.5rem}.agg{margin-left:0}}
 
 /* Stampa: una pagina A4 orizzontale con il solo cruscotto */
 @media print{
   @page{size:A4 landscape;margin:8mm}
   body{background:#fff;color:#000;font-size:10px}
-  header nav,.toolbar,.no-print,footer{display:none!important}
+  header nav,.toolbar,.no-print,footer,.vista .ctrl{display:none!important}
   header{position:static;border:0}
   section{display:none!important}
   section#p-cruscotto{display:block!important}
@@ -104,6 +125,7 @@ body.bloccato header,body.bloccato main,body.bloccato footer{display:none}
     <form id="gate-form"><label for="gate-pw" class="nota">Password</label>
       <input type="password" id="gate-pw" autocomplete="current-password" required autofocus>
       <button class="btn" type="submit">Entra</button><div class="err" id="gate-err" role="alert"></div></form>
+    <p class="nota" style="margin:.5rem 0 0">Versione __VERSIONE__</p>
   </div>
 </div>
 <header>
@@ -119,7 +141,20 @@ body.bloccato header,body.bloccato main,body.bloccato footer{display:none}
     <button role="tab" data-p="capi" aria-selected="false">Capi commessa</button>
     <button role="tab" data-p="dettaglio" aria-selected="false">Dettaglio commesse</button>
     <button role="tab" data-p="qualita" aria-selected="false">Qualità dati</button>
+    <button role="tab" data-p="carica" aria-selected="false">Carica dati</button>
   </nav>
+  <div class="vista"><div class="in">
+    <strong>Mostra:</strong>
+    <span class="ctrl" style="display:contents">
+    <label><input type="checkbox" id="v-ap" checked> commesse aperte oggi</label>
+    <label><input type="checkbox" id="v-ch" checked> chiuse dal <select id="v-da" aria-label="Chiuse dall'anno"></select> al <select id="v-a" aria-label="Chiuse fino all'anno"></select></label>
+    <label><input type="checkbox" id="v-nd"> anche chiuse senza data</label>
+    <label>capo <select id="v-capo" aria-label="Capo commessa"></select></label>
+    <label>margine minimo <input type="number" id="v-sg" min="0" max="100" step="1" aria-label="Soglia margine minimo in percentuale"> %</label>
+    <button class="btn sec" id="v-reset" type="button">Ripristina</button>
+    </span>
+    <span id="v-sint" aria-live="polite"></span>
+  </div></div>
 </header>
 <main>
 <section id="p-cruscotto">
@@ -144,17 +179,13 @@ body.bloccato header,body.bloccato main,body.bloccato footer{display:none}
 <section id="p-passato" hidden>
   <h2>Passato: commesse chiuse</h2>
   <div class="avviso" id="avv-passato"></div>
-  <div class="filtri no-print">
-    <label>Anno di chiusura <select id="f-pa-anno"></select></label>
-    <label>Capo commessa <select id="f-pa-capo"></select></label>
-  </div>
   <div class="griglia kpi5" id="kpi-passato"></div>
-  <div class="griglia due" style="margin-top:1rem">
+  <div class="griglia tre" style="margin-top:1rem">
     <div class="card"><h3>Distribuzione dei margini (n° commesse per fascia di MLC %)</h3><div class="chart"><canvas id="ch-distr" role="img" aria-label="Distribuzione dei margini percentuali"></canvas></div></div>
     <div class="card"><h3>Margine per capo commessa</h3><div class="chart"><canvas id="ch-capo-m" role="img" aria-label="Margine per capo commessa"></canvas></div></div>
     <div class="card"><h3>Margine per cliente (primi 12 per margine €)</h3><div class="chart alto"><canvas id="ch-cli-m" role="img" aria-label="Margine per cliente"></canvas></div></div>
-    <div class="card"><h3>Classifica per margine €: migliori 15</h3><div id="top-m"></div></div>
   </div>
+  <div class="card" style="margin-top:1rem"><h3>Classifica per margine €: migliori 15</h3><div id="top-m"></div></div>
   <div class="card" style="margin-top:1rem"><h3>Sotto soglia e in perdita</h3><div id="sotto"></div></div>
 </section>
 
@@ -166,10 +197,8 @@ body.bloccato header,body.bloccato main,body.bloccato footer{display:none}
     <div class="card"><h3>Residuo da fatturare per cliente (primi 12)</h3><div class="chart alto"><canvas id="ch-res-cli" role="img" aria-label="Residuo per cliente"></canvas></div></div>
   </div>
   <div class="card" style="margin-top:1rem"><h3>Commesse aperte ordinate per residuo</h3><div id="t-res"></div></div>
-  <div class="griglia due" style="margin-top:1rem">
-    <div class="card"><h3>Da chiudere (ordine = fatturato)</h3><p class="nota">Probabilmente concluse ma ancora aperte a gestionale: ordine e residuo sono lasciati vuoti.</p><div id="t-chiudere"></div></div>
-    <div class="card"><h3>Senza ordini o in avvio / senza movimenti</h3><div id="t-zero"></div></div>
-  </div>
+  <div class="card" style="margin-top:1rem"><h3>Da chiudere (ordine = fatturato)</h3><p class="nota">Probabilmente concluse ma ancora aperte a gestionale: ordine e residuo sono lasciati vuoti.</p><div id="t-chiudere"></div></div>
+  <div class="card" style="margin-top:1rem"><h3>Senza ordini o in avvio / senza movimenti</h3><div id="t-zero"></div></div>
 </section>
 
 <section id="p-capi" hidden>
@@ -197,18 +226,70 @@ body.bloccato header,body.bloccato main,body.bloccato footer{display:none}
   <h2>Qualità dei dati</h2>
   <div id="qual"></div>
 </section>
+
+<section id="p-carica" hidden>
+  <h2>Carica dati aggiornati</h2>
+  <p class="nota">Carica i file esportati da Mago4: per ogni capo commessa il prospetto totale (HTML/XML), poi i PDF aggiornati. Si può aggiornare anche un solo file: quelli non caricati restano come sono. I file vengono letti nel tuo browser; sul servizio va solo il risultato, cifrato.</p>
+  <div id="up-stato" class="avviso"></div>
+  <h3 style="margin-top:1rem">Prospetti Margine Economico per capo commessa</h3>
+  <div class="griglia slots" id="up-capi"></div>
+  <h3 style="margin-top:1rem">PDF e altri file</h3>
+  <div class="griglia slots" id="up-altri"></div>
+  <div class="card" style="margin-top:1rem">
+    <h3>1. Controlla</h3>
+    <div class="filtri"><button class="btn" id="up-elabora" type="button" disabled>Elabora e controlla</button><span class="nota" id="up-prog"></span></div>
+    <div id="up-esito"></div>
+  </div>
+  <div class="card" style="margin-top:1rem" id="up-pubblica-box" hidden>
+    <h3>2. Usa o pubblica</h3>
+    <div class="filtri">
+      <button class="btn sec" id="up-applica" type="button">Usa in questa sessione (anteprima)</button>
+      <label>Password di caricamento <input type="password" id="up-pw" autocomplete="off" placeholder="PASSWORD_CARICO del servizio"></label>
+      <button class="btn" id="up-pubblica" type="button">Pubblica per tutti</button>
+    </div>
+    <p class="nota" id="up-msg" role="status"></p>
+  </div>
+</section>
 </main>
-<footer class="nota" style="max-width:1400px;margin:0 auto;padding:1rem">Fonte: esportazioni Mago4 (Prospetto Margine Economico, Elenco Commesse, Ordini da cliente). Commesse in economia (SM, SL, SF) escluse. Costi diretti dal Prospetto Margine Economico.</footer>
+<footer class="nota" style="max-width:1400px;margin:0 auto;padding:1rem">Fonte: esportazioni Mago4 (Prospetto Margine Economico, Elenco Commesse, Ordini da cliente). Commesse in economia (SM, SL, SF) escluse. Costi diretti dal Prospetto Margine Economico.<br><strong>Versione __VERSIONE__</strong> · dati aggiornati al <span id="ver-agg"></span></footer>
 
 <script>/*CHART*/</script>
 <script>/*XLSX*/</script>
 <script>
 /*DATI*/
 </script>
+<script>/*MOTORE*/</script>
 <script>
-function avvia(DATI){
+const Cripto = {
+  b64: (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0)),
+  tob64: (u8) => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); },
+  async chiave(pw, salt, iter, usi) {
+    const k0 = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: iter, hash: "SHA-256" }, k0, { name: "AES-GCM", length: 256 }, false, usi);
+  },
+  async decifra(X, pw) {
+    const k = await this.chiave(pw, this.b64(X.salt), X.iter, ["decrypt"]);
+    let pt = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: this.b64(X.iv) }, k, this.b64(X.dati)));
+    if (X.compresso) pt = new Uint8Array(await new Response(new Blob([pt]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer());
+    return JSON.parse(new TextDecoder().decode(pt));
+  },
+  async cifra(obj, pw) {
+    const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+    const k = await this.chiave(pw, salt, 600000, ["encrypt"]);
+    let d = new TextEncoder().encode(JSON.stringify(obj));
+    d = new Uint8Array(await new Response(new Blob([d]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer());
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, k, d));
+    return { salt: this.tob64(salt), iv: this.tob64(iv), iter: 600000, dati: this.tob64(ct), compresso: true };
+  },
+};
+</script>
+<script>
+function avvia(payload, PW){
 "use strict";
-const S = DATI.soglie, C = DATI.commesse;
+let DATI = payload.dati, SORG = payload.sorgenti;
+const S = DATI.soglie, API = (S.api_url || "").replace(/\/+$/, "");
+let TUTTE = DATI.commesse;
+let C = [], aperte = [], chiuse = [], corrente = "cruscotto";
 const nf2 = new Intl.NumberFormat("it-IT",{minimumFractionDigits:2,maximumFractionDigits:2});
 const nf0 = new Intl.NumberFormat("it-IT",{maximumFractionDigits:0});
 const eur = n => n==null ? "—" : nf2.format(n)+" €";
@@ -221,20 +302,55 @@ const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">"
 const sum = (L,k) => L.reduce((a,c)=>a+(c[k]||0),0);
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
-const aperte = C.filter(c=>c.stato==="Aperta"), chiuse = C.filter(c=>c.stato==="Chiusa");
 const annoChiusura = c => anno(c.chiusura) || anno(c.chiusura_stimata) || "";
+/* Vista: di default commesse aperte oggi + chiuse nel 2025-2026 (da config/soglie.json); modificabile in alto */
+const V0 = {ap:true, ch:true, da:S.perimetro.chiuse_dal_anno, a:S.perimetro.chiuse_al_anno, nd:false, capo:"", sg:S.margine_minimo_pct};
+const V = {...V0};
+function applica(){
+  if(V.da>V.a){ const t=V.da; V.da=V.a; V.a=t; }
+  S.margine_minimo_pct = V.sg;
+  C = TUTTE.filter(c=>{
+    if(V.capo && c.capo!==V.capo) return false;
+    if(c.stato==="Aperta") return V.ap;
+    if(!V.ch) return false;
+    const y = +annoChiusura(c);
+    return y ? (y>=V.da && y<=V.a) : V.nd;
+  });
+  aperte = C.filter(c=>c.stato==="Aperta"); chiuse = C.filter(c=>c.stato==="Chiusa");
+  $("#v-sint").textContent = `${C.length} commesse in vista (${aperte.length} aperte, ${chiuse.length} chiuse)`;
+  dettaglio.stale = true;
+}
+let vistaBound = false;
+function initVista(){
+  const anni = [...new Set(TUTTE.map(annoChiusura).filter(Boolean))].sort();
+  const lim = Math.max(+DATI.oggi.slice(0,4), ...anni.map(Number));
+  const lista = []; for(let y=Math.min(...anni.map(Number)); y<=lim; y++) lista.push(y);
+  ["#v-da","#v-a"].forEach(id=>{ $(id).innerHTML = lista.map(y=>`<option>${y}</option>`).join(""); });
+  $("#v-capo").innerHTML = `<option value="">tutti</option>`+unici(TUTTE,c=>c.capo).map(v=>`<option>${esc(v)}</option>`).join("");
+  const scrivi = () => { $("#v-ap").checked=V.ap; $("#v-ch").checked=V.ch; $("#v-da").value=V.da; $("#v-a").value=V.a; $("#v-nd").checked=V.nd; $("#v-capo").value=V.capo; $("#v-sg").value=V.sg; };
+  const leggi = () => { V.ap=$("#v-ap").checked; V.ch=$("#v-ch").checked; V.da=+$("#v-da").value; V.a=+$("#v-a").value; V.nd=$("#v-nd").checked; V.capo=$("#v-capo").value; V.sg=Math.max(0,+$("#v-sg").value||0);
+    applica(); scrivi(); visti.clear(); vai(corrente); };
+  if(!vistaBound){
+    ["#v-ap","#v-ch","#v-da","#v-a","#v-nd","#v-capo","#v-sg"].forEach(id=>$(id).addEventListener("change",leggi));
+    $("#v-reset").addEventListener("click",()=>{ Object.assign(V,V0); applica(); scrivi(); visti.clear(); vai(corrente); });
+    vistaBound = true;
+  }
+  scrivi();
+}
 const mlcPct = (L) => { const r=sum(L,"ricavi"); return r? (r-sum(L,"costi"))/r*100 : null; };
 const stMargine = p => p==null ? ["neutro","—","Nessun dato"] : p<S.margine_minimo_pct ? ["crit","■","Critico"] : p<S.margine_verde_pct ? ["att","▲","Attenzione"] : ["ok","●","In linea"];
 const badge = ([cl,ic,tx]) => `<span class="badge ${cl}">${ic} ${tx}</span>`;
 const tag = (t,cl="") => `<span class="tag ${cl}">${esc(t)}</span>`;
 
-$("#agg").textContent = DATI.aggiornato_al;
+function intestazioneDati(fonte){ $("#agg").textContent = DATI.aggiornato_al; $("#ver-agg").textContent = DATI.aggiornato_al + (fonte ? " (" + fonte + ")" : ""); }
+intestazioneDati("");
 
 /* ---------- navigazione ---------- */
-const sezioni = ["cruscotto","passato","futuro","capi","dettaglio","qualita"];
+const sezioni = ["cruscotto","passato","futuro","capi","dettaglio","qualita","carica"];
 const visti=new Set();
 function vai(p){
   if(!sezioni.includes(p)) p="cruscotto";
+  corrente=p;
   sezioni.forEach(s=>{ $("#p-"+s).hidden = s!==p; });
   if(p==="cruscotto"||!visti.has(p)){ visti.add(p); render[p](); }
   document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-selected", b.dataset.p===p));
@@ -252,13 +368,15 @@ function grafico(id, cfg){
   Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
   charts[id] = new Chart($("#"+id), cfg);
 }
-const asseEur = {ticks:{callback:v=>nf0.format(v/1000)+" k€"}};
+const fmtK = v => Math.abs(v)>=2e6 ? new Intl.NumberFormat("it-IT",{maximumFractionDigits:1}).format(v/1e6)+" M€" : nf0.format(v/1000)+" k€";
+const asseEur = {ticks:{callback:fmtK}};
 const tipEur = {callbacks:{label:c=>` ${c.dataset.label}: ${eur0(c.parsed.y ?? c.parsed.x)}`}};
 function barreOrizz(id, etichette, valori, extra){
-  const corte = etichette.map(e=>e.length>26?e.slice(0,25)+"…":e);
+  const maxL = innerWidth<700?16:innerWidth<1000?20:26;
+  const corte = etichette.map(e=>e.length>maxL?e.slice(0,maxL-1)+"…":e);
   grafico(id,{type:"bar",data:{labels:corte,datasets:[{data:valori,backgroundColor:css("--serie")}]},
     options:{indexAxis:"y",maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{title:c=>etichette[c[0].dataIndex],label:c=>" "+eur0(c.parsed.x),afterLabel:c=>extra?extra[c.dataIndex]:""}}},
-      scales:{x:{ticks:{callback:v=>nf0.format(v/1000)+" k€"}}}}});
+      scales:{x:{ticks:{callback:fmtK,maxTicksLimit:6}}}}});
 }
 
 /* ---------- tabelle ---------- */
@@ -295,14 +413,15 @@ function tabella(el, righe, cols, opz={}){
     let L=[...righe];
     if(ord.k) L.sort((a,b)=>{const x=a[ord.k],y=b[ord.k]; if(x==null) return 1; if(y==null) return -1; return (typeof x==="string"?x.localeCompare(y,"it"):x-y)*ord.dir;});
     if(opz.max) L=L.slice(0,opz.max);
-    el.innerHTML = `<table><thead><tr>${cols.map(k=>`<th scope="col" class="${["e","p"].includes(COL[k][1])?"n":""}" data-k="${k}" ${ord.k===k?`aria-sort="${ord.dir>0?"ascending":"descending"}"`:""}>${COL[k][0]}</th>`).join("")}</tr></thead>
-      <tbody>${L.map(c=>`<tr>${cols.map(k=>cella(c,k,COL[k][1])).join("")}</tr>`).join("")||`<tr><td colspan="${cols.length}">Nessuna commessa.</td></tr>`}</tbody></table>`;
+    el.innerHTML = `<table><thead><tr>${cols.map(k=>`<th scope="col" class="col-${k} ${["e","p"].includes(COL[k][1])?"n":""}" data-k="${k}" ${ord.k===k?`aria-sort="${ord.dir>0?"ascending":"descending"}"`:""}>${COL[k][0]}</th>`).join("")}</tr></thead>
+      <tbody>${L.map(c=>`<tr>${cols.map(k=>cella(c,k,COL[k][1]).replace("<td",`<td data-c="${k}"`)).join("")}</tr>`).join("")||`<tr><td colspan="${cols.length}">Nessuna commessa.</td></tr>`}</tbody></table>`;
     el.querySelectorAll("th").forEach(th=>th.addEventListener("click",()=>{const k=th.dataset.k; ord.dir = ord.k===k ? -ord.dir : (typeof righe[0]?.[k]==="string"?1:-1); ord.k=k; draw();}));
   };
   draw();
 }
 const wrap = html => `<div class="tab-wrap">${html}</div>`;
-function tab(id, righe, cols, opz){ const el=$("#"+id); el.innerHTML=""; const d=document.createElement("div"); d.className="tab-wrap"; el.appendChild(d); tabella(d,righe,cols,opz); }
+function tab(id, righe, cols, opz){ const el=$("#"+id); el.innerHTML=""; const d=document.createElement("div"); d.className="tab-wrap"; el.appendChild(d); tabella(d,righe,cols,opz);
+  const p=document.createElement("p"); p.className="nota"; p.textContent=righe.length>8?`${righe.length} commesse: scorri la tabella per vederle tutte.`:`${righe.length} commesse.`; el.appendChild(p); }
 function opzioni(sel, valori, tutti="Tutti"){ sel.innerHTML = `<option value="">${tutti}</option>`+valori.map(v=>`<option>${esc(v)}</option>`).join(""); }
 const unici = (L,f) => [...new Set(L.map(f).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"it"));
 const raggruppa = (L,f) => { const m={}; L.forEach(c=>{const k=f(c)||"(n.d.)"; (m[k]??=[]).push(c);}); return m; };
@@ -348,15 +467,28 @@ function cruscotto(){
   document.querySelectorAll("[data-vai]").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();vai(a.dataset.vai);}));
   serie("mese");
 }
+function serieDati(){
+  const mo=DATI.oggi.slice(0,7), y=+mo.slice(0,4), m0=+mo.slice(5,7), P={}, F={};
+  const nDef=(S.futuro&&S.futuro.mesi_default)||6;
+  C.forEach(c=>{
+    Object.entries(c.fm||{}).forEach(([m,v])=>{ if(m<=mo) P[m]=(P[m]||0)+v; });
+    if(c.stato==="Aperta" && c.residuo>0){
+      let n=nDef; const u=c.ultima_attivita;
+      if(u && u.slice(0,7)>mo) n=Math.max(1,(+u.slice(0,4)-y)*12+(+u.slice(5,7))-m0+1);
+      for(let i=0;i<n;i++){ const mm=m0-1+i, k=(y+Math.floor(mm/12))+"-"+String(mm%12+1).padStart(2,"0"); F[k]=(F[k]||0)+c.residuo/n; }
+    }
+  });
+  return {P,F,mo};
+}
 function serie(modo){
-  const P=DATI.serie.passato, F=DATI.serie.futuro, mo=DATI.serie.mese_oggi;
+  const {P,F,mo}=serieDati();
   let labels, pas, fut;
   if(modo==="mese"){
     const tutti = new Set([...Object.keys(P),...Object.keys(F)]);
     const da = (()=>{const [y,m]=mo.split("-").map(Number); const d=new Date(y,m-1-17,1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");})();
     labels=[...tutti].filter(m=>m>=da).sort();
     pas=labels.map(m=>m<=mo?(P[m]||0):null); fut=labels.map(m=>m>=mo?(F[m]||0):null);
-    $("#nota-serie").textContent="Ultimi 18 mesi e mesi futuri. Passato: fatturato sugli ordini, per data di consegna. Futuro: residuo delle commesse aperte distribuito in parti uguali fino all'ultima consegna prevista (o 6 mesi): è una stima.";
+    $("#nota-serie").textContent="Ultimi 18 mesi e mesi futuri. Passato: fatturato per data di fattura (dove la lista fatture coincide col Prospetto), altrimenti per data di consegna degli ordini. Futuro: residuo delle commesse aperte distribuito in parti uguali fino all'ultima consegna prevista (o 6 mesi): è una stima.";
   } else {
     const ag={p:{},f:{}}; Object.entries(P).forEach(([m,v])=>ag.p[m.slice(0,4)]=(ag.p[m.slice(0,4)]||0)+v);
     Object.entries(F).forEach(([m,v])=>ag.f[m.slice(0,4)]=(ag.f[m.slice(0,4)]||0)+v);
@@ -374,15 +506,9 @@ $("#g-mese").addEventListener("click",()=>serie("mese")); $("#g-anno").addEventL
 
 /* ---------- PASSATO ---------- */
 function passato(){
-  const aa=$("#f-pa-anno"), cc=$("#f-pa-capo");
-  if(!aa.options.length){
-    opzioni(aa, unici(chiuse,annoChiusura).reverse(), "Tutti gli anni");
-    opzioni(cc, unici(chiuse,c=>c.capo), "Tutti i capi");
-    aa.onchange=cc.onchange=passato;
-  }
-  const L = chiuse.filter(c=>(!aa.value||annoChiusura(c)===aa.value)&&(!cc.value||c.capo===cc.value));
-  const nd = L.filter(c=>!c.chiusura).length;
-  $("#avv-passato").innerHTML = `<strong>Attenzione ai tempi.</strong> Per ${nd} commesse chiuse su ${L.length} Mago4 non riporta la data di chiusura: l'anno è <em>stimato</em> dall'ultima consegna/ordine (dove disponibile), altrimenti resta «n.d.». Le commesse senza alcuna data compaiono solo con «Tutti gli anni».`;
+  const L = chiuse;
+  const nd = L.filter(c=>!c.chiusura).length, st = L.filter(c=>!c.chiusura&&c.chiusura_stimata).length;
+  $("#avv-passato").innerHTML = `<strong>Periodo mostrato:</strong> chiuse ${V.ch?`dal ${V.da} al ${V.a}`:"— nessuna (disattivate in alto)"}${V.nd?", comprese quelle senza data":""}. Per ${nd} delle ${L.length} commesse chiuse in vista Mago4 non riporta la data di chiusura: ${st} hanno l'anno <em>stimato</em> dall'ultima consegna/ordine. Puoi cambiare il periodo nella barra «Mostra» in alto.`;
   const ric=sum(L,"ricavi"), mlc=ric-sum(L,"costi");
   const sotto=L.filter(c=>c.ricavi>0&&c.mlc_pct<S.margine_minimo_pct), perd=L.filter(c=>c.mlc<0);
   kpi($("#kpi-passato"),[
@@ -451,9 +577,12 @@ function capi(){
 /* ---------- DETTAGLIO ---------- */
 let dettaglioInit=false;
 function dettaglio(){
-  if(!dettaglioInit){
+  if(dettaglio.stale!==false){
     opzioni($("#d-capo"),unici(C,c=>c.capo),"Tutti"); opzioni($("#d-cli"),unici(C,c=>c.cliente),"Tutti");
     opzioni($("#d-aa"),unici(C,c=>anno(c.apertura)).reverse(),"Tutti"); opzioni($("#d-ac"),unici(C,annoChiusura).reverse(),"Tutti");
+    dettaglio.stale=false;
+  }
+  if(!dettaglioInit){
     ["#d-q","#d-capo","#d-cli","#d-stato","#d-aa","#d-ac"].forEach(s=>$(s).addEventListener("input",dettaglio));
     $("#d-xls").addEventListener("click",esporta);
     dettaglioInit=true;
@@ -462,7 +591,7 @@ function dettaglio(){
   dettaglio.L = C.filter(c=>(!q||(c.codice+" "+c.descrizione+" "+c.cliente).toLowerCase().includes(q))&&(!capo||c.capo===capo)&&(!cli||c.cliente===cli)
     &&(!st||(st==="dc"?c.da_chiudere:st==="av"?c.in_avvio:c.stato===st))&&(!aa||anno(c.apertura)===aa)&&(!ac||annoChiusura(c)===ac));
   $("#d-conta").textContent=`${dettaglio.L.length} commesse su ${C.length}. Clic sull'intestazione per ordinare.`;
-  const el=$("#d-tab").parentElement; const t=document.createElement("div"); el.innerHTML=""; el.appendChild(t);
+  const el=$("#d-tab").parentElement; const t=document.createElement("div"); t.className="completa"; el.innerHTML=""; el.appendChild(t);
   tabella(t,dettaglio.L,["codice","descrizione","capo","cliente","apertura","chiusura","stato","ricavi","costi","mlc","mlc_pct","fatturato","scostamento","ordine","residuo"],{ordina:"ricavi",dir:-1});
   t.querySelector("table").id="d-tab";
 }
@@ -480,10 +609,11 @@ function esporta(){
 
 /* ---------- QUALITA' ---------- */
 const ANOM = {
-  chiusa_senza_data:["Chiuse senza data di chiusura","Mago4 non riporta la data: non sono escluse, compaiono come «n.d.» (con una stima dall'ultima attività, se esiste)."],
+  chiusa_senza_data:["Chiuse senza data di chiusura","Mago4 non riporta la data: non sono escluse, compaiono come «n.d.» (con una stima dalla data dell'ultima fattura emessa o, in mancanza, dell'ultimo ordine)."],
   in_perdita:["In perdita","Costi diretti maggiori dei ricavi."],
   aperta_senza_ordini:["Aperte senza ordini cliente","Nessun ordine nel file «Ordini da cliente»: residuo non calcolabile."],
   fatturato_oltre_ordini:["Fatturato oltre gli ordini","Fatturato registrato sugli ordini maggiore del totale ordinato (oltre la soglia): può essere legittimo se ci sono fatture non coperte da ordine."],
+  fatture_discordanti:["Fatturato del Prospetto diverso dalle fatture emesse in lista","La «Lista fatture emesse» contiene solo le fatture immediate: differenze possono dipendere da altri tipi di fattura, note di credito o fatture registrate su altre commesse. Non è necessariamente un errore."],
   dato_da_verificare:["Dato da verificare","Segnalato a mano in config/override.json."],
 };
 function qualita(){
@@ -491,6 +621,8 @@ function qualita(){
   out.push(`<div class="card"><h3>Riconciliazione dei totali</h3><ul class="liste">
     <li>${r.prospetti_diff.length?badge(["crit","■","Differenze"]):badge(["ok","●","Quadra"])} Prospetti: ${r.prospetti_ok}/${r.prospetti_tot} controlli (ricavi, costi, fatturato per capo commessa) coincidono con le intestazioni dei prospetti.</li>
     <li>${r.ordini_diff.length?badge(["crit","■","Differenze"]):badge(["ok","●","Quadra"])} Ordini: ${r.ordini_totali} righe «Totale Commessa» controllate contro la somma delle righe d'ordine${r.ordini_diff.length?`: ${r.ordini_diff.length} differenze (${r.ordini_diff.map(d=>esc(d.codice)).join(", ")})`:""}. ${r.ordini_senza_importi} totali sono stampati senza importi e valgono zero.</li>
+    ${r.responsabili?`<li>${r.responsabili.controlli.every(c=>c.ok)?badge(["ok","●","Quadra"]):badge(["crit","■","Differenze"])} Prospetti per capo vs «Prospetto Margine Responsabili Commessa»: ${r.responsabili.controlli.filter(c=>c.ok).length}/${r.responsabili.controlli.length} prospetti coincidono con una riga del totale responsabili (stessi ricavi, costi e fatturato). Responsabili non esportati (fuori dal perimetro): ${r.responsabili.non_esportati.map(a=>esc(a.nome.replace(/\.+$/,""))).join(", ")||"nessuno"}.</li>`:""}
+    ${r.capi_senza_prospetto.length?`<li>${badge(["att","▲","Dati mancanti"])} Nessun Prospetto Margine Economico per: <strong>${r.capi_senza_prospetto.map(esc).join(", ")}</strong>. Le loro commesse con movimenti non sono nella dashboard finché non viene esportato il prospetto.</li>`:""}
     <li>${r.v6.stato==="presente"?badge(["att","▲","Da completare"]):badge(["att","▲","Non disponibile"])} Confronto con l'Excel v6: ${esc(r.v6.nota)}</li></ul></div>`);
   Object.entries(ANOM).forEach(([k,[tit,desc]])=>{
     const L=C.filter(c=>c.anomalie.includes(k)); if(!L.length) return;
@@ -501,31 +633,207 @@ function qualita(){
     <li><strong>Costi:</strong> derivano sempre dal Prospetto Margine Economico, non dalla Cronostoria.</li>
     ${dv.map(c=>`<li><strong>${esc(c.codice)}</strong> (${esc(c.cliente)}): ${esc(c.note)}</li>`).join("")}
     <li><strong>Fatture fuori ordine:</strong> lo scostamento tra ricavi e ordini può essere legittimo.</li>
-    <li><strong>Escluse dalla dashboard:</strong> ${DATI.escluse.interne||0} commesse interne e ${DATI.escluse.sospese||0} sospese senza movimenti; commesse in economia (SM, SL, SF) sempre escluse.</li></ul></div>`);
+    <li><strong>Escluse dalla dashboard:</strong> ${DATI.escluse.interne||0} commesse interne, ${DATI.escluse.sospese||0} sospese senza movimenti e ${DATI.escluse.capi_non_attivi||0} senza movimenti di capi commessa non più in azienda; commesse in economia (SM, SL, SF) sempre escluse.</li></ul></div>`);
   $("#qual").innerHTML=out.join("");
   Object.keys(ANOM).forEach(k=>{ const L=C.filter(c=>c.anomalie.includes(k)); if(L.length) tab("q-"+k,L,["codice","descrizione","cliente","capo","stato","ricavi","costi","mlc_pct","ordine","residuo"],{ordina:"ricavi"}); });
 }
 
+
+/* ---------- aggiornamento dati dal browser / dal servizio ---------- */
+function applicaSorgenti(S2, meta, fonte){
+  const res = Motore.costruisci(S2, DATI.soglie, DATI.override || {});
+  SORG = S2;
+  DATI.commesse = res.commesse; DATI.escluse = res.escluse; DATI.riconciliazione = res.riconciliazione;
+  if(meta){ if(meta.aggiornato_al) DATI.aggiornato_al = meta.aggiornato_al; if(meta.oggi) DATI.oggi = meta.oggi; }
+  TUTTE = DATI.commesse;
+  intestazioneDati(fonte);
+  initVista(); applica(); visti.clear(); vai(corrente);
+}
+async function caricaRemoto(){
+  if(!API || !PW) return;
+  try{
+    const r = await fetch(API + "/dati", {cache:"no-store"});
+    if(!r.ok) return;
+    const j = await r.json();
+    if(!j.blob || !j.meta || j.meta.caricato <= (payload.generato||"")) return;
+    const p2 = await Cripto.decifra(j.blob, PW);
+    applicaSorgenti(p2.sorgenti, p2.meta, "caricamento del " + new Date(j.meta.caricato).toLocaleString("it-IT"));
+  }catch(e){ console.warn("Servizio dati non raggiungibile", e); }
+}
+
+/* ---------- CARICA DATI ---------- */
+const UP = { pend:{}, S2:null, res:null };
+const ALTRI = [
+  {id:"elenco", t:"Elenco commesse (PDF con Stato)", h:"«Elenco Commesse per Tipologia» con Stato e date: Standard + Variante, senza Economia.", acc:".pdf"},
+  {id:"lista", t:"Elenco con responsabile (PDF)", h:"Lo stesso elenco nella versione con Resp/Nome: serve per dare un capo alle commesse senza movimenti.", acc:".pdf"},
+  {id:"ordini", t:"Ordini da cliente (PDF)", h:"«Ordini da cliente», dal 01/01/2014 a una data futura.", acc:".pdf"},
+  {id:"fatture", t:"Fatture emesse (PDF)", h:"«Lista fatture emesse» (fatture immediate).", acc:".pdf"},
+  {id:"responsabili", t:"Totali responsabili (HTML/XML)", h:"«Prospetto Margine Responsabili Commessa»: serve solo ai controlli.", acc:".html,.htm,.xml,.txt"},
+];
+const parseHtml = h => new DOMParser().parseFromString(h, "text/html");
+const nomeCapo = tok => { const p = Object.values(SORG.prospetti||{}).find(p=>Motore.capoAttivo(p.capo,[tok])); return p ? p.capo : tok.replace(/\w\S*/g,t=>t[0]+t.slice(1).toLowerCase()); };
+
+function statoSlot(id){
+  const nuovo = UP.pend[id];
+  if(nuovo && nuovo.errore) return [`✖ ${esc(nuovo.errore)}`,"err"];
+  if(nuovo) return [`✔ Pronto: ${esc(nuovo.nomi.join(", "))} — ${esc(nuovo.sintesi)}`,"ok"];
+  if(id.startsWith("capo:")){
+    const L = Object.values(SORG.prospetti||{}).filter(p=>Motore.capoAttivo(p.capo,[id.slice(5)]));
+    return L.length ? [`In uso: ${L.length} file · ricavi ${eur0(L.reduce((a,p)=>a+p.intestazione.ricavi,0))}`,""] : ["Nessun prospetto: carica il file.","err"];
+  }
+  const src = SORG[id];
+  const n = src ? (src.righe||[]).length : 0;
+  return n ? [`In uso: ${nf0.format(n)} righe${src.file?" ("+esc(src.file)+")":""}`,""] : ["Non presente.",""];
+}
+function disegnaSlot(el, id, titolo, aiuto, acc, multi){
+  const [t,cl] = statoSlot(id);
+  el.innerHTML = `<div class="card slot"><h4>${esc(titolo)}</h4>${aiuto?`<div class="nota">${esc(aiuto)}</div>`:""}<div class="st ${cl}" aria-live="polite">${t}</div>
+    <input type="file" accept="${acc}" ${multi?"multiple":""} aria-label="Scegli il file per ${esc(titolo)}" data-slot="${esc(id)}"></div>`;
+  el.querySelector("input").addEventListener("change", e=>gestisciFile(id, [...e.target.files]));
+}
+function carica(){
+  const attivi = (S.perimetro && S.perimetro.capi_attivi) || [];
+  $("#up-capi").innerHTML = attivi.map(t=>`<div data-s="capo:${esc(t)}"></div>`).join("");
+  attivi.forEach(t=>disegnaSlot($(`#up-capi [data-s="capo:${t}"]`), "capo:"+t, nomeCapo(t), t.includes("MORESCHI")?"Se il capo ha più codici responsabile (es. Moreschi) scegli tutti i suoi file insieme.":"", ".html,.htm,.xml,.txt", true));
+  $("#up-altri").innerHTML = ALTRI.map(a=>`<div data-s="${a.id}"></div>`).join("");
+  ALTRI.forEach(a=>disegnaSlot($(`#up-altri [data-s="${a.id}"]`), a.id, a.t, a.h, a.acc, false));
+  const ok = !!PW;
+  $("#up-stato").innerHTML = ok
+    ? `Dati in uso: <strong>${esc(DATI.aggiornato_al)}</strong>. ${API?"Servizio di pubblicazione collegato.":"Servizio di pubblicazione <strong>non ancora configurato</strong>: puoi caricare e controllare i file e usarli in questa sessione, ma non pubblicarli per tutti (vedi README, «Caricamento dati»)."}`
+    : `Questa copia locale non è collegata al servizio: apri la pagina pubblicata (hub.siciet.it/commesse) per caricare file.`;
+  $("#up-elabora").disabled = !Object.keys(UP.pend).length;
+  $("#up-elabora").onclick = elabora;
+  $("#up-applica").onclick = () => { applicaSorgenti(UP.S2, {aggiornato_al:new Date().toLocaleDateString("it-IT"), oggi:new Date().toISOString().slice(0,10)}, "anteprima: dati non pubblicati"); $("#up-msg").textContent="Dati usati solo in questa sessione: ricaricando la pagina tornano quelli pubblicati."; };
+  $("#up-pubblica").onclick = pubblica;
+}
+async function pdfPagine(file, prog){
+  let lib;
+  try{ lib = await import("./lib/pdf.min.mjs"); }
+  catch(e){ throw new Error("Per leggere i PDF apri la pagina pubblicata (https) o da un server: da file locale il browser lo impedisce."); }
+  lib.GlobalWorkerOptions.workerSrc = "./lib/pdf.worker.min.mjs";
+  const doc = await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+  const out = [];
+  for(let i=1;i<=doc.numPages;i++){
+    const pg = await doc.getPage(i), vp = pg.getViewport({scale:1}), tc = await pg.getTextContent();
+    out.push({items:tc.items.filter(x=>x.str!==undefined).map(x=>({s:x.str,x0:x.transform[4],x1:x.transform[4]+x.width,top:vp.height-x.transform[5]}))});
+    if(prog && i%10===0) prog(i, doc.numPages);
+  }
+  return out;
+}
+function tipoPdf(pagine){
+  const t = pagine.slice(0,2).map(p=>p.items.map(i=>i.s).join(" ")).join(" ");
+  if(/Ordini da cliente/i.test(t)) return "ordini";
+  if(/Fatture immediate|fatture emesse/i.test(t)) return "fatture";
+  if(/Elenco Commesse per Tipologia/i.test(t)) return /\bStato\b/.test(t) ? "elenco" : "lista";
+  return null;
+}
+async function gestisciFile(id, files){
+  const prog = (i,n)=>{ $("#up-prog").textContent = `Lettura PDF: pagina ${i} di ${n}…`; };
+  delete UP.pend[id];
+  if(!files.length){ carica(); return; }
+  try{
+    if(id.startsWith("capo:")){
+      const tok = id.slice(5), voci = [];
+      for(const f of files){
+        const p = Motore.leggiProspetto(await f.text(), parseHtml);
+        if(!Motore.capoAttivo(p.capo,[tok])) throw new Error(`Il file «${f.name}» è del prospetto di ${p.capo}, non di ${nomeCapo(tok)}.`);
+        voci.push({nome:f.name, p});
+      }
+      UP.pend[id] = {tipo:"capo", tok, nomi:voci.map(v=>v.nome), voci,
+        sintesi:`${voci.reduce((a,v)=>a+v.p.righe.length,0)} righe · ricavi ${eur0(voci.reduce((a,v)=>a+v.p.intestazione.ricavi,0))}`};
+    } else {
+      const f = files[0];
+      if(id==="responsabili"){
+        const r = Motore.leggiTotaliResponsabili(await f.text(), parseHtml);
+        if(!r.righe.length) throw new Error("Non sembra il «Prospetto Margine Responsabili Commessa».");
+        UP.pend[id] = {tipo:id, nomi:[f.name], dati:r, sintesi:`${r.righe.length} responsabili`};
+      } else {
+        $("#up-prog").textContent = "Lettura PDF…";
+        const pagine = await pdfPagine(f, prog);
+        const t = tipoPdf(pagine);
+        if(t !== id) throw new Error(`Il file «${f.name}» sembra ${t?`di tipo «${(ALTRI.find(a=>a.id===t)||{}).t}»`:"un PDF non riconosciuto"}, non «${(ALTRI.find(a=>a.id===id)||{}).t}».`);
+        let dati;
+        if(id==="elenco") dati = {righe:Motore.leggiElenco(pagine)};
+        else if(id==="lista") dati = {righe:Motore.leggiLista(pagine)};
+        else if(id==="fatture") dati = {righe:Motore.leggiFatture(pagine)};
+        else { const o = Motore.leggiOrdini(pagine); dati = {righe:o.righe, totali:o.totali, avvisi:o.avvisi, diffPagine:o.diffPagine}; }
+        if(!dati.righe.length) throw new Error("Nessuna riga letta dal PDF.");
+        dati.file = f.name;
+        UP.pend[id] = {tipo:id, nomi:[f.name], dati, sintesi:`${nf0.format(dati.righe.length)} righe`};
+      }
+    }
+  }catch(e){ UP.pend[id] = {errore:e.message, nomi:[]}; }
+  $("#up-prog").textContent = "";
+  UP.res = null; $("#up-esito").innerHTML = ""; $("#up-pubblica-box").hidden = true;
+  const el = $(`[data-s="${CSS.escape(id)}"]`) || $(`[data-s="${id}"]`);
+  disegnaSlot(el, id, id.startsWith("capo:")?nomeCapo(id.slice(5)):ALTRI.find(a=>a.id===id).t, id.startsWith("capo:")?"":(ALTRI.find(a=>a.id===id)||{}).h, id.startsWith("capo:")?".html,.htm,.xml,.txt":(ALTRI.find(a=>a.id===id)||{}).acc, id.startsWith("capo:"));
+  $("#up-elabora").disabled = !Object.values(UP.pend).some(p=>!p.errore);
+}
+function riassunto(C_){
+  const ap = C_.filter(c=>c.stato==="Aperta");
+  return {n:C_.length, aperte:ap.length, ricavi:sum(C_,"ricavi"), mlc:sum(C_,"ricavi")-sum(C_,"costi"), residuo:sum(ap,"residuo"), dc:ap.filter(c=>c.da_chiudere).length};
+}
+function elabora(){
+  const S2 = JSON.parse(JSON.stringify(SORG)); S2.prospetti = S2.prospetti || {};
+  const stamp = new Date().toISOString();
+  for(const [id,p] of Object.entries(UP.pend)){
+    if(p.errore) continue;
+    if(p.tipo==="capo"){
+      for(const k of Object.keys(S2.prospetti)) if(Motore.capoAttivo(S2.prospetti[k].capo,[p.tok])) delete S2.prospetti[k];
+      p.voci.forEach(v=>{ S2.prospetti["web:"+v.nome] = v.p; });
+    } else { S2[p.tipo] = Object.assign({}, p.dati, {caricato:stamp}); }
+  }
+  const res = Motore.costruisci(S2, DATI.soglie, DATI.override || {});
+  UP.S2 = S2; UP.res = res;
+  const a = riassunto(DATI.commesse), b = riassunto(res.commesse), r = res.riconciliazione;
+  const riga = (et, x, y, f=eur0) => `<tr><td>${et}</td><td class="n">${f(x)}</td><td class="n">${f(y)}</td><td class="n ${y-x<0?"neg":""}">${y-x>0?"+":""}${f(y-x)}</td></tr>`;
+  const prob = [];
+  if(r.prospetti_diff.length) prob.push(`${badge(["crit","■","Differenze"])} Prospetti non coerenti con le proprie intestazioni: ${r.prospetti_diff.map(d=>esc(d.capo)+" ("+d.voce+")").join(", ")}`);
+  if(r.ordini_diff.length) prob.push(`${badge(["crit","■","Differenze"])} Ordini: ${r.ordini_diff.length} commesse con righe diverse dai totali stampati`);
+  if(r.responsabili && !r.responsabili.controlli.every(c=>c.ok)) prob.push(`${badge(["att","▲","Attenzione"])} Prospetti non trovati nel totale responsabili: ${r.responsabili.controlli.filter(c=>!c.ok).map(c=>esc(c.capo)).join(", ")}`);
+  if(r.capi_senza_prospetto.length) prob.push(`${badge(["att","▲","Attenzione"])} Mancano i prospetti di: ${r.capi_senza_prospetto.map(esc).join(", ")}`);
+  if(!prob.length) prob.push(`${badge(["ok","●","Quadra"])} Tutti i controlli di riconciliazione sono superati (${r.prospetti_ok}/${r.prospetti_tot} prospetti${r.responsabili?`, ${r.responsabili.controlli.filter(c=>c.ok).length}/${r.responsabili.controlli.length} nel totale responsabili`:""}, ${r.ordini_totali} totali ordini).`);
+  $("#up-esito").innerHTML = `<div class="tab-wrap" style="max-height:none"><table><thead><tr><th>Numero</th><th class="n">Prima</th><th class="n">Dopo</th><th class="n">Differenza</th></tr></thead><tbody>
+    ${riga("Commesse",a.n,b.n,v=>nf0.format(v))}${riga("di cui aperte",a.aperte,b.aperte,v=>nf0.format(v))}${riga("Ricavi",a.ricavi,b.ricavi)}${riga("Margine",a.mlc,b.mlc)}${riga("Residuo da fatturare (aperte)",a.residuo,b.residuo)}${riga("Aperte «da chiudere»",a.dc,b.dc,v=>nf0.format(v))}</tbody></table></div>
+    <ul class="liste" style="margin-top:.75rem">${prob.map(x=>`<li>${x}</li>`).join("")}</ul>`;
+  $("#up-pubblica-box").hidden = false;
+  $("#up-pubblica").disabled = !(API && PW);
+  $("#up-msg").textContent = API ? "" : "Pubblicazione non disponibile: il servizio non è ancora configurato (api_url vuoto).";
+}
+async function pubblica(){
+  const msg = $("#up-msg"), pw = $("#up-pw").value;
+  if(!pw){ msg.textContent = "Inserisci la password di caricamento."; return; }
+  try{
+    msg.textContent = "Cifratura e invio…";
+    const adesso = new Date();
+    const meta = {caricato:adesso.toISOString(), aggiornato_al:adesso.toLocaleDateString("it-IT"), oggi:adesso.toISOString().slice(0,10), file:Object.values(UP.pend).filter(p=>!p.errore).flatMap(p=>p.nomi)};
+    const blob = await Cripto.cifra({sorgenti:UP.S2, meta}, PW);
+    const r = await fetch(API + "/dati", {method:"PUT", headers:{"Content-Type":"application/json","X-Password":pw}, body:JSON.stringify({meta:{caricato:meta.caricato}, blob})});
+    if(r.status===401||r.status===403){ msg.textContent = "Password di caricamento non corretta."; return; }
+    if(!r.ok) throw new Error("risposta " + r.status);
+    applicaSorgenti(UP.S2, meta, "caricamento del " + adesso.toLocaleString("it-IT"));
+    UP.pend = {}; UP.res = null;
+    msg.textContent = "✔ Pubblicato: da ora tutti vedono i dati aggiornati (alla prossima apertura della pagina).";
+    carica(); $("#up-esito").innerHTML = ""; $("#up-pubblica-box").hidden = false; msg.textContent = "✔ Pubblicato: tutti vedranno i dati aggiornati aprendo la pagina.";
+  }catch(e){ msg.textContent = "Pubblicazione non riuscita: " + e.message; }
+}
+
 /* ---------- avvio ---------- */
-const render={cruscotto,passato,futuro,capi,dettaglio,qualita};
+const render={cruscotto,passato,futuro,capi,dettaglio,qualita,carica};
+initVista(); applica();
 vai((location.hash||"#cruscotto").slice(1));
+caricaRemoto();
 }
 </script>
 <script>
 (function(){
-  if(typeof DATI_CHIARI!=="undefined"){ avvia(DATI_CHIARI); return; }
+  if(typeof DATI_CHIARI!=="undefined"){ avvia(DATI_CHIARI, null); return; }
   document.body.classList.add("bloccato"); document.getElementById("gate").hidden=false;
-  const X=DATI_CIFRATI, b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
-  async function sblocca(pw){
-    const k0=await crypto.subtle.importKey("raw",new TextEncoder().encode(pw),"PBKDF2",false,["deriveKey"]);
-    const k=await crypto.subtle.deriveKey({name:"PBKDF2",salt:b64(X.salt),iterations:X.iter,hash:"SHA-256"},k0,{name:"AES-GCM",length:256},false,["decrypt"]);
-    const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64(X.iv)},k,b64(X.dati));
-    return JSON.parse(new TextDecoder().decode(pt));
-  }
   document.getElementById("gate-form").addEventListener("submit",async e=>{
     e.preventDefault(); const err=document.getElementById("gate-err"); err.textContent="Controllo…";
-    try{ const d=await sblocca(document.getElementById("gate-pw").value);
-      document.getElementById("gate").hidden=true; document.body.classList.remove("bloccato"); avvia(d);
+    const pw=document.getElementById("gate-pw").value;
+    try{ const d=await Cripto.decifra(DATI_CIFRATI, pw);
+      document.getElementById("gate").hidden=true; document.body.classList.remove("bloccato"); avvia(d, pw);
     }catch(x){ err.textContent="Password non corretta."; }
   });
 })();
