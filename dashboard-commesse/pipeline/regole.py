@@ -207,15 +207,8 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=
             c["anomalie"].append("dato_da_verificare")
         commesse.append(c)
 
-    # perimetro
-    a, b = cfg["perimetro"]["chiuse_dal_anno"], cfg["perimetro"]["chiuse_al_anno"]
-    dentro, fuori = [], []
-    for c in commesse:
-        if c["stato"] == "Aperta":
-            dentro.append(c)
-        elif c["chiusura"]:
-            (dentro if a <= int(c["chiusura"][:4]) <= b else fuori).append(c)
-        else:
-            (dentro if cfg["perimetro"]["includi_chiuse_senza_data"] else fuori).append(c)
+    # Il perimetro (aperte + chiuse 2025-2026 di default) è una VISTA modificabile nella dashboard:
+    # il dataset contiene tutte le commesse dei capi attivi.
+    dentro, fuori = commesse, []
     fuori_extra = escluse
     return dentro, fuori, fuori_extra

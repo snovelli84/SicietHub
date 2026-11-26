@@ -5,3 +5,5 @@ dist/
 __pycache__/
 *.pyc
 config/password.txt
+node_modules/
+package-lock.json

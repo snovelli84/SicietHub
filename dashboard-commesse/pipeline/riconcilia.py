@@ -18,9 +18,9 @@ def prospetti_vs_intestazione(prospetti, tol):
     return out
 
 
-def ordini_righe_vs_totali(path, righe_pag):
+def ordini_righe_vs_totali(tot_avvisi, righe_pag):
     """Somma delle righe d'ordine per codice vs righe 'Totale Commessa' stampate nel PDF."""
-    tot, avvisi = parse_ordini.leggi(path)
+    tot, avvisi = tot_avvisi
     somma = defaultdict(lambda: [0.0, 0.0])
     for p in righe_pag:
         for r in p["righe"]:

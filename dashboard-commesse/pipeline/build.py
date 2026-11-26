@@ -46,10 +46,12 @@ def main():
     (RADICE / "data").mkdir(exist_ok=True)
     json.dump(dict(commesse=dentro, fuori_perimetro=fuori, escluse=escluse), open(RADICE / "data/commesse.json", "w", encoding="utf-8"),
               ensure_ascii=False, indent=1)
+    tot_av = _cache("ordini_tot", [fo], lambda: parse_ordini.leggi(fo))
+    _scrivi_sorgenti(prospetti, elenco, lista, righe_pag, tot_av, fatture, inp)
     # --- riconciliazione ---
     rec = dict(
         prospetti=riconcilia.prospetti_vs_intestazione(prospetti, cfg["tolleranza_riconciliazione_euro"]),
-        ordini=riconcilia.ordini_righe_vs_totali(fo, righe_pag),
+        ordini=riconcilia.ordini_righe_vs_totali(tot_av, righe_pag),
         totali_pagina_ordini=riconcilia.totali_pagina(righe_pag),
         v6=_confronta_v6(inp, dentro),
         responsabili=(riconcilia.prospetti_vs_responsabili(prospetti, parse_resp.leggi(inp / "Totali responsabili.html"), cfg["tolleranza_riconciliazione_euro"])
@@ -61,6 +63,28 @@ def main():
     json.dump(rec, open(RADICE / "data/riconciliazione.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     _scrivi_report(rec, dentro, fuori)
     return prospetti, elenco, ordini, dentro, fuori
+
+
+def _scrivi_sorgenti(prospetti, elenco, lista, righe_pag, tot_av, fatture, inp):
+    """Sorgenti elaborate (stesso formato del motore JavaScript): permettono aggiornamenti parziali dal browser."""
+    tot, avvisi = tot_av
+    pr = {}
+    for p in prospetti:
+        eco = p["economie"]
+        pr[Path(p["file"]).name] = dict(
+            capo=p["capo"], intestazione=p["intestazione"], righe=p["righe"],
+            economie=dict(n=len(eco), ricavi=round(sum(x["ricavi"] for x in eco), 2),
+                          costi=round(sum(x["costi"] for x in eco), 2), fatturato=round(sum(x["fatturato"] for x in eco), 2)))
+    resp = None
+    if (inp / "Totali responsabili.html").exists():
+        resp = parse_resp.leggi(inp / "Totali responsabili.html")
+    src = dict(
+        prospetti=pr, elenco=dict(righe=elenco), lista=dict(righe=lista),
+        ordini=dict(righe=[r for p in righe_pag for r in p["righe"]],
+                    totali=[dict(codice=t["codice"], ordine=t["ordine"], fatturato_ordini=t["fatturato_ordini"]) for t in tot],
+                    avvisi=avvisi),
+        fatture=dict(righe=fatture), responsabili=resp)
+    json.dump(src, open(RADICE / "data/sorgenti.json", "w", encoding="utf-8"), ensure_ascii=False)
 
 
 def _confronta_v6(inp, dentro):

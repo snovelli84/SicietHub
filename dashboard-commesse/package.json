@@ -1,0 +1,6 @@
+{
+  "name": "dashboard-commesse",
+  "private": true,
+  "description": "Strumenti di test del motore JavaScript (non necessari per usare la dashboard)",
+  "devDependencies": { "jsdom": "^25.0.1", "pdfjs-dist": "4.10.38" }
+}
