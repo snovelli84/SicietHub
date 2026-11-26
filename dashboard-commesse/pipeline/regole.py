@@ -23,9 +23,14 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=
         el_per_gruppo[gruppo(e["codice"])].append(e)
 
     # ordini per gruppo (somma delle righe d'ordine; i 'Totale Commessa' del PDF servono da controllo)
-    ord_g = defaultdict(lambda: {"ordine": 0.0, "fatt": 0.0, "n": 0})
+    ord_g = defaultdict(lambda: {"ordine": 0.0, "fatt": 0.0, "n": 0, "ult": None, "righe": []})
     for r in ordini_righe:
         g = ord_g[gruppo(r["codice"])]
+        d = r.get("consegna") or r.get("data_ordine")
+        if d and (g["ult"] is None or d > g["ult"]):
+            g["ult"] = d
+        if r.get("fatturato"):
+            g["righe"].append((d, r["fatturato"]))
         g["ordine"] += r["ordine"] or 0.0
         g["fatt"] += r["fatturato"] or 0.0
         g["n"] += 1
@@ -129,6 +134,8 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=
             c["senza_prospetto"] = any(r.get("senza_prospetto") for r in righe)
 
         o = ord_g.get(g)
+        c["ultima_attivita"] = o["ult"] if o else None
+        c["fatt_righe"] = [list(x) for x in o["righe"]] if o else []
         c["ordine_totale_pdf"] = round(o["ordine"], 2) if o else 0.0
         c["fatt_su_ordini"] = round(o["fatt"], 2) if o else 0.0
         if aperta:
@@ -142,6 +149,9 @@ def costruisci(prospetti, elenco, ordini_righe, cfg, override, oggi=None, lista=
                 c["anomalie"].append("aperta_senza_ordini")
             if res < -cfg["soglia_da_chiudere_euro"]:
                 c["anomalie"].append("fatturato_oltre_ordini")
+        c["chiusura_stimata"] = None
+        if aperta is False and not chiusura:
+            c["chiusura_stimata"] = c["ultima_attivita"]      # stima: ultima consegna/ordine nel PDF Ordini
         # anomalie comuni
         if aperta is False and not chiusura:
             c["anomalie"].append("chiusa_senza_data")

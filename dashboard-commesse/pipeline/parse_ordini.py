@@ -7,7 +7,7 @@ scambiata tra ordinato e fatturato. Il codice può avere suffissi (V01, Q01, STR
 """
 import re
 import pdfplumber
-from .util import num, MONEY
+from .util import num, data, iso, MONEY
 
 X_SPLIT = 580  # importi con bordo destro < 580 = Totale Ordine, >= 580 = Fatturato
 
@@ -47,10 +47,13 @@ def _righe_ordine(linee):
         if cod is None or not any(w["text"] in ("Si", "No") and 535 <= w["x0"] <= 548 for w in l):
             continue
         ordine = fatt = None
+        d_ord = next((iso(data(w["text"])) for w in l if w["x0"] < 70 and data(w["text"])), None)
+        consegna = next((iso(data(w["text"])) for w in l if w["x0"] >= 655 and data(w["text"])), None)
         for w in l:
             m = GLUED.match(w["text"])
             if m and w["x0"] > 590:
                 fatt = num(m.group(1))
+                consegna = consegna or iso(data(m.group(2)))
             elif MONEY.match(w["text"]):
                 if w["x1"] < X_SPLIT:
                     ordine = num(w["text"])
@@ -65,7 +68,8 @@ def _righe_ordine(linee):
                         ordine = num(w["text"])
                     elif w["x1"] >= X_SPLIT and fatt is None:
                         fatt = num(w["text"])
-        righe.append(dict(codice=cod["text"].strip("\"'“”"), ordine=ordine, fatturato=fatt))
+        righe.append(dict(codice=cod["text"].strip("\"'“”"), ordine=ordine, fatturato=fatt,
+                          data_ordine=d_ord, consegna=consegna))
     return righe
 
 

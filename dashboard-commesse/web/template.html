@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SICIET · Andamento commesse</title>
+<style>
+:root{
+  --bg:#f4f6f9; --card:#fff; --ink:#1b2430; --muted:#5a6676; --line:#dde3ea;
+  --brand:#1f4e8c; --serie:#2f6fb3; --serie2:#8aa9cf;
+  --ok:#17794a; --ok-bg:#e3f4ea; --att:#9a5b00; --att-bg:#fdf0d5; --crit:#b3261e; --crit-bg:#fbe4e2;
+  --neutro:#4a5565; --neutro-bg:#eceff3;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#10151c; --card:#1a212b; --ink:#e8edf3; --muted:#9aa7b8; --line:#2c3644;
+    --brand:#7fb0ee; --serie:#6ea6e6; --serie2:#3d5f87;
+    --ok:#5fd394; --ok-bg:#16301f; --att:#f0b44c; --att-bg:#33270f; --crit:#ff8a80; --crit-bg:#3a1a18;
+    --neutro:#aab6c6; --neutro-bg:#242d39;
+  }
+}
+*{box-sizing:border-box}
+html{font-size:16px}
+body{margin:0;background:var(--bg);color:var(--ink);font:1rem/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+header{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1.25rem;padding:.75rem 1rem;max-width:1400px;margin:0 auto}
+h1{font-size:1.2rem;margin:0;color:var(--brand)}
+.agg{color:var(--muted);font-size:.9rem;margin-left:auto}
+.agg strong{color:var(--ink)}
+nav{display:flex;gap:.25rem;overflow-x:auto;padding:0 1rem;max-width:1400px;margin:0 auto}
+nav button{border:0;background:none;color:var(--muted);padding:.65rem .9rem;font:inherit;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
+nav button[aria-selected="true"]{color:var(--brand);border-color:var(--brand);font-weight:600}
+button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+main{max-width:1400px;margin:0 auto;padding:1rem}
+section[hidden]{display:none}
+h2{font-size:1.25rem;margin:.25rem 0 .75rem}
+h3{font-size:1rem;margin:0 0 .5rem}
+.griglia{display:grid;gap:1rem}
+.kpi5{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.due{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1rem}
+.kpi .et{color:var(--muted);font-size:.85rem;text-transform:uppercase;letter-spacing:.03em}
+.kpi .val{font-size:1.9rem;font-weight:700;line-height:1.15;margin:.2rem 0}
+.kpi .sub{color:var(--muted);font-size:.85rem;min-height:2.4em}
+.badge{display:inline-flex;align-items:center;gap:.35rem;border-radius:999px;padding:.15rem .6rem;font-size:.8rem;font-weight:600;margin-top:.4rem}
+.badge.ok{background:var(--ok-bg);color:var(--ok)} .badge.att{background:var(--att-bg);color:var(--att)}
+.badge.crit{background:var(--crit-bg);color:var(--crit)} .badge.neutro{background:var(--neutro-bg);color:var(--neutro)}
+.chart{position:relative;height:320px}
+.chart.alto{height:420px}
+.nota{color:var(--muted);font-size:.85rem}
+.avviso{border-left:4px solid var(--att);background:var(--att-bg);padding:.6rem .9rem;border-radius:6px;font-size:.9rem;margin:.75rem 0}
+.tab-wrap{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{padding:.45rem .6rem;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+thead th{position:sticky;top:0;background:var(--card);cursor:pointer;z-index:1}
+thead th[aria-sort="ascending"]::after{content:" ▲"} thead th[aria-sort="descending"]::after{content:" ▼"}
+td.desc{white-space:normal;min-width:240px;max-width:380px}
+tr:hover td{background:var(--neutro-bg)}
+.neg{color:var(--crit)} .pos{color:var(--ok)}
+.tag{display:inline-block;border-radius:4px;padding:0 .4rem;font-size:.75rem;font-weight:600;margin-right:.25rem;background:var(--neutro-bg);color:var(--neutro)}
+.tag.crit{background:var(--crit-bg);color:var(--crit)} .tag.att{background:var(--att-bg);color:var(--att)} .tag.ok{background:var(--ok-bg);color:var(--ok)}
+.filtri{display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:.75rem;align-items:end}
+.filtri label{display:flex;flex-direction:column;font-size:.8rem;color:var(--muted);gap:.15rem}
+select,input[type=search],input[type=number]{font:inherit;padding:.4rem .5rem;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);min-width:140px}
+.btn{font:inherit;padding:.45rem .9rem;border-radius:6px;border:1px solid var(--brand);background:var(--brand);color:#fff;cursor:pointer}
+.btn.sec{background:none;color:var(--brand)}
+.capi{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.capo h3{font-size:1.05rem}
+.capo dl{display:grid;grid-template-columns:1fr auto;gap:.25rem .75rem;margin:.5rem 0 0}
+.capo dt{color:var(--muted);font-size:.85rem} .capo dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+ul.liste{margin:.25rem 0 0;padding-left:1.1rem} ul.liste li{margin:.15rem 0}
+details{margin:.5rem 0} summary{cursor:pointer;font-weight:600}
+.toolbar{display:flex;gap:.5rem;flex-wrap:wrap;margin-left:auto}
+@media (max-width:640px){.kpi .val{font-size:1.5rem}.agg{margin-left:0}}
+
+/* Stampa: una pagina A4 orizzontale con il solo cruscotto */
+@media print{
+  @page{size:A4 landscape;margin:8mm}
+  body{background:#fff;color:#000;font-size:10px}
+  header nav,.toolbar,.no-print,footer{display:none!important}
+  header{position:static;border:0}
+  section{display:none!important}
+  section#p-cruscotto{display:block!important}
+  .card{break-inside:avoid;border-color:#bbb;padding:.5rem}
+  .kpi .val{font-size:1.3rem}
+  .chart{height:190px}
+  .griglia{gap:.4rem}
+  main{padding:.25rem}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1>SICIET · Andamento commesse</h1>
+    <div class="agg">Dati aggiornati al <strong id="agg"></strong></div>
+    <div class="toolbar"><button class="btn sec" id="btn-stampa" title="Stampa il cruscotto in una pagina (salva come PDF)">Stampa cruscotto (PDF)</button></div>
+  </div>
+  <nav role="tablist" aria-label="Sezioni">
+    <button role="tab" data-p="cruscotto" aria-selected="true">Cruscotto</button>
+    <button role="tab" data-p="passato" aria-selected="false">Passato</button>
+    <button role="tab" data-p="futuro" aria-selected="false">Futuro</button>
+    <button role="tab" data-p="capi" aria-selected="false">Capi commessa</button>
+    <button role="tab" data-p="dettaglio" aria-selected="false">Dettaglio commesse</button>
+    <button role="tab" data-p="qualita" aria-selected="false">Qualità dati</button>
+  </nav>
+</header>
+<main>
+<section id="p-cruscotto">
+  <h2>Come sta l'azienda</h2>
+  <div class="griglia kpi5" id="kpi"></div>
+  <div class="card" style="margin-top:1rem">
+    <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center">
+      <h3 style="margin:0">Fatturato nel tempo: passato (pieno) e residuo atteso (tratteggiato)</h3>
+      <div class="toolbar no-print"><button class="btn sec" id="g-mese">Per mese</button><button class="btn sec" id="g-anno">Per anno</button></div>
+    </div>
+    <div class="chart"><canvas id="ch-serie" role="img" aria-label="Grafico del fatturato passato e del residuo atteso"></canvas></div>
+    <p class="nota" id="nota-serie"></p>
+  </div>
+  <div class="griglia due" style="margin-top:1rem">
+    <div class="card"><h3>Da guardare subito</h3><ul class="liste" id="attenzione"></ul></div>
+    <div class="card"><h3>Come leggere questa pagina</h3>
+      <p class="nota" style="margin:0">Ogni numero ha un'etichetta con simbolo e parola (● In linea, ▲ Attenzione, ■ Critico), non solo il colore. Margine = ricavi − costi diretti. Il «residuo» è quanto resta da fatturare sugli ordini delle commesse aperte. Le soglie si cambiano in <code>config/soglie.json</code>.</p>
+    </div>
+  </div>
+</section>
+
+<section id="p-passato" hidden>
+  <h2>Passato: commesse chiuse</h2>
+  <div class="avviso" id="avv-passato"></div>
+  <div class="filtri no-print">
+    <label>Anno di chiusura <select id="f-pa-anno"></select></label>
+    <label>Capo commessa <select id="f-pa-capo"></select></label>
+  </div>
+  <div class="griglia kpi5" id="kpi-passato"></div>
+  <div class="griglia due" style="margin-top:1rem">
+    <div class="card"><h3>Distribuzione dei margini (n° commesse per fascia di MLC %)</h3><div class="chart"><canvas id="ch-distr" role="img" aria-label="Distribuzione dei margini percentuali"></canvas></div></div>
+    <div class="card"><h3>Margine per capo commessa</h3><div class="chart"><canvas id="ch-capo-m" role="img" aria-label="Margine per capo commessa"></canvas></div></div>
+    <div class="card"><h3>Margine per cliente (primi 12 per margine €)</h3><div class="chart alto"><canvas id="ch-cli-m" role="img" aria-label="Margine per cliente"></canvas></div></div>
+    <div class="card"><h3>Classifica per margine €: migliori 15</h3><div id="top-m"></div></div>
+  </div>
+  <div class="card" style="margin-top:1rem"><h3>Sotto soglia e in perdita</h3><div id="sotto"></div></div>
+</section>
+
+<section id="p-futuro" hidden>
+  <h2>Futuro: commesse aperte</h2>
+  <div class="griglia kpi5" id="kpi-futuro"></div>
+  <div class="griglia due" style="margin-top:1rem">
+    <div class="card"><h3>Residuo da fatturare per capo commessa</h3><div class="chart"><canvas id="ch-res-capo" role="img" aria-label="Residuo per capo commessa"></canvas></div></div>
+    <div class="card"><h3>Residuo da fatturare per cliente (primi 12)</h3><div class="chart alto"><canvas id="ch-res-cli" role="img" aria-label="Residuo per cliente"></canvas></div></div>
+  </div>
+  <div class="card" style="margin-top:1rem"><h3>Commesse aperte ordinate per residuo</h3><div id="t-res"></div></div>
+  <div class="griglia due" style="margin-top:1rem">
+    <div class="card"><h3>Da chiudere (ordine = fatturato)</h3><p class="nota">Probabilmente concluse ma ancora aperte a gestionale: ordine e residuo sono lasciati vuoti.</p><div id="t-chiudere"></div></div>
+    <div class="card"><h3>Senza ordini o in avvio / senza movimenti</h3><div id="t-zero"></div></div>
+  </div>
+</section>
+
+<section id="p-capi" hidden>
+  <h2>Capi commessa</h2>
+  <p class="nota">Il confronto con la media aziendale riguarda il margine percentuale (differenza in punti percentuali).</p>
+  <div class="griglia capi" id="capi"></div>
+</section>
+
+<section id="p-dettaglio" hidden>
+  <h2>Dettaglio commesse</h2>
+  <div class="filtri no-print">
+    <label>Cerca <input type="search" id="d-q" placeholder="codice, descrizione, cliente"></label>
+    <label>Capo <select id="d-capo"></select></label>
+    <label>Cliente <select id="d-cli"></select></label>
+    <label>Stato <select id="d-stato"><option value="">Tutti</option><option>Aperta</option><option>Chiusa</option><option value="dc">Da chiudere</option><option value="av">In avvio / senza movimenti</option></select></label>
+    <label>Anno apertura <select id="d-aa"></select></label>
+    <label>Anno chiusura <select id="d-ac"></select></label>
+    <button class="btn" id="d-xls">Esporta Excel</button>
+  </div>
+  <p class="nota" id="d-conta"></p>
+  <div class="tab-wrap" style="max-height:70vh"><table id="d-tab"></table></div>
+</section>
+
+<section id="p-qualita" hidden>
+  <h2>Qualità dei dati</h2>
+  <div id="qual"></div>
+</section>
+</main>
+<footer class="nota" style="max-width:1400px;margin:0 auto;padding:1rem">Fonte: esportazioni Mago4 (Prospetto Margine Economico, Elenco Commesse, Ordini da cliente). Commesse in economia (SM, SL, SF) escluse. Costi diretti dal Prospetto Margine Economico.</footer>
+
+<script>/*CHART*/</script>
+<script>/*XLSX*/</script>
+<script>
+/*DATI*/
+</script>
+<script>
+"use strict";
+const S = DATI.soglie, C = DATI.commesse;
+const nf2 = new Intl.NumberFormat("it-IT",{minimumFractionDigits:2,maximumFractionDigits:2});
+const nf0 = new Intl.NumberFormat("it-IT",{maximumFractionDigits:0});
+const eur = n => n==null ? "—" : nf2.format(n)+" €";
+const eur0 = n => n==null ? "—" : nf0.format(Math.round(n))+" €";
+const pct = n => n==null ? "—" : nf2.format(n)+" %";
+const dt = s => s ? s.slice(8,10)+"/"+s.slice(5,7)+"/"+s.slice(0,4) : "n.d.";
+const anno = s => s ? s.slice(0,4) : "";
+const $ = (s,r=document) => r.querySelector(s);
+const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const sum = (L,k) => L.reduce((a,c)=>a+(c[k]||0),0);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+const aperte = C.filter(c=>c.stato==="Aperta"), chiuse = C.filter(c=>c.stato==="Chiusa");
+const annoChiusura = c => anno(c.chiusura) || anno(c.chiusura_stimata) || "";
+const mlcPct = (L) => { const r=sum(L,"ricavi"); return r? (r-sum(L,"costi"))/r*100 : null; };
+const stMargine = p => p==null ? ["neutro","—","Nessun dato"] : p<S.margine_minimo_pct ? ["crit","■","Critico"] : p<S.margine_verde_pct ? ["att","▲","Attenzione"] : ["ok","●","In linea"];
+const badge = ([cl,ic,tx]) => `<span class="badge ${cl}">${ic} ${tx}</span>`;
+const tag = (t,cl="") => `<span class="tag ${cl}">${esc(t)}</span>`;
+
+$("#agg").textContent = DATI.aggiornato_al;
+
+/* ---------- navigazione ---------- */
+const sezioni = ["cruscotto","passato","futuro","capi","dettaglio","qualita"];
+const visti=new Set();
+function vai(p){
+  if(!sezioni.includes(p)) p="cruscotto";
+  sezioni.forEach(s=>{ $("#p-"+s).hidden = s!==p; });
+  if(p==="cruscotto"||!visti.has(p)){ visti.add(p); render[p](); }
+  document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-selected", b.dataset.p===p));
+  history.replaceState(null,"","#"+p);
+  window.scrollTo(0,0);
+}
+document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>vai(b.dataset.p)));
+$("#btn-stampa").addEventListener("click",()=>{ vai("cruscotto"); setTimeout(()=>window.print(),200); });
+
+/* ---------- grafici ---------- */
+const charts = {};
+function grafico(id, cfg){
+  if(charts[id]) charts[id].destroy();
+  Chart.defaults.color = css("--muted"); Chart.defaults.borderColor = css("--line");
+  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+  charts[id] = new Chart($("#"+id), cfg);
+}
+const asseEur = {ticks:{callback:v=>nf0.format(v/1000)+" k€"}};
+const tipEur = {callbacks:{label:c=>` ${c.dataset.label}: ${eur0(c.parsed.y ?? c.parsed.x)}`}};
+function barreOrizz(id, etichette, valori, extra){
+  const corte = etichette.map(e=>e.length>26?e.slice(0,25)+"…":e);
+  grafico(id,{type:"bar",data:{labels:corte,datasets:[{data:valori,backgroundColor:css("--serie")}]},
+    options:{indexAxis:"y",maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{title:c=>etichette[c[0].dataIndex],label:c=>" "+eur0(c.parsed.x),afterLabel:c=>extra?extra[c.dataIndex]:""}}},
+      scales:{x:{ticks:{callback:v=>nf0.format(v/1000)+" k€"}}}}});
+}
+
+/* ---------- tabelle ---------- */
+const COL = {
+  codice:["Commessa","t"], descrizione:["Descrizione","d"], capo:["Capo","t"], cliente:["Cliente","t"],
+  apertura:["Apertura","dt"], chiusura:["Chiusura","dc"], stato:["Stato","st"],
+  ricavi:["Ricavi","e"], costi:["Costi diretti","e"], mlc:["MLC","e"], mlc_pct:["MLC %","p"],
+  fatturato:["Fatturato","e"], scostamento:["Scostamento","e"], ordine:["Ordine cliente (atteso)","e"], residuo:["Residuo da fatturare","e"]
+};
+function stati(c){
+  const t=[];
+  if(c.stato==="Aperta") t.push(tag("Aperta","ok")); else t.push(tag("Chiusa"));
+  if(c.da_chiudere) t.push(tag("da chiudere","att"));
+  if(c.in_avvio) t.push(tag("in avvio / senza movimenti","att"));
+  if(c.dato_da_verificare) t.push(tag("dato da verificare","crit"));
+  if(c.anomalie.includes("in_perdita")) t.push(tag("in perdita","crit"));
+  return t.join("");
+}
+function cella(c,k,tipo){
+  const v=c[k];
+  switch(tipo){
+    case "t": return `<td>${esc(v)}</td>`;
+    case "d": return `<td class="desc">${esc(v)}</td>`;
+    case "dt": return `<td>${dt(v)}</td>`;
+    case "dc": return `<td>${c.chiusura?dt(c.chiusura):(c.stato==="Chiusa"?`n.d.${c.chiusura_stimata?` <span class="nota" title="Stima: ultima consegna/ordine">(~${dt(c.chiusura_stimata)})</span>`:""}`:"—")}</td>`;
+    case "st": return `<td>${stati(c)}</td>`;
+    case "e": return `<td class="n ${v<0&&k!=="scostamento"?"neg":""}">${eur(v)}</td>`;
+    case "p": return `<td class="n ${v!=null&&v<S.margine_minimo_pct?"neg":""}">${v==null?"—":pct(v)}</td>`;
+  }
+}
+function tabella(el, righe, cols, opz={}){
+  const ord = {k:opz.ordina||null, dir:opz.dir||-1};
+  const draw = () => {
+    let L=[...righe];
+    if(ord.k) L.sort((a,b)=>{const x=a[ord.k],y=b[ord.k]; if(x==null) return 1; if(y==null) return -1; return (typeof x==="string"?x.localeCompare(y,"it"):x-y)*ord.dir;});
+    if(opz.max) L=L.slice(0,opz.max);
+    el.innerHTML = `<table><thead><tr>${cols.map(k=>`<th scope="col" class="${["e","p"].includes(COL[k][1])?"n":""}" data-k="${k}" ${ord.k===k?`aria-sort="${ord.dir>0?"ascending":"descending"}"`:""}>${COL[k][0]}</th>`).join("")}</tr></thead>
+      <tbody>${L.map(c=>`<tr>${cols.map(k=>cella(c,k,COL[k][1])).join("")}</tr>`).join("")||`<tr><td colspan="${cols.length}">Nessuna commessa.</td></tr>`}</tbody></table>`;
+    el.querySelectorAll("th").forEach(th=>th.addEventListener("click",()=>{const k=th.dataset.k; ord.dir = ord.k===k ? -ord.dir : (typeof righe[0]?.[k]==="string"?1:-1); ord.k=k; draw();}));
+  };
+  draw();
+}
+const wrap = html => `<div class="tab-wrap">${html}</div>`;
+function tab(id, righe, cols, opz){ const el=$("#"+id); el.innerHTML=""; const d=document.createElement("div"); d.className="tab-wrap"; el.appendChild(d); tabella(d,righe,cols,opz); }
+function opzioni(sel, valori, tutti="Tutti"){ sel.innerHTML = `<option value="">${tutti}</option>`+valori.map(v=>`<option>${esc(v)}</option>`).join(""); }
+const unici = (L,f) => [...new Set(L.map(f).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"it"));
+const raggruppa = (L,f) => { const m={}; L.forEach(c=>{const k=f(c)||"(n.d.)"; (m[k]??=[]).push(c);}); return m; };
+
+/* ---------- CRUSCOTTO ---------- */
+function kpi(el, items){
+  el.innerHTML = items.map(i=>`<div class="card kpi"><div class="et">${i.et}</div><div class="val">${i.val}</div><div class="sub">${i.sub||""}</div>${badge(i.st)}</div>`).join("");
+}
+function cruscotto(){
+  const ric=sum(C,"ricavi"), mlc=ric-sum(C,"costi"), fat=sum(C,"fatturato"), res=sum(aperte,"residuo"), ord=sum(aperte,"ordine");
+  const mp = ric? mlc/ric*100:null;
+  const scost = Math.abs(ric-fat)/(ric||1)*100;
+  const dc = aperte.filter(c=>c.da_chiudere).length, nz = aperte.filter(c=>c.in_avvio).length;
+  const sen = aperte.filter(c=>c.anomalie.includes("aperta_senza_ordini")).length;
+  const quotaDc = aperte.length? dc/aperte.length*100:0;
+  const fatAp = sum(aperte,"fatturato"), ricAp=sum(aperte,"ricavi");
+  const cop = ricAp? fatAp/ricAp*100:100;
+  const rit = S.ritardo_fatturazione;
+  kpi($("#kpi"),[
+    {et:"Ricavi totali",val:eur0(ric),sub:`${eur0(sum(aperte,"ricavi"))} su commesse aperte · ${eur0(sum(chiuse,"ricavi"))} su chiuse`,
+      st: scost<1?["ok","●","Ricavi e fatturato allineati"]:["att","▲",`Scostamento ${pct(scost)}`]},
+    {et:"Margine totale",val:eur0(mlc),sub:`${pct(mp)} dei ricavi · chiuse ${pct(mlcPct(chiuse))} · aperte ${pct(mlcPct(aperte))}`,st:stMargine(mp)},
+    {et:"Fatturato",val:eur0(fat),sub:`Sulle aperte: ${pct(cop)} dei ricavi maturati`,
+      st: cop>=rit.attenzione_sotto_pct?["ok","●","In linea"]:cop>=rit.critico_sotto_pct?["att","▲","In ritardo"]:["crit","■","Molto in ritardo"]},
+    {et:"Residuo da fatturare (aperte)",val:eur0(res),sub:`Su ${eur0(ord)} di ordini attesi (${ord?nf0.format(res/ord*100):0} %)`,
+      st: sen/(aperte.length||1)>.1?["att","▲",`${sen} aperte senza ordini`]:["ok","●","Ordini presenti"]},
+    {et:"Commesse aperte",val:`${aperte.length}`,sub:`${dc} da chiudere · ${nz} in avvio / senza movimenti`,
+      st: quotaDc>25?["crit","■","Molte da chiudere"]:quotaDc>10?["att","▲","Da chiudere: "+dc]:["ok","●","In ordine"]},
+  ]);
+  /* da guardare */
+  const perd = chiuse.concat(aperte).filter(c=>c.anomalie.includes("in_perdita")).length;
+  const sotto = C.filter(c=>c.mlc_pct!=null&&c.ricavi>0&&c.mlc_pct<S.margine_minimo_pct&&c.mlc_pct>=0).length;
+  const nd = chiuse.filter(c=>!c.chiusura).length;
+  const L=[];
+  L.push(`<li>${badge(perd?["crit","■","Critico"]:["ok","●","In linea"])} ${perd} commesse in perdita (costi maggiori dei ricavi)</li>`);
+  L.push(`<li>${badge(sotto?["att","▲","Attenzione"]:["ok","●","In linea"])} ${sotto} commesse con margine sotto il ${nf0.format(S.margine_minimo_pct)} %</li>`);
+  L.push(`<li>${badge(dc?["att","▲","Attenzione"]:["ok","●","In linea"])} ${dc} commesse aperte da chiudere</li>`);
+  L.push(`<li>${badge(sen?["att","▲","Attenzione"]:["ok","●","In linea"])} ${sen} commesse aperte senza ordini</li>`);
+  L.push(`<li>${badge(["neutro","i","Dati"])} ${nd} commesse chiuse senza data di chiusura; <a href="#qualita" data-vai="qualita">vedi Qualità dati</a></li>`);
+  const dv = C.filter(c=>c.dato_da_verificare);
+  if(dv.length) L.push(`<li>${badge(["att","▲","Attenzione"])} Dato da verificare: ${dv.map(c=>esc(c.codice)).join(", ")}</li>`);
+  $("#attenzione").innerHTML = L.join("");
+  document.querySelectorAll("[data-vai]").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();vai(a.dataset.vai);}));
+  serie("mese");
+}
+function serie(modo){
+  const P=DATI.serie.passato, F=DATI.serie.futuro, mo=DATI.serie.mese_oggi;
+  let labels, pas, fut;
+  if(modo==="mese"){
+    const tutti = new Set([...Object.keys(P),...Object.keys(F)]);
+    const da = (()=>{const [y,m]=mo.split("-").map(Number); const d=new Date(y,m-1-17,1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");})();
+    labels=[...tutti].filter(m=>m>=da).sort();
+    pas=labels.map(m=>m<=mo?(P[m]||0):null); fut=labels.map(m=>m>=mo?(F[m]||0):null);
+    $("#nota-serie").textContent="Ultimi 18 mesi e mesi futuri. Passato: fatturato sugli ordini, per data di consegna. Futuro: residuo delle commesse aperte distribuito in parti uguali fino all'ultima consegna prevista (o 6 mesi): è una stima.";
+  } else {
+    const ag={p:{},f:{}}; Object.entries(P).forEach(([m,v])=>ag.p[m.slice(0,4)]=(ag.p[m.slice(0,4)]||0)+v);
+    Object.entries(F).forEach(([m,v])=>ag.f[m.slice(0,4)]=(ag.f[m.slice(0,4)]||0)+v);
+    labels=[...new Set([...Object.keys(ag.p),...Object.keys(ag.f)])].sort().filter(a=>a>="2017");
+    pas=labels.map(a=>ag.p[a]||0); fut=labels.map(a=>ag.f[a]||null);
+    $("#nota-serie").textContent="Per anno: il passato comprende l'anno in corso fino ad oggi; il residuo atteso è una stima.";
+  }
+  const col=css("--serie");
+  grafico("ch-serie",{type:"bar",data:{labels,datasets:[
+    {label:"Fatturato (passato)",data:pas,backgroundColor:col,borderColor:col,borderWidth:1},
+    {label:"Residuo atteso (futuro, stima)",data:fut,backgroundColor:"transparent",borderColor:col,borderWidth:2,borderDash:[6,4]}]},
+    options:{maintainAspectRatio:false,plugins:{tooltip:tipEur,legend:{position:"bottom"}},scales:{y:asseEur}}});
+}
+$("#g-mese").addEventListener("click",()=>serie("mese")); $("#g-anno").addEventListener("click",()=>serie("anno"));
+
+/* ---------- PASSATO ---------- */
+function passato(){
+  const aa=$("#f-pa-anno"), cc=$("#f-pa-capo");
+  if(!aa.options.length){
+    opzioni(aa, unici(chiuse,annoChiusura).reverse(), "Tutti gli anni");
+    opzioni(cc, unici(chiuse,c=>c.capo), "Tutti i capi");
+    aa.onchange=cc.onchange=passato;
+  }
+  const L = chiuse.filter(c=>(!aa.value||annoChiusura(c)===aa.value)&&(!cc.value||c.capo===cc.value));
+  const nd = L.filter(c=>!c.chiusura).length;
+  $("#avv-passato").innerHTML = `<strong>Attenzione ai tempi.</strong> Per ${nd} commesse chiuse su ${L.length} Mago4 non riporta la data di chiusura: l'anno è <em>stimato</em> dall'ultima consegna/ordine (dove disponibile), altrimenti resta «n.d.». Le commesse senza alcuna data compaiono solo con «Tutti gli anni».`;
+  const ric=sum(L,"ricavi"), mlc=ric-sum(L,"costi");
+  const sotto=L.filter(c=>c.ricavi>0&&c.mlc_pct<S.margine_minimo_pct), perd=L.filter(c=>c.mlc<0);
+  kpi($("#kpi-passato"),[
+    {et:"Commesse chiuse",val:L.length,sub:"nel periodo selezionato",st:["neutro","i","Info"]},
+    {et:"Ricavi",val:eur0(ric),sub:"",st:["neutro","i","Info"]},
+    {et:"Margine",val:eur0(mlc),sub:`${pct(ric?mlc/ric*100:null)} dei ricavi`,st:stMargine(ric?mlc/ric*100:null)},
+    {et:`Sotto il ${nf0.format(S.margine_minimo_pct)} %`,val:sotto.length,sub:"commesse sotto soglia (comprese quelle in perdita)",st:sotto.length/(L.length||1)>.25?["crit","■","Molte"]:sotto.length?["att","▲","Da guardare"]:["ok","●","Nessuna"]},
+    {et:"In perdita",val:perd.length,sub:`Perdita complessiva ${eur0(sum(perd,"mlc"))}`,st:perd.length?["crit","■","Critico"]:["ok","●","Nessuna"]},
+  ]);
+  /* distribuzione */
+  const fasce=[["< 0 % (perdita)",-1e9,0],["0–5 %",0,5],["5–10 %",5,10],["10–15 %",10,15],["15–25 %",15,25],["25–40 %",25,40],["≥ 40 %",40,1e9]];
+  const con=L.filter(c=>c.ricavi>0);
+  const cnt=fasce.map(([,a,b])=>con.filter(c=>c.mlc_pct>=a&&c.mlc_pct<b).length);
+  const colf=fasce.map(([,a])=>a<0?css("--crit"):a<S.margine_minimo_pct?css("--att"):css("--serie"));
+  grafico("ch-distr",{type:"bar",data:{labels:fasce.map(f=>f[0]),datasets:[{data:cnt,backgroundColor:colf}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.parsed.y} commesse`}}},scales:{y:{ticks:{precision:0}}}}});
+  /* per capo */
+  const gc=raggruppa(L,c=>c.capo); const capi=Object.keys(gc).sort((a,b)=>sum(gc[b],"mlc")-sum(gc[a],"mlc"));
+  barreOrizz("ch-capo-m",capi,capi.map(k=>Math.round(sum(gc[k],"mlc"))),capi.map(k=>"MLC % "+pct(mlcPct(gc[k]))));
+  /* per cliente */
+  const gl=raggruppa(L,c=>c.cliente); const cl=Object.keys(gl).sort((a,b)=>sum(gl[b],"mlc")-sum(gl[a],"mlc")).slice(0,12);
+  barreOrizz("ch-cli-m",cl,cl.map(k=>Math.round(sum(gl[k],"mlc"))),cl.map(k=>"MLC % "+pct(mlcPct(gl[k]))));
+  tab("top-m",[...L].sort((a,b)=>b.mlc-a.mlc).slice(0,15),["codice","descrizione","cliente","ricavi","mlc","mlc_pct"],{});
+  const bad=L.filter(c=>c.mlc<0||(c.ricavi>0&&c.mlc_pct<S.margine_minimo_pct)).sort((a,b)=>a.mlc_pct-b.mlc_pct);
+  tab("sotto",bad,["codice","descrizione","cliente","capo","ricavi","costi","mlc","mlc_pct","stato"],{ordina:"mlc_pct",dir:1});
+}
+
+/* ---------- FUTURO ---------- */
+function futuro(){
+  const res=sum(aperte,"residuo"), ord=sum(aperte,"ordine");
+  const dc=aperte.filter(c=>c.da_chiudere), zero=aperte.filter(c=>c.in_avvio||c.anomalie.includes("aperta_senza_ordini"));
+  const conRes=aperte.filter(c=>c.residuo>0);
+  kpi($("#kpi-futuro"),[
+    {et:"Residuo da fatturare",val:eur0(res),sub:`${conRes.length} commesse con residuo`,st:["neutro","i","Info"]},
+    {et:"Ordini attesi",val:eur0(ord),sub:"Totale ordini delle commesse aperte (escluse da chiudere)",st:["neutro","i","Info"]},
+    {et:"Da chiudere",val:dc.length,sub:"ordine = fatturato (residuo entro "+nf0.format(S.soglia_da_chiudere_euro)+" €)",st:dc.length?["att","▲","Da sistemare"]:["ok","●","Nessuna"]},
+    {et:"Senza ordini",val:aperte.filter(c=>c.anomalie.includes("aperta_senza_ordini")).length,sub:"aperte senza alcun ordine cliente",st:["att","▲","Da controllare"]},
+    {et:"In avvio / senza movimenti",val:aperte.filter(c=>c.in_avvio).length,sub:"importi a zero (ricavi, costi, fatturato)",st:["neutro","i","Info"]},
+  ]);
+  const gc=raggruppa(conRes,c=>c.capo); const capi=Object.keys(gc).sort((a,b)=>sum(gc[b],"residuo")-sum(gc[a],"residuo"));
+  barreOrizz("ch-res-capo",capi,capi.map(k=>Math.round(sum(gc[k],"residuo"))));
+  const gl=raggruppa(conRes,c=>c.cliente); const cl=Object.keys(gl).sort((a,b)=>sum(gl[b],"residuo")-sum(gl[a],"residuo")).slice(0,12);
+  barreOrizz("ch-res-cli",cl,cl.map(k=>Math.round(sum(gl[k],"residuo"))));
+  tab("t-res",[...aperte].filter(c=>c.residuo!=null),["codice","descrizione","cliente","capo","apertura","ordine","fatturato","residuo","stato"],{ordina:"residuo",dir:-1});
+  tab("t-chiudere",dc,["codice","descrizione","cliente","capo","ricavi","fatturato"],{ordina:"ricavi"});
+  tab("t-zero",zero,["codice","descrizione","cliente","capo","apertura","ordine","stato"],{ordina:"apertura"});
+}
+
+/* ---------- CAPI ---------- */
+function capi(){
+  const g=raggruppa(C,c=>c.capo); const media=mlcPct(C);
+  const nomi=Object.keys(g).sort((a,b)=>sum(g[b],"ricavi")-sum(g[a],"ricavi"));
+  $("#capi").innerHTML = nomi.map(k=>{
+    const L=g[k], ap=L.filter(c=>c.stato==="Aperta"), ch=L.filter(c=>c.stato==="Chiusa");
+    const mp=mlcPct(L), d=mp==null||media==null?null:mp-media;
+    const conf = d==null?badge(["neutro","i","n.d."]):d>=0?badge(["ok","▲",`+${nf2.format(d)} pp sopra la media`]):badge(["att","▼",`${nf2.format(d)} pp sotto la media`]);
+    return `<div class="card capo"><h3>${esc(k)}</h3>${conf}
+      <dl><dt>Commesse aperte</dt><dd>${ap.length}</dd><dt>Commesse chiuse</dt><dd>${ch.length}</dd>
+      <dt>Ricavi</dt><dd>${eur0(sum(L,"ricavi"))}</dd><dt>Margine</dt><dd>${eur0(sum(L,"mlc"))}</dd>
+      <dt>Margine medio</dt><dd>${pct(mp)} (azienda ${pct(media)})</dd>
+      <dt>Fatturato</dt><dd>${eur0(sum(L,"fatturato"))}</dd><dt>Residuo da fatturare</dt><dd>${eur0(sum(ap,"residuo"))}</dd>
+      <dt>Da chiudere</dt><dd>${ap.filter(c=>c.da_chiudere).length}</dd><dt>In perdita</dt><dd>${L.filter(c=>c.anomalie.includes("in_perdita")).length}</dd></dl></div>`;
+  }).join("");
+}
+
+/* ---------- DETTAGLIO ---------- */
+let dettaglioInit=false;
+function dettaglio(){
+  if(!dettaglioInit){
+    opzioni($("#d-capo"),unici(C,c=>c.capo),"Tutti"); opzioni($("#d-cli"),unici(C,c=>c.cliente),"Tutti");
+    opzioni($("#d-aa"),unici(C,c=>anno(c.apertura)).reverse(),"Tutti"); opzioni($("#d-ac"),unici(C,annoChiusura).reverse(),"Tutti");
+    ["#d-q","#d-capo","#d-cli","#d-stato","#d-aa","#d-ac"].forEach(s=>$(s).addEventListener("input",dettaglio));
+    $("#d-xls").addEventListener("click",esporta);
+    dettaglioInit=true;
+  }
+  const q=$("#d-q").value.toLowerCase().trim(), capo=$("#d-capo").value, cli=$("#d-cli").value, st=$("#d-stato").value, aa=$("#d-aa").value, ac=$("#d-ac").value;
+  dettaglio.L = C.filter(c=>(!q||(c.codice+" "+c.descrizione+" "+c.cliente).toLowerCase().includes(q))&&(!capo||c.capo===capo)&&(!cli||c.cliente===cli)
+    &&(!st||(st==="dc"?c.da_chiudere:st==="av"?c.in_avvio:c.stato===st))&&(!aa||anno(c.apertura)===aa)&&(!ac||annoChiusura(c)===ac));
+  $("#d-conta").textContent=`${dettaglio.L.length} commesse su ${C.length}. Clic sull'intestazione per ordinare.`;
+  const el=$("#d-tab").parentElement; const t=document.createElement("div"); el.innerHTML=""; el.appendChild(t);
+  tabella(t,dettaglio.L,["codice","descrizione","capo","cliente","apertura","chiusura","stato","ricavi","costi","mlc","mlc_pct","fatturato","scostamento","ordine","residuo"],{ordina:"ricavi",dir:-1});
+  t.querySelector("table").id="d-tab";
+}
+function esporta(){
+  const righe=dettaglio.L.map(c=>({"Commessa":c.codice,"Descrizione":c.descrizione,"Capo commessa":c.capo,"Cliente":c.cliente,
+    "Data apertura":dt(c.apertura),"Data chiusura":c.chiusura?dt(c.chiusura):"n.d.","Chiusura stimata (ultima attività)":c.chiusura?"":dt(c.chiusura_stimata),"Stato":c.stato,
+    "Ricavi":c.ricavi,"Costi diretti":c.costi,"MLC":c.mlc,"MLC %":c.mlc_pct,"Fatturato":c.fatturato,"Scostamento (Ricavi−Fatturato)":c.scostamento,
+    "Ordine cliente (atteso)":c.ordine,"Residuo da fatturare":c.residuo,"Da chiudere":c.da_chiudere?"sì":"","In avvio / senza movimenti":c.in_avvio?"sì":"",
+    "Dato da verificare":c.dato_da_verificare?"sì":"","Note":c.note,"Anomalie":c.anomalie.join(", ")}));
+  const ws=XLSX.utils.json_to_sheet(righe), wb=XLSX.utils.book_new();
+  ws["!cols"]=[{wch:10},{wch:50},{wch:22},{wch:30}].concat(Array(17).fill({wch:16}));
+  XLSX.utils.book_append_sheet(wb,ws,"Commesse");
+  XLSX.writeFile(wb,`SICIET_commesse_${DATI.oggi}.xlsx`);
+}
+
+/* ---------- QUALITA' ---------- */
+const ANOM = {
+  chiusa_senza_data:["Chiuse senza data di chiusura","Mago4 non riporta la data: non sono escluse, compaiono come «n.d.» (con una stima dall'ultima attività, se esiste)."],
+  in_perdita:["In perdita","Costi diretti maggiori dei ricavi."],
+  aperta_senza_ordini:["Aperte senza ordini cliente","Nessun ordine nel file «Ordini da cliente»: residuo non calcolabile."],
+  fatturato_oltre_ordini:["Fatturato oltre gli ordini","Fatturato registrato sugli ordini maggiore del totale ordinato (oltre la soglia): può essere legittimo se ci sono fatture non coperte da ordine."],
+  dato_da_verificare:["Dato da verificare","Segnalato a mano in config/override.json."],
+};
+function qualita(){
+  const r=DATI.riconciliazione; const out=[];
+  out.push(`<div class="card"><h3>Riconciliazione dei totali</h3><ul class="liste">
+    <li>${r.prospetti_diff.length?badge(["crit","■","Differenze"]):badge(["ok","●","Quadra"])} Prospetti: ${r.prospetti_ok}/${r.prospetti_tot} controlli (ricavi, costi, fatturato per capo commessa) coincidono con le intestazioni dei prospetti.</li>
+    <li>${r.ordini_diff.length?badge(["crit","■","Differenze"]):badge(["ok","●","Quadra"])} Ordini: ${r.ordini_totali} righe «Totale Commessa» controllate contro la somma delle righe d'ordine${r.ordini_diff.length?`: ${r.ordini_diff.length} differenze (${r.ordini_diff.map(d=>esc(d.codice)).join(", ")})`:""}. ${r.ordini_senza_importi} totali sono stampati senza importi e valgono zero.</li>
+    <li>${r.v6.stato==="presente"?badge(["att","▲","Da completare"]):badge(["att","▲","Non disponibile"])} Confronto con l'Excel v6: ${esc(r.v6.nota)}</li></ul></div>`);
+  Object.entries(ANOM).forEach(([k,[tit,desc]])=>{
+    const L=C.filter(c=>c.anomalie.includes(k)); if(!L.length) return;
+    out.push(`<details class="card" ${k==="dato_da_verificare"||L.length<15?"open":""}><summary>${tit} (${L.length})</summary><p class="nota">${desc}</p><div id="q-${k}"></div></details>`);
+  });
+  const dv=C.filter(c=>c.dato_da_verificare||c.note);
+  out.push(`<div class="card"><h3>Note sui dati</h3><ul class="liste">
+    <li><strong>Costi:</strong> derivano sempre dal Prospetto Margine Economico, non dalla Cronostoria.</li>
+    ${dv.map(c=>`<li><strong>${esc(c.codice)}</strong> (${esc(c.cliente)}): ${esc(c.note)}</li>`).join("")}
+    <li><strong>Fatture fuori ordine:</strong> lo scostamento tra ricavi e ordini può essere legittimo.</li>
+    <li><strong>Escluse dalla dashboard:</strong> ${DATI.escluse.interne||0} commesse interne e ${DATI.escluse.sospese||0} sospese senza movimenti; commesse in economia (SM, SL, SF) sempre escluse.</li></ul></div>`);
+  $("#qual").innerHTML=out.join("");
+  Object.keys(ANOM).forEach(k=>{ const L=C.filter(c=>c.anomalie.includes(k)); if(L.length) tab("q-"+k,L,["codice","descrizione","cliente","capo","stato","ricavi","costi","mlc_pct","ordine","residuo"],{ordina:"ricavi"}); });
+}
+
+/* ---------- avvio ---------- */
+const render={cruscotto,passato,futuro,capi,dettaglio,qualita};
+vai((location.hash||"#cruscotto").slice(1));
+</script>
+</body>
+</html>
