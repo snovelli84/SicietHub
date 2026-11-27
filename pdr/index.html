@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SICIET PDR 125</title>
+<meta name="theme-color" content="#005baa">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="icons/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root{
+  --brand:#005baa;--bg:#f4f6f9;--card:#fff;--text:#1d2430;--muted:#5d6878;--border:#e3e7ee;
+  --chip:#e8eef6;--warn:#7a5600;--warn-bg:#fff4d6;--err:#b3261e;--err-bg:#fbe4e2;--ok:#1e7d3c;--ok-bg:#e0f3e6;
+  --shadow:0 2px 10px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#11161d;--card:#1a212b;--text:#e8edf3;--muted:#9aa6b5;--border:#2a3340;--chip:#232c38;
+  --warn:#f1d38a;--warn-bg:#3a3018;--err:#f2b8b5;--err-bg:#3a1d1b;--ok:#7fd59a;--ok-bg:#16301f;--shadow:0 2px 10px rgba(0,0,0,.4)}
+}
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.4}
+header{background:var(--brand);color:#fff;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.logo{display:inline-flex;background:#fff;border-radius:10px;padding:4px 8px;line-height:0}
+.logo img{height:40px;width:auto;display:block}
+header h1{font-size:1.1rem;flex:1;min-width:180px}
+header h1 small{display:block;font-weight:400;opacity:.85;font-size:.76rem}
+.btn{border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:8px;padding:7px 12px;font-size:.85rem;cursor:pointer}
+header .btn{background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.35)}
+.btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+.btn.danger{color:var(--err)}
+nav{display:flex;gap:6px;overflow-x:auto;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5}
+nav button{border:0;background:var(--chip);color:var(--text);padding:8px 14px;border-radius:999px;font-size:.88rem;white-space:nowrap;cursor:pointer}
+nav button.on{background:var(--brand);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:16px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;box-shadow:var(--shadow);min-width:0}
+.card h2{font-size:.95rem;margin-bottom:8px}
+.alert{border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:.9rem}
+.alert.warn{background:var(--warn-bg);color:var(--warn)}
+.alert.err{background:var(--err-bg);color:var(--err)}
+.sec{margin:18px 0 8px;font-size:1rem}
+.muted{color:var(--muted)}.small{font-size:.8rem}
+.big{font-size:2rem;font-weight:700}
+.bar{height:10px;border-radius:6px;background:var(--chip);overflow:hidden;margin:6px 0}
+.bar i{display:block;height:100%;background:var(--brand)}
+.bar.ok i{background:var(--ok)}
+.pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:.75rem;font-weight:600;background:var(--chip);white-space:nowrap}
+.pill.si{background:var(--ok-bg);color:var(--ok)}.pill.no{background:var(--err-bg);color:var(--err)}
+.pill.na{background:var(--chip);color:var(--muted)}.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.filtri{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.filtri button,.filtri select{border:1px solid var(--border);background:var(--card);color:var(--text);padding:6px 11px;border-radius:999px;font-size:.82rem;cursor:pointer}
+.filtri button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.ind{background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;box-shadow:var(--shadow)}
+.ind>summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;gap:10px;align-items:flex-start}
+.ind>summary::-webkit-details-marker{display:none}
+.ind .num{flex:none;min-width:2.3rem;font-weight:700;color:var(--brand)}
+.ind .tt{flex:1;font-size:.9rem}
+.ind .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.ind .corpo{padding:0 14px 14px;border-top:1px solid var(--border)}
+.ind .corpo>*{margin-top:12px}
+label{display:block;font-size:.78rem;color:var(--muted);font-weight:600;margin-bottom:3px}
+input,textarea,select{width:100%;font:inherit;font-size:.9rem;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text)}
+textarea{min-height:110px;resize:vertical}
+.row{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.stati{display:flex;gap:6px}
+.stati label{flex:1;margin:0;text-align:center;border:1px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;color:var(--text);font-size:.85rem}
+.stati input{display:none}
+.stati input:checked+span{font-weight:700}
+.stati label:has(input:checked){background:var(--brand);color:#fff;border-color:var(--brand)}
+.riga{display:grid;gap:6px;grid-template-columns:1fr 1.6fr auto;margin-bottom:6px}
+.riga.r3{grid-template-columns:1fr 1fr 1.4fr auto}
+@media(max-width:560px){.riga,.riga.r3{grid-template-columns:1fr 1fr}}
+.faq{background:var(--chip);border-radius:8px;padding:8px 12px;font-size:.8rem}
+.faq p{margin-top:5px}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th,td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600}
+#login{max-width:380px;margin:40px auto}
+#login input{margin-bottom:10px}
+footer{max-width:1100px;margin:0 auto;padding:10px 16px 30px;font-size:.75rem;color:var(--muted)}
+.print-only{display:none}
+.scheda .ar{margin-top:18px}
+.scheda .ar h2{font-size:1rem;border-bottom:2px solid var(--brand);padding-bottom:4px;margin-bottom:8px}
+.scheda .it{border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;break-inside:avoid}
+@media print{
+  header,nav,footer,.noprint,#stato{display:none!important}
+  body{background:#fff;color:#000;font-size:11px}
+  .print-only{display:block}
+  .card,.scheda .it{box-shadow:none}
+  main{padding:0}
+}
+</style>
+</head>
+<body>
+<header>
+  <span class="logo"><img src="icons/logo.png" alt="SICIET"></span>
+  <h1>PDR 125 – Parità di genere<small>Indicatori e evidenze per l'audit UNI/PdR 125:2022 · <span id="stato"></span></small></h1>
+  <button class="btn" id="btnForget" hidden>Esci</button>
+</header>
+
+<section id="login" hidden>
+  <div class="card">
+    <h2>Accesso</h2>
+    <div class="alert err" id="loginErr" hidden></div>
+    <label for="nome">Il tuo nome</label>
+    <input id="nome" autocomplete="name" placeholder="Nome e cognome">
+    <label for="pwd">Password</label>
+    <input id="pwd" type="password" autocomplete="current-password">
+    <button class="btn primary" id="btnLogin">Entra</button>
+    <p class="muted small" style="margin-top:10px">Il nome resta registrato accanto a ogni modifica.</p>
+  </div>
+</section>
+
+<div id="app" hidden>
+  <nav id="tabs"></nav>
+  <main id="main"></main>
+</div>
+<footer id="ver"></footer>
+
+<script src="indicatori.js"></script>
+<script>
+"use strict";
+/* ---------- configurazione ---------- */
+var PDR_CONFIG={
+  // Indirizzo del servizio (Cloudflare Worker, vedi api/worker.js), es.
+  // "https://siciet-pdr.<nome-account>.workers.dev/api".
+  // Finché è vuoto la pagina funziona IN LOCALE: i dati restano solo sul dispositivo.
+  api:"",
+  secondi:30,
+  // Punteggio minimo complessivo per la certificazione (UNI/PdR 125:2022): verificare con l'ente.
+  soglia:60
+};
+const CFG=PDR_CONFIG;
+// Versione della pagina: va aumentata a ogni modifica.
+const VERSIONE="1.0",DATA_VERSIONE="27/11/2026";
+const KEY="siciet_pdr_data_v1",KP="siciet_pdr_pwd",KN="siciet_pdr_nome",KQ="siciet_pdr_coda";
+const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const urlOk=u=>/^https?:\/\//i.test(String(u||"").trim());
+const oggi=()=>new Date().toISOString().slice(0,10);
+const fmtData=d=>d?d.split("-").reverse().join("/"):"";
+
+/* ---------- dati ---------- */
+const TUTTI=[];PDR_AREE.forEach(a=>a.ind.forEach(i=>{i.area=a.id;TUTTI.push(i)}));
+const FASCE={1:"Fascia 1 – micro (fino a 9 persone)",2:"Fascia 2 – piccola (10–49)",3:"Fascia 3 – media (50–249)",4:"Fascia 4 – grande (250 e oltre)"};
+// periodo di riferimento ricavato dal testo dell'indicatore (giorni oltre i quali l'evidenza è da rinnovare)
+function finestra(i){
+  const t=(i.testo+" "+(i.misura||"")).toLowerCase();
+  if(/ultimo biennio/.test(t))return{giorni:730,nome:"ultimo biennio"};
+  if(/ultimo anno|su base annua|anno su anno/.test(t))return{giorni:365,nome:"ultimo anno"};
+  return null;
+}
+let D={ind:{},imp:{}},tab="quadro",areaSel="tutte",statoSel="tutti",aperti=new Set(),ultimo=0,timer=null,coda=[],stato="";
+try{coda=JSON.parse(ls.get(KQ)||"[]")}catch(e){}
+const operatore=()=>ls.get(KN)||"";
+const rec=id=>D.ind[id]||{};
+const fascia=()=>Number(D.imp.fascia)||0;
+const applicabile=i=>(!fascia()||i.fasce.includes(fascia()))&&rec(i.id).stato!=="na";
+const fuoriFascia=i=>fascia()&&!i.fasce.includes(fascia());
+
+function applyVoce(v){
+  const m=v.tipo==="ind"?D.ind:v.tipo==="imp"?null:undefined;
+  if(m===undefined)return false;
+  if(v.tipo==="imp"){const a=JSON.stringify(D.imp);D.imp=v.dati||{};return a!==JSON.stringify(D.imp)}
+  const a=JSON.stringify(m[v.chiave]);
+  if(v.dati===null)delete m[v.chiave];else m[v.chiave]=v.dati;
+  return a!==JSON.stringify(m[v.chiave]);
+}
+
+/* ---------- archivio e sincronizzazione ---------- */
+async function api(path,method,body){
+  const h={"X-Password":ls.get(KP)||""};if(body!==undefined)h["Content-Type"]="application/json";
+  let res;try{res=await fetch(CFG.api+path,{method,headers:h,body:body===undefined?undefined:JSON.stringify(body)})}
+  catch(e){const er=new Error("Nessuna connessione al servizio.");er.rete=true;throw er}
+  let j={};try{j=await res.json()}catch(e){}
+  if(res.status===401){ls.del(KP);const er=new Error(j.error||"Password non corretta.");er.auth=true;throw er}
+  if(!res.ok)throw new Error(j.error||"Errore del servizio ("+res.status+").");
+  return j;
+}
+function piede(){$("ver").textContent="SICIET PDR 125 · versione "+VERSIONE+" ("+DATA_VERSIONE+") · archivio: "+(CFG.api?"servizio condiviso":"solo questo dispositivo")}
+function mostraStato(){
+  piede();
+  $("stato").textContent=!CFG.api?"modalità locale: dati solo su questo dispositivo":coda.length?"⏳ "+coda.length+" modifiche da inviare":stato||"✓ sincronizzato";
+}
+async function svuotaCoda(){
+  while(coda.length){
+    const parte=coda.slice(0,300);
+    await api("/dati","POST",{voci:parte,operatore:operatore()});
+    coda=coda.slice(parte.length);ls.set(KQ,JSON.stringify(coda));
+  }
+}
+function salvaLocale(){if(!ls.set(KEY,JSON.stringify(D)))alert("Non c'è spazio per salvare i dati su questo dispositivo: scarica una copia con «Esporta».")}
+function saveVoci(list){
+  list.forEach(applyVoce);
+  if(CFG.api){
+    const k=v=>v.tipo+"|"+v.chiave,nuove=new Set(list.map(k));
+    coda=coda.filter(v=>!nuove.has(k(v))).concat(list);ls.set(KQ,JSON.stringify(coda));
+    mostraStato();
+    svuotaCoda().then(mostraStato).catch(e=>{stato=e.auth?"":"⚠ "+e.message;mostraStato();if(e.auth)avvia()});
+  }else salvaLocale();
+}
+async function sincronizza(){
+  if(!CFG.api)return;
+  try{
+    await svuotaCoda();
+    const j=await api("/dati?da="+ultimo,"GET");
+    let c=false;j.voci.forEach(v=>{if(applyVoce(v))c=true});
+    ultimo=Math.max(0,j.ora-5000);stato="";mostraStato();
+    // non ridisegnare mentre qualcuno sta scrivendo in una scheda
+    if(c&&!document.activeElement.closest("details.ind"))render();
+  }catch(e){
+    if(e.auth){clearInterval(timer);avvia()}else{stato="⚠ "+e.message;mostraStato()}
+  }
+}
+function schermata(x){
+  $("login").hidden=x!=="login";$("app").hidden=x!=="app";$("btnForget").hidden=x!=="app"||!CFG.api;
+}
+async function avvia(){
+  clearInterval(timer);
+  if(!CFG.api){
+    try{const s=ls.get(KEY);if(s){const o=JSON.parse(s);D={ind:o.ind||{},imp:o.imp||{}}}}catch(e){}
+    mostra();return;
+  }
+  if(!ls.get(KP)||!operatore()){mostraAccesso();return}
+  try{
+    const j=await api("/dati?da=0","GET");
+    D={ind:{},imp:{}};j.voci.forEach(applyVoce);ultimo=Math.max(0,j.ora-5000);
+    coda.forEach(applyVoce);
+    mostra();
+    timer=setInterval(sincronizza,Math.max(10,CFG.secondi||30)*1000);
+  }catch(e){
+    mostraAccesso(e.auth?e.message:"");
+    if(!e.auth){$("loginErr").hidden=false;$("loginErr").textContent=e.message}
+  }
+}
+function mostraAccesso(msg){
+  piede();schermata("login");
+  $("nome").value=operatore();
+  $("loginErr").hidden=!msg;$("loginErr").textContent=msg||"";
+}
+$("btnLogin").onclick=()=>{
+  const n=$("nome").value.trim(),p=$("pwd").value;
+  if(!n||!p){$("loginErr").hidden=false;$("loginErr").textContent="Inserisci nome e password.";return}
+  ls.set(KN,n);ls.set(KP,p);$("pwd").value="";avvia();
+};
+$("pwd").addEventListener("keydown",e=>{if(e.key==="Enter")$("btnLogin").click()});
+$("btnForget").onclick=()=>{ls.del(KP);ls.del(KN);clearInterval(timer);D={ind:{},imp:{}};avvia()};
+
+/* ---------- calcoli ---------- */
+function punteggi(){
+  let tot=0,pesoTot=0;
+  const aree=PDR_AREE.map(a=>{
+    const app=a.ind.filter(applicabile);
+    const disp=app.reduce((s,i)=>s+i.punti,0);
+    const ott=app.filter(i=>rec(i.id).stato==="si").reduce((s,i)=>s+i.punti,0);
+    const pct=disp?ott/disp:null;
+    if(pct!==null){tot+=a.peso*pct;pesoTot+=a.peso}
+    const daFare=app.filter(i=>!rec(i.id).stato).length;
+    return{a,disp,ott,pct,daFare,nApp:app.length};
+  });
+  // il totale è sul peso delle sole aree con indicatori applicabili, riportato su 100
+  return{aree,totale:pesoTot?tot*100/pesoTot:null,pesoTot};
+}
+function scaduta(i){
+  const r=rec(i.id),f=finestra(i);
+  if(!f||r.stato!=="si")return null;
+  if(!r.dataEvidenza)return"senza data";
+  const g=(Date.now()-new Date(r.dataEvidenza).getTime())/864e5;
+  return g>f.giorni?"oltre "+f.nome:null;
+}
+function revisioneScaduta(i){const r=rec(i.id);return r.revisione&&r.revisione<oggi()}
+function problemi(i){
+  const p=[],r=rec(i.id);
+  if(fuoriFascia(i))return p;
+  if(r.stato==="na")return p;
+  if(!r.stato)p.push("da valutare");
+  if(r.stato==="si"&&!(r.evidenze||"").trim()&&!(r.documenti||[]).length)p.push("manca l'evidenza");
+  const s=scaduta(i);if(s)p.push(s==="senza data"?"data dell'evidenza mancante":"evidenza "+s);
+  if(revisioneScaduta(i))p.push("revisione scaduta il "+fmtData(r.revisione));
+  return p;
+}
+const pillStato=s=>s==="si"?'<span class="pill si">Soddisfatto</span>':s==="no"?'<span class="pill no">Non soddisfatto</span>':s==="na"?'<span class="pill na">N/A</span>':'<span class="pill warn">Da valutare</span>';
+
+/* ---------- viste ---------- */
+const TABS=[["quadro","Quadro"],["ind","Indicatori"],["scheda","Scheda per l'audit"],["dati","Azienda e dati"]];
+function buildTabs(){
+  $("tabs").innerHTML=TABS.map(([k,n])=>`<button data-t="${k}" class="${k===tab?"on":""}">${n}</button>`).join("");
+  $("tabs").querySelectorAll("button").forEach(b=>b.onclick=()=>{tab=b.dataset.t;buildTabs();render();window.scrollTo(0,0)});
+}
+function render(){
+  piede();
+  const f={quadro:vQuadro,ind:vInd,scheda:vScheda,dati:vDati}[tab];
+  $("main").innerHTML=f();
+  if(tab==="ind")bindInd();
+  if(tab==="dati")bindDati();
+  if(tab==="quadro")$("main").querySelectorAll("[data-vai]").forEach(b=>b.onclick=()=>{areaSel=b.dataset.vai;statoSel=b.dataset.st||"tutti";tab="ind";buildTabs();render();window.scrollTo(0,0)});
+  const ld=$("main").querySelector("[data-dati]");if(ld)ld.onclick=e=>{e.preventDefault();tab="dati";buildTabs();render()};
+  if(tab==="scheda")$("btnStampa").onclick=()=>window.print();
+}
+function mostra(){
+  piede();schermata("app");mostraStato();buildTabs();render();
+}
+
+function vQuadro(){
+  const p=punteggi(),avvisi=[];
+  if(!fascia())avvisi.push('<div class="alert warn">Non è ancora stata indicata la <b>fascia dimensionale</b> dell\'azienda: i punteggi considerano tutti gli indicatori. Si imposta in <a href="#" data-dati>Azienda e dati</a>.</div>');
+  const prob=TUTTI.filter(i=>!fuoriFascia(i)).map(i=>({i,p:problemi(i)})).filter(x=>x.p.length);
+  const ok=p.totale!==null&&p.totale>=CFG.soglia;
+  let h=avvisi.join("");
+  h+=`<div class="grid"><div class="card"><h2>Punteggio complessivo (stima)</h2>
+    <div class="big">${p.totale===null?"–":p.totale.toFixed(0)+" / 100"}</div>
+    <div class="bar ${ok?"ok":""}"><i style="width:${p.totale||0}%"></i></div>
+    <p class="small muted">${p.totale===null?"Nessun indicatore valutato.":ok?"Sopra la soglia di "+CFG.soglia+"%.":"Sotto la soglia di "+CFG.soglia+"% richiesta per la certificazione."} Conta solo ciò che è segnato «Soddisfatto»; i N/A sono esclusi. È una stima per prepararsi: il giudizio è dell'ente di certificazione.</p></div>
+    <div class="card"><h2>Stato degli indicatori${fascia()?" – "+FASCE[fascia()].split(" – ")[0]:""}</h2>${(()=>{
+      const l=TUTTI.filter(i=>!fuoriFascia(i)),c=s=>l.filter(i=>(rec(i.id).stato||"")===s).length;
+      return `<table><tr><td>Soddisfatti</td><td><b>${c("si")}</b></td></tr><tr><td>Non soddisfatti</td><td><b>${c("no")}</b></td></tr><tr><td>Non applicabili</td><td><b>${c("na")}</b></td></tr><tr><td>Da valutare</td><td><b>${c("")}</b></td></tr></table>
+      <p class="small muted" style="margin-top:6px">Su ${l.length} indicatori${fascia()?" applicabili alla fascia":""}.</p>`})()}</div>
+    <div class="card"><h2>Da sistemare</h2><div style="font-size:2rem;font-weight:700">${prob.length}</div><p class="small muted">indicatori con evidenze mancanti, scadute o da valutare.</p></div></div>`;
+  h+=`<h2 class="sec">Aree</h2><div class="grid">`+p.aree.map(x=>`<div class="card"><h2>${esc(x.a.nome)}</h2>
+    <p class="small muted">Peso ${x.a.peso}% · ${x.nApp} indicatori applicabili</p>
+    <div class="big" style="font-size:1.5rem">${x.pct===null?"–":Math.round(x.pct*100)+"%"}</div>
+    <div class="bar"><i style="width:${(x.pct||0)*100}%"></i></div>
+    <p class="small">${x.ott} / ${x.disp} punti${x.daFare?` · <b>${x.daFare}</b> da valutare`:""}</p>
+    <button class="btn" style="margin-top:8px" data-vai="${x.a.id}">Apri indicatori</button></div>`).join("")+`</div>`;
+  if(prob.length){
+    h+=`<h2 class="sec">Cosa aggiornare prima dell'audit</h2><div class="card"><table>`+prob.map(({i,p})=>`<tr><td style="width:3.2rem"><b>${esc(i.id.replace(/^[a-z]+\./,""))}</b></td><td>${esc(PDR_AREE.find(a=>a.id===i.area).nome)}</td><td>${esc(i.testo.length>90?i.testo.slice(0,90)+"…":i.testo)}</td><td>${p.map(x=>`<span class="pill warn">${esc(x)}</span>`).join(" ")}</td></tr>`).join("")+`</table></div>`;
+  }
+  return h;
+}
+
+function formInd(i){
+  const r=rec(i.id),f=finestra(i),docs=r.documenti||[],ril=r.rilevazioni||[];
+  const quant=i.tipo==="Quantitativo";
+  return `<div class="corpo" data-id="${esc(i.id)}">
+    ${i.nota?`<div class="faq">${esc(i.nota)}</div>`:""}
+    ${i.misura?`<div class="faq"><b>Come si misura:</b> ${esc(i.misura)}<br><b>Fonte:</b> ${esc(i.fonte)}</div>`:""}
+    ${(i.faq||[]).length?`<details class="faq"><summary><b>FAQ Accredia/UNI (gennaio 2026)</b></summary>${i.faq.map(x=>`<p>${esc(x)}</p>`).join("")}</details>`:""}
+    <div><label>Indicatore soddisfatto</label><div class="stati">
+      ${[["si","Sì"],["no","No"],["na","N/A"],["","Da valutare"]].map(([v,n])=>`<label><input type="radio" name="st-${esc(i.id)}" value="${v}" ${(r.stato||"")===v?"checked":""}><span>${n}</span></label>`).join("")}
+    </div></div>
+    <div class="row">
+      <div><label>Responsabile dell'evidenza</label><input data-f="responsabile" value="${esc(r.responsabile)}"></div>
+      <div><label>Data dell'evidenza più recente${f?" ("+f.nome+")":""}</label><input type="date" data-f="dataEvidenza" value="${esc(r.dataEvidenza)}"></div>
+      <div><label>Prossima revisione</label><input type="date" data-f="revisione" value="${esc(r.revisione)}"></div>
+    </div>
+    <div><label>Evidenze oggettive (cosa si mostra all'auditor)</label><textarea data-f="evidenze" placeholder="Documenti, procedure, registrazioni, numeri…">${esc(r.evidenze)}</textarea></div>
+    <div><label>Documenti collegati (SharePoint, cartelle di rete, PDF…)</label><div data-lista="documenti">
+      ${docs.map(d=>rigaDoc(d)).join("")}</div><button class="btn" data-add="doc" type="button">＋ Documento</button></div>
+    ${quant?`<div><label>Rilevazioni (periodo e valore)</label><div data-lista="rilevazioni">${ril.map(x=>rigaRil(x)).join("")}</div><button class="btn" data-add="ril" type="button">＋ Rilevazione</button></div>`:""}
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn primary" data-salva type="button">Salva</button><span class="small muted">${r.aggiornato?"Ultimo salvataggio: "+esc(r.aggiornato.slice(0,10).split("-").reverse().join("/"))+(r.da?" da "+esc(r.da):""):"Mai salvato"}</span></div>
+  </div>`;
+}
+const rigaDoc=d=>`<div class="riga"><input data-d="titolo" placeholder="Nome del documento" value="${esc(d&&d.titolo)}"><input data-d="url" placeholder="https://…" value="${esc(d&&d.url)}"><button class="btn danger" data-del type="button">✕</button></div>`;
+const rigaRil=x=>`<div class="riga r3"><input data-d="periodo" placeholder="Periodo (es. 2025)" value="${esc(x&&x.periodo)}"><input data-d="valore" placeholder="Valore (es. 24,5%)" value="${esc(x&&x.valore)}"><input data-d="nota" placeholder="Nota" value="${esc(x&&x.nota)}"><button class="btn danger" data-del type="button">✕</button></div>`;
+
+function vInd(){
+  const lista=PDR_AREE.filter(a=>areaSel==="tutte"||a.id===areaSel);
+  let h=`<div class="filtri"><button data-a="tutte" class="${areaSel==="tutte"?"on":""}">Tutte le aree</button>`+PDR_AREE.map(a=>`<button data-a="${a.id}" class="${areaSel===a.id?"on":""}">${esc(a.nome.split(" ").slice(0,2).join(" "))}</button>`).join("")+`</div>
+  <div class="filtri"><span class="small muted">Mostra:</span>`+[["tutti","Tutti"],["","Da valutare"],["si","Soddisfatti"],["no","Non soddisfatti"],["na","N/A"],["prob","Da sistemare"]].map(([v,n])=>`<button data-s="${v}" class="${statoSel===v?"on":""}">${n}</button>`).join("")+`</div>`;
+  lista.forEach(a=>{
+    const righe=a.ind.filter(i=>{
+      if(statoSel==="tutti")return true;
+      if(statoSel==="prob")return problemi(i).length>0;
+      return (rec(i.id).stato||"")===statoSel;
+    });
+    if(!righe.length)return;
+    h+=`<h2 class="sec">${esc(a.nome)} <span class="small muted">(peso ${a.peso}%)</span></h2>`;
+    (a.note||[]).forEach(n=>h+=`<p class="small muted" style="margin-bottom:6px">${esc(n)}</p>`);
+    righe.forEach(i=>{
+      const r=rec(i.id),pr=problemi(i),f=finestra(i);
+      h+=`<details class="ind" data-id="${esc(i.id)}" ${aperti.has(i.id)?"open":""}><summary>
+        <span class="num">${i.n}</span><div class="tt">${esc(i.testo)}<div class="meta">${pillStato(r.stato||"")}
+        <span class="pill">${i.punti} punti</span><span class="pill">${i.tipo}</span><span class="pill">fasce ${i.fasce.join("-")}</span>
+        ${fuoriFascia(i)?'<span class="pill na">non applicabile alla fascia</span>':""}${f?`<span class="pill">${esc(f.nome)}</span>`:""}
+        ${pr.map(x=>`<span class="pill warn">${esc(x)}</span>`).join("")}</div></div></summary>${aperti.has(i.id)?formInd(i):""}</details>`;
+    });
+  });
+  if(!/class="ind"/.test(h))h+='<p class="muted">Nessun indicatore con questo filtro.</p>';
+  return h;
+}
+function bindInd(){
+  const m=$("main");
+  m.querySelectorAll(".filtri [data-a]").forEach(b=>b.onclick=()=>{areaSel=b.dataset.a;render()});
+  m.querySelectorAll(".filtri [data-s]").forEach(b=>b.onclick=()=>{statoSel=b.dataset.s;render()});
+  m.querySelectorAll("details.ind").forEach(d=>d.addEventListener("toggle",()=>{
+    const id=d.dataset.id,i=TUTTI.find(x=>x.id===id);
+    if(d.open){aperti.add(id);if(!d.querySelector(".corpo")){d.insertAdjacentHTML("beforeend",formInd(i));legaForm(d.querySelector(".corpo"))}}
+    else aperti.delete(id);
+  }));
+  m.querySelectorAll(".corpo").forEach(legaForm);
+}
+function legaForm(c){
+  const id=c.dataset.id;
+  c.addEventListener("click",e=>{
+    const t=e.target;
+    if(t.dataset.add){
+      const l=c.querySelector(`[data-lista="${t.dataset.add==="doc"?"documenti":"rilevazioni"}"]`);
+      l.insertAdjacentHTML("beforeend",t.dataset.add==="doc"?rigaDoc():rigaRil());
+    }
+    if(t.dataset.del!==undefined)t.closest(".riga").remove();
+    if(t.dataset.salva!==undefined)salvaInd(c,id);
+  });
+}
+function salvaInd(c,id){
+  const r={};
+  const st=c.querySelector('input[type=radio]:checked');r.stato=st?st.value:"";
+  c.querySelectorAll("[data-f]").forEach(el=>{r[el.dataset.f]=el.value.trim()});
+  const righe=l=>[...c.querySelectorAll(`[data-lista="${l}"] .riga`)].map(row=>{const o={};row.querySelectorAll("[data-d]").forEach(el=>o[el.dataset.d]=el.value.trim());return o}).filter(o=>Object.values(o).some(Boolean));
+  r.documenti=righe("documenti");
+  const mal=r.documenti.find(d=>d.url&&!urlOk(d.url));
+  if(mal){alert("Il collegamento «"+mal.url+"» deve iniziare con http:// o https://");return}
+  if(c.querySelector('[data-lista="rilevazioni"]'))r.rilevazioni=righe("rilevazioni");
+  r.aggiornato=new Date().toISOString();r.da=operatore();
+  saveVoci([{tipo:"ind",chiave:id,dati:r}]);
+  aperti.delete(id);
+  render();
+  toast("Salvato: indicatore "+id.replace(/^[a-z]+\./,"")+" · "+PDR_AREE.find(a=>a.id===id.split(".")[0]).nome);
+}
+function toast(t){
+  const e=document.createElement("div");
+  e.textContent=t;e.className="card noprint";
+  e.style.cssText="position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:20;max-width:90%;font-size:.85rem";
+  document.body.appendChild(e);setTimeout(()=>e.remove(),2800);
+}
+
+function vScheda(){
+  const p=punteggi();
+  let h=`<div class="noprint" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><button class="btn primary" id="btnStampa">Stampa / salva in PDF</button><button class="btn" onclick="esportaCsv()">Esporta CSV</button></div>
+  <div class="scheda"><h1 style="font-size:1.2rem">Audit di Fase 2 UNI/PdR 125:2022 – riepilogo indicatori</h1>
+  <p class="small muted">${esc(D.imp.ragione||"SICIET")}${fascia()?" · "+esc(FASCE[fascia()]):""}${D.imp.audit?" · audit del "+fmtData(D.imp.audit):""} · stampato il ${fmtData(oggi())}${p.totale!==null?" · punteggio stimato "+p.totale.toFixed(0)+"/100":""}</p>`;
+  PDR_AREE.forEach(a=>{
+    h+=`<div class="ar"><h2>${esc(a.nome)} (peso ${a.peso}%)</h2>`;
+    a.ind.forEach(i=>{
+      const r=rec(i.id);
+      h+=`<div class="it"><b>${i.n}. ${esc(i.testo)}</b><div class="small muted">${i.tipo} · ${i.punti} punti · fasce ${i.fasce.join("-")}${fuoriFascia(i)?" · non applicabile alla fascia":""}</div>
+      <p style="margin-top:4px"><b>Indicatore soddisfatto:</b> ${r.stato==="si"?"SÌ":r.stato==="no"?"NO":r.stato==="na"?"N/A":"da valutare"}${r.dataEvidenza?" · evidenza del "+fmtData(r.dataEvidenza):""}${r.responsabile?" · resp. "+esc(r.responsabile):""}</p>
+      ${r.evidenze?`<p style="white-space:pre-wrap;margin-top:4px">${esc(r.evidenze)}</p>`:""}
+      ${(r.documenti||[]).length?`<ul style="margin:4px 0 0 18px">${r.documenti.map(d=>`<li>${urlOk(d.url)?`<a href="${esc(d.url)}">${esc(d.titolo||d.url)}</a>`:esc(d.titolo||d.url)}</li>`).join("")}</ul>`:""}
+      ${(r.rilevazioni||[]).length?`<table style="margin-top:4px">${r.rilevazioni.map(x=>`<tr><td>${esc(x.periodo)}</td><td>${esc(x.valore)}</td><td>${esc(x.nota)}</td></tr>`).join("")}</table>`:""}</div>`;
+    });
+    h+="</div>";
+  });
+  return h+"</div>";
+}
+function csvCell(s){return '"'+String(s==null?"":s).replace(/"/g,'""')+'"'}
+function esportaCsv(){
+  const righe=[["Area","N","Indicatore","Tipo","Punti","Fasce","Soddisfatto","Data evidenza","Responsabile","Prossima revisione","Evidenze","Documenti","Rilevazioni"]];
+  PDR_AREE.forEach(a=>a.ind.forEach(i=>{const r=rec(i.id);righe.push([a.nome,i.n,i.testo,i.tipo,i.punti,i.fasce.join("-"),r.stato==="si"?"SÌ":r.stato==="no"?"NO":r.stato==="na"?"N/A":"",r.dataEvidenza||"",r.responsabile||"",r.revisione||"",r.evidenze||"",(r.documenti||[]).map(d=>d.titolo+" "+d.url).join(" | "),(r.rilevazioni||[]).map(x=>[x.periodo,x.valore,x.nota].join(" ")).join(" | ")])}));
+  scarica("pdr125_indicatori.csv","﻿"+righe.map(r=>r.map(csvCell).join(";")).join("\r\n"),"text/csv");
+}
+function scarica(nome,testo,tipo){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([testo],{type:tipo}));a.download=nome;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+
+function vDati(){
+  const im=D.imp;
+  return `<div class="card"><h2>Dati dell'azienda</h2>
+    <div class="row">
+      <div><label>Ragione sociale</label><input id="im-ragione" value="${esc(im.ragione||"SICIET")}"></div>
+      <div><label>Fascia dimensionale</label><select id="im-fascia"><option value="">Da indicare</option>${[1,2,3,4].map(n=>`<option value="${n}" ${fascia()===n?"selected":""}>${esc(FASCE[n])}</option>`).join("")}</select></div>
+      <div><label>Data dell'audit</label><input type="date" id="im-audit" value="${esc(im.audit)}"></div>
+    </div>
+    <p class="small muted" style="margin-top:8px">La fascia stabilisce quali indicatori si applicano e quindi il calcolo del punteggio. Verificarla con l'ente di certificazione.</p>
+    <button class="btn primary" style="margin-top:10px" id="btnImp">Salva</button></div>
+  <div class="card" style="margin-top:14px"><h2>Copia dei dati</h2>
+    <p class="small muted" style="margin-bottom:8px">${CFG.api?"I dati sono nel servizio condiviso (Cloudflare). Conviene scaricare ogni tanto una copia.":"I dati sono solo in questo dispositivo: scarica una copia per non perderli."}</p>
+    <button class="btn" id="btnExp">Esporta (JSON)</button> <button class="btn" onclick="esportaCsv()">Esporta (CSV)</button>
+    <button class="btn" id="btnImpFile">Importa file</button><input type="file" id="file" accept=".json,application/json" hidden></div>`;
+}
+function bindDati(){
+  $("btnImp").onclick=()=>{
+    saveVoci([{tipo:"imp",chiave:"azienda",dati:{ragione:$("im-ragione").value.trim(),fascia:$("im-fascia").value,audit:$("im-audit").value}}]);
+    toast("Dati dell'azienda salvati");render();
+  };
+  $("btnExp").onclick=()=>scarica("siciet_pdr125_dati.json",JSON.stringify(D),"application/json");
+  $("btnImpFile").onclick=()=>$("file").click();
+  $("file").onchange=e=>{
+    const f=e.target.files[0];if(!f)return;const r=new FileReader();
+    r.onload=()=>{try{
+      const o=JSON.parse(r.result);if(!o||typeof o.ind!=="object")throw new Error("File non valido.");
+      if(!confirm("I dati del file sostituiranno quelli degli stessi indicatori. Continuare?"))return;
+      const v=Object.keys(o.ind).filter(k=>TUTTI.some(i=>i.id===k)).map(k=>({tipo:"ind",chiave:k,dati:o.ind[k]}));
+      if(o.imp&&Object.keys(o.imp).length)v.push({tipo:"imp",chiave:"azienda",dati:o.imp});
+      saveVoci(v);render();toast("Importati "+v.length+" elementi");
+    }catch(err){alert(err.message)}};
+    r.readAsText(f);e.target.value="";
+  };
+}
+
+avvia();
+</script>
+</body>
+</html>

@@ -115,6 +115,8 @@ La cartella [`hr/`](hr/) contiene **SICIET HR** (comunicazione delle nuove assun
 
 La cartella [`inventrack/`](inventrack/) contiene **SICIET InvenTrack** (inventario del magazzino generale e dei magazzini di commessa: report del gestionale, conteggio dal telefono, Excel delle differenze), all'indirizzo `https://hub.siciet.it/inventrack/` e protetta da password: vedi [`inventrack/README.md`](inventrack/README.md). Non compare nel portale.
 
+La cartella [`pdr/`](pdr/) contiene **SICIET PDR 125** (stato ed evidenze degli indicatori dell'audit UNI/PdR 125:2022 sulla parità di genere, punteggio stimato e scheda stampabile), raggiungibile solo all'indirizzo `https://hub.siciet.it/pdr/`. Non compare nel portale: vedi [`pdr/README.md`](pdr/README.md).
+
 La cartella [`energia/`](energia/) contiene **SICIET Energia** (dashboard dei consumi di elettricità, gas, carburanti, fotovoltaico e flotta, con la scheda di monitoraggio degli indicatori e l'inserimento mese per mese), all'indirizzo `https://hub.siciet.it/energia/`. Non compare nel portale. I dati **non sono nel repository**: stanno nel database di un servizio Cloudflare protetto da password, oppure (finché il servizio non è attivato) solo nel browser del dispositivo: vedi [`energia/README.md`](energia/README.md).
 
 ## Webapp installata sui PC (NinjaOne)
