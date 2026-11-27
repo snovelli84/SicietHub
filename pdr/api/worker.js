@@ -22,11 +22,13 @@
  * Tipi di voce:
  *   ind   un indicatore (chiave: id, es. "governance.3"): stato, evidenze, documenti, rilevazioni
  *   imp   impostazioni dell'azienda (chiave "azienda"): fascia dimensionale, data dell'audit…
+ *   evt   evento del registro (chiave: id): assunzione, promozione, congedo, formazione, indagine…
+ *   org   organico aggregato di un anno (chiave: anno): persone per livello e genere, ruoli, retribuzioni medie
  * Se due dispositivi salvano la stessa voce vale l'ultima arrivata.
  */
 
 const MB = 1024 * 1024;
-const TIPI = ["ind", "imp"];
+const TIPI = ["ind", "imp", "evt", "org"];
 const MAX_VOCI = 600;       // voci per richiesta
 const MAX_DATI = 1.5 * MB;  // dimensione di una voce
 

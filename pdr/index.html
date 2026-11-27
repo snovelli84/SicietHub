@@ -135,7 +135,7 @@ var PDR_CONFIG={
 };
 const CFG=PDR_CONFIG;
 // Versione della pagina: va aumentata a ogni modifica.
-const VERSIONE="1.0",DATA_VERSIONE="27/11/2026";
+const VERSIONE="1.1",DATA_VERSIONE="27/11/2026";
 const KEY="siciet_pdr_data_v1",KP="siciet_pdr_pwd",KN="siciet_pdr_nome",KQ="siciet_pdr_coda";
 const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const $=id=>document.getElementById(id);
@@ -154,7 +154,7 @@ function finestra(i){
   if(/ultimo anno|su base annua|anno su anno/.test(t))return{giorni:365,nome:"ultimo anno"};
   return null;
 }
-let D={ind:{},imp:{}},tab="quadro",areaSel="tutte",statoSel="tutti",aperti=new Set(),ultimo=0,timer=null,coda=[],stato="";
+let D={ind:{},imp:{},evt:{},org:{}},anno=new Date().getFullYear(),evtEdit=null,filtroEvt="tutti",qCerca="",tab="quadro",areaSel="tutte",statoSel="tutti",aperti=new Set(),ultimo=0,timer=null,coda=[],stato="";
 try{coda=JSON.parse(ls.get(KQ)||"[]")}catch(e){}
 const operatore=()=>ls.get(KN)||"";
 const rec=id=>D.ind[id]||{};
@@ -163,7 +163,7 @@ const applicabile=i=>(!fascia()||i.fasce.includes(fascia()))&&rec(i.id).stato!==
 const fuoriFascia=i=>fascia()&&!i.fasce.includes(fascia());
 
 function applyVoce(v){
-  const m=v.tipo==="ind"?D.ind:v.tipo==="imp"?null:undefined;
+  const m=v.tipo==="ind"?D.ind:v.tipo==="evt"?D.evt:v.tipo==="org"?D.org:v.tipo==="imp"?null:undefined;
   if(m===undefined)return false;
   if(v.tipo==="imp"){const a=JSON.stringify(D.imp);D.imp=v.dati||{};return a!==JSON.stringify(D.imp)}
   const a=JSON.stringify(m[v.chiave]);
@@ -222,13 +222,13 @@ function schermata(x){
 async function avvia(){
   clearInterval(timer);
   if(!CFG.api){
-    try{const s=ls.get(KEY);if(s){const o=JSON.parse(s);D={ind:o.ind||{},imp:o.imp||{}}}}catch(e){}
+    try{const s=ls.get(KEY);if(s){const o=JSON.parse(s);D={ind:o.ind||{},imp:o.imp||{},evt:o.evt||{},org:o.org||{}}}}catch(e){}
     mostra();return;
   }
   if(!ls.get(KP)||!operatore()){mostraAccesso();return}
   try{
     const j=await api("/dati?da=0","GET");
-    D={ind:{},imp:{}};j.voci.forEach(applyVoce);ultimo=Math.max(0,j.ora-5000);
+    D={ind:{},imp:{},evt:{},org:{}};j.voci.forEach(applyVoce);ultimo=Math.max(0,j.ora-5000);
     coda.forEach(applyVoce);
     mostra();
     timer=setInterval(sincronizza,Math.max(10,CFG.secondi||30)*1000);
@@ -248,7 +248,7 @@ $("btnLogin").onclick=()=>{
   ls.set(KN,n);ls.set(KP,p);$("pwd").value="";avvia();
 };
 $("pwd").addEventListener("keydown",e=>{if(e.key==="Enter")$("btnLogin").click()});
-$("btnForget").onclick=()=>{ls.del(KP);ls.del(KN);clearInterval(timer);D={ind:{},imp:{}};avvia()};
+$("btnForget").onclick=()=>{ls.del(KP);ls.del(KN);clearInterval(timer);D={ind:{},imp:{},evt:{},org:{}};avvia()};
 
 /* ---------- calcoli ---------- */
 function punteggi(){
@@ -286,15 +286,20 @@ function problemi(i){
 const pillStato=s=>s==="si"?'<span class="pill si">Soddisfatto</span>':s==="no"?'<span class="pill no">Non soddisfatto</span>':s==="na"?'<span class="pill na">N/A</span>':'<span class="pill warn">Da valutare</span>';
 
 /* ---------- viste ---------- */
-const TABS=[["quadro","Quadro"],["ind","Indicatori"],["scheda","Scheda per l'audit"],["dati","Azienda e dati"]];
+const TABS=[["quadro","Quadro"],["cerca","Rispondi all'audit"],["reg","Registro eventi"],["org","Organico"],["ind","Indicatori"],["scheda","Scheda per l'audit"],["dati","Azienda e dati"]];
 function buildTabs(){
   $("tabs").innerHTML=TABS.map(([k,n])=>`<button data-t="${k}" class="${k===tab?"on":""}">${n}</button>`).join("");
+  $("tabs").insertAdjacentHTML("beforeend",`<select id="annoSel" style="width:auto;margin-left:auto;border-radius:999px" title="Anno di riferimento">${anniDisponibili().map(a=>`<option ${a===anno?"selected":""}>${a}</option>`).join("")}</select>`);
+  $("annoSel").onchange=e=>{anno=Number(e.target.value);render()};
   $("tabs").querySelectorAll("button").forEach(b=>b.onclick=()=>{tab=b.dataset.t;buildTabs();render();window.scrollTo(0,0)});
 }
 function render(){
   piede();
-  const f={quadro:vQuadro,ind:vInd,scheda:vScheda,dati:vDati}[tab];
+  const f={quadro:vQuadro,cerca:vCerca,reg:vReg,org:vOrg,ind:vInd,scheda:vScheda,dati:vDati}[tab];
   $("main").innerHTML=f();
+  if(tab==="cerca")bindCerca();
+  if(tab==="reg")bindReg();
+  if(tab==="org")bindOrg();
   if(tab==="ind")bindInd();
   if(tab==="dati")bindDati();
   if(tab==="quadro")$("main").querySelectorAll("[data-vai]").forEach(b=>b.onclick=()=>{areaSel=b.dataset.vai;statoSel=b.dataset.st||"tutti";tab="ind";buildTabs();render();window.scrollTo(0,0)});
@@ -339,6 +344,7 @@ function formInd(i){
     ${i.nota?`<div class="faq">${esc(i.nota)}</div>`:""}
     ${i.misura?`<div class="faq"><b>Come si misura:</b> ${esc(i.misura)}<br><b>Fonte:</b> ${esc(i.fonte)}</div>`:""}
     ${(i.faq||[]).length?`<details class="faq"><summary><b>FAQ Accredia/UNI (gennaio 2026)</b></summary>${i.faq.map(x=>`<p>${esc(x)}</p>`).join("")}</details>`:""}
+    ${boxCalcolo(i)}
     <div><label>Indicatore soddisfatto</label><div class="stati">
       ${[["si","Sì"],["no","No"],["na","N/A"],["","Da valutare"]].map(([v,n])=>`<label><input type="radio" name="st-${esc(i.id)}" value="${v}" ${(r.stato||"")===v?"checked":""}><span>${n}</span></label>`).join("")}
     </div></div>
@@ -438,6 +444,7 @@ function vScheda(){
       const r=rec(i.id);
       h+=`<div class="it"><b>${i.n}. ${esc(i.testo)}</b><div class="small muted">${i.tipo} · ${i.punti} punti · fasce ${i.fasce.join("-")}${fuoriFascia(i)?" · non applicabile alla fascia":""}</div>
       <p style="margin-top:4px"><b>Indicatore soddisfatto:</b> ${r.stato==="si"?"SÌ":r.stato==="no"?"NO":r.stato==="na"?"N/A":"da valutare"}${r.dataEvidenza?" · evidenza del "+fmtData(r.dataEvidenza):""}${r.responsabile?" · resp. "+esc(r.responsabile):""}</p>
+      ${(()=>{const k=kpi(i.id,anno);return k?`<p style="margin-top:4px"><b>Dato calcolato ${anno}:</b> ${esc(k.v)}${k.ok===true?" (obiettivo raggiunto)":k.ok===false?" (obiettivo non raggiunto)":""}</p>`:""})()}
       ${r.evidenze?`<p style="white-space:pre-wrap;margin-top:4px">${esc(r.evidenze)}</p>`:""}
       ${(r.documenti||[]).length?`<ul style="margin:4px 0 0 18px">${r.documenti.map(d=>`<li>${urlOk(d.url)?`<a href="${esc(d.url)}">${esc(d.titolo||d.url)}</a>`:esc(d.titolo||d.url)}</li>`).join("")}</ul>`:""}
       ${(r.rilevazioni||[]).length?`<table style="margin-top:4px">${r.rilevazioni.map(x=>`<tr><td>${esc(x.periodo)}</td><td>${esc(x.valore)}</td><td>${esc(x.nota)}</td></tr>`).join("")}</table>`:""}</div>`;
@@ -451,6 +458,11 @@ function esportaCsv(){
   const righe=[["Area","N","Indicatore","Tipo","Punti","Fasce","Soddisfatto","Data evidenza","Responsabile","Prossima revisione","Evidenze","Documenti","Rilevazioni"]];
   PDR_AREE.forEach(a=>a.ind.forEach(i=>{const r=rec(i.id);righe.push([a.nome,i.n,i.testo,i.tipo,i.punti,i.fasce.join("-"),r.stato==="si"?"SÌ":r.stato==="no"?"NO":r.stato==="na"?"N/A":"",r.dataEvidenza||"",r.responsabile||"",r.revisione||"",r.evidenze||"",(r.documenti||[]).map(d=>d.titolo+" "+d.url).join(" | "),(r.rilevazioni||[]).map(x=>[x.periodo,x.valore,x.nota].join(" ")).join(" | ")])}));
   scarica("pdr125_indicatori.csv","﻿"+righe.map(r=>r.map(csvCell).join(";")).join("\r\n"),"text/csv");
+}
+function esportaEventi(){
+  const r=[["Data","Tipo","Titolo","Donne","Uomini","Livello","Giorni","Documento","Note"]];
+  evtAll().forEach(e=>r.push([e.data,TIPI_EVT[e.tipo]?TIPI_EVT[e.tipo][0]:e.tipo,e.titolo,e.nF||0,e.nM||0,e.livello,e.giorni||"",e.url,e.nota]));
+  scarica("pdr125_registro_eventi.csv","\ufeff"+r.map(x=>x.map(csvCell).join(";")).join("\r\n"),"text/csv");
 }
 function scarica(nome,testo,tipo){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([testo],{type:tipo}));a.download=nome;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 
@@ -466,7 +478,7 @@ function vDati(){
     <button class="btn primary" style="margin-top:10px" id="btnImp">Salva</button></div>
   <div class="card" style="margin-top:14px"><h2>Copia dei dati</h2>
     <p class="small muted" style="margin-bottom:8px">${CFG.api?"I dati sono nel servizio condiviso (Cloudflare). Conviene scaricare ogni tanto una copia.":"I dati sono solo in questo dispositivo: scarica una copia per non perderli."}</p>
-    <button class="btn" id="btnExp">Esporta (JSON)</button> <button class="btn" onclick="esportaCsv()">Esporta (CSV)</button>
+    <button class="btn" id="btnExp">Esporta (JSON)</button> <button class="btn" onclick="esportaCsv()">Indicatori (CSV)</button> <button class="btn" onclick="esportaEventi()">Registro eventi (CSV)</button>
     <button class="btn" id="btnImpFile">Importa file</button><input type="file" id="file" accept=".json,application/json" hidden></div>`;
 }
 function bindDati(){
@@ -483,10 +495,228 @@ function bindDati(){
       if(!confirm("I dati del file sostituiranno quelli degli stessi indicatori. Continuare?"))return;
       const v=Object.keys(o.ind).filter(k=>TUTTI.some(i=>i.id===k)).map(k=>({tipo:"ind",chiave:k,dati:o.ind[k]}));
       if(o.imp&&Object.keys(o.imp).length)v.push({tipo:"imp",chiave:"azienda",dati:o.imp});
+      Object.keys(o.evt||{}).forEach(k=>v.push({tipo:"evt",chiave:k,dati:o.evt[k]}));
+      Object.keys(o.org||{}).forEach(k=>v.push({tipo:"org",chiave:k,dati:o.org[k]}));
       saveVoci(v);render();toast("Importati "+v.length+" elementi");
     }catch(err){alert(err.message)}};
     r.readAsText(f);e.target.value="";
   };
+}
+
+/* ---------- registro eventi, organico, KPI calcolati ---------- */
+const TIPI_EVT={
+  assunzione:["Assunzione",["hr.1"]],cessazione:["Cessazione / dimissioni",["hr.2"]],
+  promozione:["Promozione / avanzamento",["equita.2","hr.4"]],
+  congedo_pat:["Congedo di paternità obbligatorio",["genitorialita.5","genitorialita.4"]],
+  congedo_par:["Congedo parentale",["genitorialita.4","genitorialita.3"]],
+  maternita:["Maternità / rientro",["hr.5","genitorialita.1","genitorialita.3"]],
+  flex:["Part-time, smart working, conciliazione",["genitorialita.2","genitorialita.1"]],
+  formazione:["Formazione",["cultura.5","hr.3"]],indagine:["Indagine su percezione / clima",["cultura.2","cultura.6"]],
+  comunicazione:["Comunicazione interna / sensibilizzazione",["cultura.3"]],esterno:["Iniziativa esterna / stakeholder",["cultura.7"]],
+  segnalazione:["Segnalazione (molestie, mobbing, non inclusività)",["governance.2","hr.6"]],
+  governance:["Governance: nomina, comitato, budget, obiettivi",["governance.1","governance.3","governance.4","cultura.1"]],
+  altro:["Altro",[]]
+};
+const evtAll=()=>Object.values(D.evt).sort((a,b)=>b.data.localeCompare(a.data));
+const evtTipo=(t,y0,y1)=>evtAll().filter(e=>e.tipo===t&&(y0===undefined||(+e.data.slice(0,4)>=y0&&+e.data.slice(0,4)<=(y1===undefined?y0:y1))));
+const somma=(l,k)=>l.reduce((s,e)=>s+(Number(e[k])||0),0);
+const P=x=>x===null||x===undefined||isNaN(x)?"–":(x*100).toFixed(1).replace(".",",")+"%";
+const PP=d=>(d>=0?"+":"")+(d*100).toFixed(1).replace(".",",")+" pp";
+const quota=(f,m)=>(+f||0)+(+m||0)>0?(+f||0)/((+f||0)+(+m||0)):null;
+function orgTot(o){let F=0,M=0;(o.righe||[]).forEach(r=>{F+=+r.F||0;M+=+r.M||0});return{F,M,t:F+M}}
+function precedente(y){for(const d of [2,1])if(D.org[y-d])return{o:D.org[y-d],anno:y-d};return null}
+function anniDisponibili(){
+  const s=new Set([new Date().getFullYear(),anno]);
+  Object.keys(D.org).forEach(k=>s.add(+k));Object.values(D.evt).forEach(e=>s.add(+e.data.slice(0,4)));
+  return [...s].filter(Boolean).sort((a,b)=>b-a);
+}
+// risultato calcolato dai dati: { v: testo, ok: true|false|null }
+function kpi(id,y){
+  const o=D.org[y],pv=precedente(y),mancaOrg={v:"Mancano i dati dell'organico "+y+" (scheda Organico).",ok:null};
+  const conf=(q,rif,etichetta)=>q===null||rif===null||rif===undefined?null:q-rif;
+  switch(id){
+  case"crescita.1":{if(!o)return mancaOrg;const t=orgTot(o),q=quota(t.F,t.M);
+    const d=pv?q-quota(orgTot(pv.o).F,orgTot(pv.o).M):null;
+    return{v:`Donne ${P(q)} (${t.F} su ${t.t}); ${d===null?"nessun anno precedente inserito":PP(d)+" rispetto al "+pv.anno}`,ok:d===null?null:(q>=.5||d>=.1)}}
+  case"crescita.2":{if(!o)return mancaOrg;const t=orgTot(o),q=quota(t.F,t.M);if(o.istatD===undefined||o.istatD==="")return{v:`Donne ${P(q)}; manca il dato Istat del settore (scheda Organico).`,ok:null};
+    const d=q-o.istatD/100,cr=pv?q>=quota(orgTot(pv.o).F,orgTot(pv.o).M):true;
+    return{v:`Donne ${P(q)} contro ${P(o.istatD/100)} del settore (${PP(d)}); ${cr?"in crescita o stabile":"in calo"} sul ${pv?pv.anno:"periodo precedente"}`,ok:d>=.1&&cr}}
+  case"crescita.3":{if(!o)return mancaOrg;const n=(+o.dirF||0)+(+o.dirM||0);if(!n)return{v:"Nessun dirigente in organico: indicatore non soddisfatto (FAQ). Se si applica il caso «primo riporto dell'amministratore», registrare quelle persone come dirigenti.",ok:false};
+    const q=quota(o.dirF,o.dirM),d=pv&&((+pv.o.dirF||0)+(+pv.o.dirM||0))?q-quota(pv.o.dirF,pv.o.dirM):null;
+    return{v:`Donne dirigenti ${P(q)} (${o.dirF||0} su ${n}); ${d===null?"nessun anno precedente":PP(d)+" rispetto al "+pv.anno}`,ok:d===null?null:(q>=.5||d>=.1)}}
+  case"crescita.4":case"crescita.6":case"crescita.7":{if(!o)return mancaOrg;
+    const[f,m,nome]=id==="crescita.4"?[o.dirF,o.dirM,"dirigenti"]:id==="crescita.6"?[o.lineaF,o.lineaM,"prima linea di riporto"]:[o.budF,o.budM,"con delega di budget"];
+    if(!((+f||0)+(+m||0)))return{v:`Nessun dato sulle donne ${nome} nel ${y}.`,ok:id==="crescita.4"?false:null};
+    if(o.istatDir===undefined||o.istatDir==="")return{v:`Donne ${nome} ${P(quota(f,m))}; manca il dato Istat sulle dirigenti del settore.`,ok:null};
+    const q=quota(f,m),d=q-o.istatDir/100;
+    return{v:`Donne ${nome} ${P(q)} (${f||0} su ${(+f||0)+(+m||0)}) contro ${P(o.istatDir/100)} delle dirigenti del settore (${PP(d)})`,ok:d>=.1}}
+  case"crescita.5":{if(!o)return mancaOrg;if(!((+o.respF||0)+(+o.respM||0)))return{v:"Nessun dato sui responsabili di unità.",ok:null};
+    const q=quota(o.respF,o.respM),cr=pv?q>=quota(pv.o.respF,pv.o.respM):true;
+    return{v:`Donne responsabili ${P(q)} (${o.respF||0} su ${(+o.respF||0)+(+o.respM||0)}); ${cr?"in crescita o stabile":"in calo"}`,ok:q>=.4&&cr}}
+  case"equita.1":{if(!o)return mancaOrg;const r=(o.righe||[]).filter(r=>+r.F>0&&+r.M>0&&+r.retrF>0&&+r.retrM>0);
+    if(!r.length)return{v:"Mancano le retribuzioni medie per livello (scheda Organico).",ok:null};
+    const g=r.map(x=>({l:x.livello,g:(x.retrM-x.retrF)/x.retrM})),peggio=g.reduce((a,b)=>Math.abs(b.g)>Math.abs(a.g)?b:a);
+    return{v:"Differenza M-D per livello: "+g.map(x=>`${x.l} ${P(x.g)}`).join(" · ")+` (massima: ${P(Math.abs(peggio.g))}; soglia 10% su ogni livello)`,ok:g.every(x=>Math.abs(x.g)<.1)}}
+  case"equita.2":{const pr=evtTipo("promozione",y);const pF=somma(pr,"nF"),pM=somma(pr,"nM");
+    if(!pF&&!pM)return{v:`Nessuna promozione registrata nel ${y}: l'indicatore non è soddisfatto (FAQ).`,ok:false};
+    if(!o)return{v:`Promozioni ${y}: donne ${pF}, uomini ${pM}. `+mancaOrg.v,ok:null};
+    const t=orgTot(o),rF=t.F?pF/t.F:null,rM=t.M?pM/t.M:null;
+    return{v:`Promosse ${pF} donne su ${t.F} (${P(rF)}) · promossi ${pM} uomini su ${t.M} (${P(rM)})`,ok:rF!==null&&rM!==null?rF>=rM:null}}
+  case"equita.3":{if(!o)return mancaOrg;if(o.varF===undefined||o.varF===""||o.varM===undefined||o.varM==="")return{v:"Mancano le persone con retribuzione variabile (scheda Organico).",ok:null};
+    const t=orgTot(o),rF=t.F?o.varF/t.F:null,rM=t.M?o.varM/t.M:null;
+    return{v:`Con variabile: donne ${o.varF} su ${t.F} (${P(rF)}) · uomini ${o.varM} su ${t.M} (${P(rM)})`,ok:rF!==null&&rM!==null?rF>=rM:null}}
+  case"hr.1":{const a=evtTipo("assunzione",y);return{v:`Assunzioni ${y}: ${somma(a,"nF")} donne, ${somma(a,"nM")} uomini`,ok:null}}
+  case"hr.2":{const c=evtTipo("cessazione",y),cF=somma(c,"nF"),cM=somma(c,"nM");
+    if(!o)return{v:`Cessazioni ${y}: ${cF} donne, ${cM} uomini. `+mancaOrg.v,ok:null};
+    const t=orgTot(o);return{v:`Turnover in uscita ${y}: donne ${cF} su ${t.F} (${P(t.F?cF/t.F:null)}) · uomini ${cM} su ${t.M} (${P(t.M?cM/t.M:null)})`,ok:null}}
+  case"genitorialita.4":{const c=evtTipo("congedo_par",y),b=somma(c,"nM");
+    if(!o||!(+o.padri>0))return{v:`Padri che hanno usufruito del congedo parentale nel ${y}: ${b}. Manca il numero di padri con diritto (scheda Organico).`,ok:null};
+    const q=b/o.padri;return{v:`Padri beneficiari ${b} su ${o.padri} aventi diritto (${P(q)}); soglia indicativa 90% («prossimo al 100%»)`,ok:q>=.9}}
+  case"genitorialita.5":{const c=evtTipo("congedo_pat",y);if(!c.length)return{v:`Nessun congedo di paternità registrato nel ${y}.`,ok:null};
+    const pers=somma(c,"nM")||c.length,gg=c.reduce((s,e)=>s+(Number(e.giorni)||0)*(Number(e.nM)||1),0)/pers,q=gg/10;
+    return{v:`Media ${gg.toFixed(1).replace(".",",")} giorni su 10 previsti (${P(q)}) per ${pers} padri; soglia indicativa 90%`,ok:q>=.9}}
+  case"cultura.3":{const e=evtTipo("comunicazione",y);return{v:`${e.length} ${e.length===1?"iniziativa":"iniziative"} di comunicazione/sensibilizzazione nel ${y}`+(e[0]?` (ultima: ${fmtData(e[0].data)} – ${e[0].titolo||""})`:""),ok:e.length>0}}
+  case"cultura.5":{const e=evtTipo("formazione",y-1,y),n=somma(e,"nF")+somma(e,"nM"),t=o?orgTot(o).t:0;
+    if(!e.length)return{v:`Nessuna formazione registrata nel biennio ${y-1}–${y}.`,ok:false};
+    return{v:`${e.length} ${e.length===1?"intervento":"interventi"} nel biennio ${y-1}–${y}, ${n} partecipazioni`+(t?` su ${t} persone in organico (${P(n/t)}); l'indicatore richiede tutto il personale`:""),ok:t?n>=t*.95:null}}
+  case"cultura.6":{const e=evtTipo("indagine",y);return{v:e.length?`${e.length} indagini nel ${y}; ultima il ${fmtData(e[0].data)} – ${e[0].titolo||""}`:`Nessuna indagine sulla percezione registrata nel ${y}.`,ok:e.length>0}}
+  case"cultura.7":{const e=evtTipo("esterno",y-1,y);return{v:e.length?`${e.length} iniziative esterne nel biennio ${y-1}–${y}; ultima il ${fmtData(e[0].data)} – ${e[0].titolo||""}`:`Nessuna iniziativa esterna registrata nel biennio ${y-1}–${y}.`,ok:e.length>0}}
+  case"governance.2":case"hr.6":{const e=evtTipo("segnalazione",y);return{v:`${e.length} segnalazioni registrate nel ${y}`,ok:null}}
+  }
+  return null;
+}
+function boxCalcolo(i){
+  const k=kpi(i.id,anno),col=[];
+  Object.keys(TIPI_EVT).forEach(t=>{if(TIPI_EVT[t][1].includes(i.id))col.push(t)});
+  const ev=evtAll().filter(e=>col.includes(e.tipo)).slice(0,5);
+  if(!k&&!col.length)return"";
+  return `<div class="faq" style="border-left:4px solid ${k&&k.ok===true?"var(--ok)":k&&k.ok===false?"var(--err)":"var(--brand)"}">
+    ${k?`<b>Dato calcolato (${anno}):</b> ${esc(k.v)} ${k.ok===true?'<span class="pill si">obiettivo raggiunto</span>':k.ok===false?'<span class="pill no">obiettivo non raggiunto</span>':""}`:""}
+    ${col.length?`<p><b>Eventi collegati</b> (${col.map(t=>esc(TIPI_EVT[t][0])).join(", ")}): ${ev.length?ev.map(e=>`${fmtData(e.data)} ${esc(e.titolo||TIPI_EVT[e.tipo][0])}`).join(" · "):"nessuno ancora registrato"}</p>`:""}</div>`;
+}
+
+/* --- registro --- */
+function vReg(){
+  let l=evtAll().filter(e=>filtroEvt==="tutti"||e.tipo===filtroEvt);
+  l=l.filter(e=>+e.data.slice(0,4)===anno);
+  let h=`<div class="alert warn noprint">Registra solo <b>genere e livello</b>, mai nomi o dati personali: bastano per calcolare gli indicatori.</div>
+  <div class="filtri"><button class="btn primary" id="btnNuovoEvt">＋ Nuovo evento</button>
+  <select id="fEvt"><option value="tutti">Tutti i tipi</option>${Object.keys(TIPI_EVT).map(t=>`<option value="${t}" ${filtroEvt===t?"selected":""}>${esc(TIPI_EVT[t][0])}</option>`).join("")}</select>
+  <span class="small muted">Anno ${anno}: ${l.length} eventi</span></div>`;
+  if(evtEdit)h+=formEvt(evtEdit==="new"?{data:oggi(),tipo:filtroEvt==="tutti"?"formazione":filtroEvt}:D.evt[evtEdit]);
+  h+=l.length?`<div class="card" style="overflow-x:auto"><table><tr><th>Data</th><th>Tipo</th><th>Titolo</th><th>Donne</th><th>Uomini</th><th>Livello</th><th>Doc.</th><th></th></tr>`+l.map(e=>`<tr><td>${fmtData(e.data)}</td><td>${esc((TIPI_EVT[e.tipo]||["?"])[0])}</td><td>${esc(e.titolo)}${e.nota?`<div class="small muted">${esc(e.nota)}</div>`:""}</td><td>${e.nF||""}</td><td>${e.nM||""}</td><td>${esc(e.livello)}</td><td>${urlOk(e.url)?`<a href="${esc(e.url)}" target="_blank" rel="noopener">link</a>`:""}</td><td style="white-space:nowrap"><button class="btn" data-modif="${esc(e.id)}">Modifica</button></td></tr>`).join("")+`</table></div>`:'<p class="muted">Nessun evento registrato per questo anno e questo tipo.</p>';
+  return h;
+}
+function formEvt(e){
+  const livelli=[...new Set(Object.values(D.org).flatMap(o=>(o.righe||[]).map(r=>r.livello)).filter(Boolean))];
+  return `<div class="card noprint" id="frmEvt" style="margin-bottom:14px"><h2>${e.id?"Modifica evento":"Nuovo evento"}</h2>
+   <div class="row"><div><label>Data</label><input type="date" id="e-data" value="${esc(e.data)}"></div>
+   <div><label>Tipo</label><select id="e-tipo">${Object.keys(TIPI_EVT).map(t=>`<option value="${t}" ${e.tipo===t?"selected":""}>${esc(TIPI_EVT[t][0])}</option>`).join("")}</select></div>
+   <div><label>Donne coinvolte (n.)</label><input type="number" min="0" id="e-nF" value="${esc(e.nF||"")}"></div>
+   <div><label>Uomini coinvolti (n.)</label><input type="number" min="0" id="e-nM" value="${esc(e.nM||"")}"></div>
+   <div><label>Livello / qualifica</label><input id="e-liv" list="liv" value="${esc(e.livello)}"><datalist id="liv">${livelli.map(l=>`<option>${esc(l)}`).join("")}</datalist></div>
+   <div><label>Giorni di congedo (per persona)</label><input type="number" min="0" id="e-gg" value="${esc(e.giorni||"")}"></div></div>
+   <div style="margin-top:10px"><label>Titolo (es. «Corso bias inconsci – tutto il personale»)</label><input id="e-titolo" value="${esc(e.titolo)}"></div>
+   <div class="row" style="margin-top:10px"><div><label>Documento (link SharePoint, attestati, verbale…)</label><input id="e-url" placeholder="https://…" value="${esc(e.url)}"></div>
+   <div><label>Note</label><input id="e-nota" value="${esc(e.nota)}"></div></div>
+   <p class="small muted" style="margin-top:6px">Per un singolo evento (una promozione, un'assunzione, un congedo) indica 1 nella colonna del genere. Il tipo decide a quali indicatori il dato contribuisce.</p>
+   <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn primary" id="e-salva">Salva</button><button class="btn" id="e-annulla">Annulla</button>${e.id?'<button class="btn danger" id="e-elimina">Elimina</button>':""}</div></div>`;
+}
+function bindReg(){
+  $("btnNuovoEvt").onclick=()=>{evtEdit="new";render();$("frmEvt").scrollIntoView()};
+  $("fEvt").onchange=e=>{filtroEvt=e.target.value;render()};
+  $("main").querySelectorAll("[data-modif]").forEach(b=>b.onclick=()=>{evtEdit=b.dataset.modif;render();$("frmEvt").scrollIntoView()});
+  if(!evtEdit)return;
+  $("e-annulla").onclick=()=>{evtEdit=null;render()};
+  if($("e-elimina"))$("e-elimina").onclick=()=>{if(!confirm("Eliminare questo evento?"))return;saveVoci([{tipo:"evt",chiave:evtEdit,dati:null}]);evtEdit=null;render()};
+  $("e-salva").onclick=()=>{
+    const e={data:$("e-data").value,tipo:$("e-tipo").value,nF:Number($("e-nF").value)||0,nM:Number($("e-nM").value)||0,livello:$("e-liv").value.trim(),giorni:Number($("e-gg").value)||0,titolo:$("e-titolo").value.trim(),url:$("e-url").value.trim(),nota:$("e-nota").value.trim()};
+    if(!e.data){alert("Indica la data.");return}
+    if(e.url&&!urlOk(e.url)){alert("Il collegamento deve iniziare con http:// o https://");return}
+    e.id=evtEdit==="new"?Date.now().toString(36)+Math.random().toString(36).slice(2,6):evtEdit;
+    e.aggiornato=new Date().toISOString();e.da=operatore();
+    saveVoci([{tipo:"evt",chiave:e.id,dati:e}]);
+    anno=+e.data.slice(0,4);evtEdit=null;buildTabs();render();toast("Evento salvato");
+  };
+}
+
+/* --- organico --- */
+const CAMPI_ORG=[["dirF","dirM","Dirigenti (o primo riporto dell'amministratore, vedi FAQ)"],["respF","respM","Responsabili di unità organizzative"],["lineaF","lineaM","Prima linea di riporto al vertice"],["budF","budM","Con delega su un budget di spesa/investimento"],["varF","varM","Con retribuzione variabile target"]];
+function vOrg(){
+  const o=D.org[anno]||{righe:[]},righe=o.righe&&o.righe.length?o.righe:[{}];
+  const t=orgTot(o);
+  return `<div class="card"><h2>Organico ${anno}</h2>
+  <p class="small muted" style="margin-bottom:10px">Dati aggregati sulle <b>teste</b> che hanno composto l'organico nell'anno (compresi part-time, co.co.co. e amministratori; esclusi liberi professionisti e occasionali), come da FAQ. Dall'anno prima in poi si calcolano le variazioni.</p>
+  <label>Per livello di inquadramento</label>
+  <div class="small muted" style="display:grid;grid-template-columns:1.6fr repeat(4,1fr) 2.6rem;gap:6px;margin-bottom:2px"><span>Livello</span><span>Donne (n.)</span><span>Uomini (n.)</span><span>Retr. media donne</span><span>Retr. media uomini</span><span></span></div><div id="righeOrg">${righe.map(rigaOrg).join("")}</div>
+  <button class="btn" id="addRigaOrg" type="button">＋ Livello</button> <span class="small muted">Totale: ${t.F} donne · ${t.M} uomini${t.t?" · "+P(t.F/t.t)+" donne":""}</span>
+  <h2 style="margin-top:16px">Ruoli e retribuzione variabile</h2>
+  <div style="overflow-x:auto"><table><tr><th></th><th>Donne</th><th>Uomini</th></tr>${CAMPI_ORG.map(([a,b,n])=>`<tr><td>${esc(n)}</td><td><input type="number" min="0" data-o="${a}" value="${esc(o[a]??"")}"></td><td><input type="number" min="0" data-o="${b}" value="${esc(o[b]??"")}"></td></tr>`).join("")}</table></div>
+  <div class="row" style="margin-top:10px">
+   <div><label>Padri con diritto al congedo parentale (n.)</label><input type="number" min="0" data-o="padri" value="${esc(o.padri??"")}"></div>
+   <div><label>Istat: % donne nel settore (ATECO)</label><input type="number" step="0.1" data-o="istatD" value="${esc(o.istatD??"")}"></div>
+   <div><label>Istat: % donne dirigenti nel settore</label><input type="number" step="0.1" data-o="istatDir" value="${esc(o.istatDir??"")}"></div></div>
+  <p class="small muted" style="margin-top:6px">I dati Istat si chiedono su contact.istat.it e vanno aggiornati a ogni audit (riferiti ai due anni precedenti).</p>
+  <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" id="btnOrg">Salva organico ${anno}</button>${D.org[anno]?'<button class="btn danger" id="btnOrgDel">Elimina anno</button>':""}</div></div>
+  ${tabKpi()}`;
+}
+const rigaOrg=r=>`<div class="riga" style="grid-template-columns:1.6fr repeat(4,1fr) auto;align-items:center"><input data-r="livello" placeholder="Livello (es. 5° livello)" value="${esc(r.livello)}"><input type="number" min="0" data-r="F" placeholder="Donne" value="${esc(r.F??"")}"><input type="number" min="0" data-r="M" placeholder="Uomini" value="${esc(r.M??"")}"><input type="number" min="0" data-r="retrF" placeholder="Retr. media D" value="${esc(r.retrF??"")}"><input type="number" min="0" data-r="retrM" placeholder="Retr. media U" value="${esc(r.retrM??"")}"><button class="btn danger" data-delr type="button">✕</button></div>`;
+function tabKpi(){
+  const ids=TUTTI.map(i=>i.id).filter(id=>kpi(id,anno));
+  return `<h2 class="sec">Indicatori calcolati – ${anno}</h2><div class="card"><table>`+ids.map(id=>{const k=kpi(id,anno),i=TUTTI.find(x=>x.id===id);return `<tr><td style="width:5rem"><b>${esc(id)}</b></td><td>${esc(i.testo.length>70?i.testo.slice(0,70)+"…":i.testo)}</td><td>${esc(k.v)}</td><td>${k.ok===true?'<span class="pill si">ok</span>':k.ok===false?'<span class="pill no">no</span>':'<span class="pill na">–</span>'}</td></tr>`}).join("")+`</table></div>`;
+}
+function bindOrg(){
+  const c=$("righeOrg");
+  $("addRigaOrg").onclick=()=>c.insertAdjacentHTML("beforeend",rigaOrg({}));
+  c.addEventListener("click",e=>{if(e.target.dataset.delr!==undefined)e.target.closest(".riga").remove()});
+  $("btnOrg").onclick=()=>{
+    const o={anno,righe:[...c.querySelectorAll(".riga")].map(r=>{const x={};r.querySelectorAll("[data-r]").forEach(el=>x[el.dataset.r]=el.dataset.r==="livello"?el.value.trim():(el.value===""?"":Number(el.value)));return x}).filter(x=>x.livello||x.F||x.M)};
+    $("main").querySelectorAll("[data-o]").forEach(el=>o[el.dataset.o]=el.value===""?"":Number(el.value));
+    o.aggiornato=new Date().toISOString();o.da=operatore();
+    saveVoci([{tipo:"org",chiave:String(anno),dati:o}]);toast("Organico "+anno+" salvato");render();
+  };
+  if($("btnOrgDel"))$("btnOrgDel").onclick=()=>{if(confirm("Eliminare i dati dell'organico "+anno+"?")){saveVoci([{tipo:"org",chiave:String(anno),dati:null}]);render()}};
+}
+
+/* --- risposte rapide --- */
+function risposte(y){
+  const o=D.org[y],t=o?orgTot(o):null,out=[];
+  const ult=(tp)=>{const e=evtTipo(tp)[0];return e?`${fmtData(e.data)} – ${esc(e.titolo||TIPI_EVT[tp][0])}${urlOk(e.url)?` <a href="${esc(e.url)}" target="_blank" rel="noopener">documento</a>`:""}`:null};
+  const k=id=>{const r=kpi(id,y);return r?esc(r.v):null};
+  const R=(q,a,cerca)=>out.push({q,a:a||'<span class="muted">Dato non ancora inserito.</span>',cerca:(q+" "+(cerca||"")).toLowerCase()});
+  R("Quando avete fatto l'ultima formazione su differenze di genere e bias?",ult("formazione"),"formazione corso bias stereotipi");
+  R("La formazione ha coinvolto tutto il personale nell'ultimo biennio?",k("cultura.5"),"formazione biennio personale");
+  R("Quando è stata fatta l'ultima indagine sulla percezione delle pari opportunità?",ult("indagine"),"indagine clima percezione questionario");
+  R("Quali iniziative avete fatto per la comunicazione interna e verso l'esterno?",(k("cultura.3")||"")+(k("cultura.7")?"<br>"+k("cultura.7"):"")||null,"comunicazione sensibilizzazione esterno stakeholder");
+  R("Qual è la percentuale di donne in organico e come è cambiata?",k("crescita.1"),"donne organico percentuale");
+  R("Quante donne sono dirigenti / responsabili / in prima linea?",[k("crescita.3"),k("crescita.5"),k("crescita.6")].filter(Boolean).join("<br>")||null,"dirigenti responsabili prima linea");
+  R("Quante assunzioni e cessazioni ci sono state e qual è il turnover per genere?",[k("hr.1"),k("hr.2")].filter(Boolean).join("<br>"),"assunzioni cessazioni turnover");
+  R("Quante promozioni per genere?",k("equita.2"),"promozioni avanzamenti");
+  R("Qual è la differenza retributiva tra donne e uomini a parità di livello?",k("equita.1"),"retribuzione gap stipendio livello");
+  R("Chi ha la retribuzione variabile, per genere?",k("equita.3"),"variabile premio");
+  R("Quanti padri hanno usufruito di congedi parentali e di paternità?",[k("genitorialita.4"),k("genitorialita.5")].filter(Boolean).join("<br>"),"congedo paternità parentale padri");
+  R("Come sono state gestite le segnalazioni di molestie, mobbing o non inclusività?",k("governance.2")+(ult("segnalazione")?"<br>Ultima: "+ult("segnalazione"):""),"segnalazione molestie mobbing");
+  R("Chi presidia i temi di parità di genere e che budget c'è?",ult("governance"),"governance comitato referente budget obiettivi presidio");
+  return out;
+}
+function vCerca(){
+  return `<div class="card"><h2>Rispondi all'audit – ${anno}</h2><input id="q" type="search" placeholder="Cerca: formazione, promozioni, congedo, retribuzione, segnalazioni…" value="${esc(qCerca)}" autofocus>
+  <p class="small muted" style="margin-top:6px">Cerca in risposte rapide, eventi registrati ed evidenze degli indicatori. Anno di riferimento: ${anno} (selettore in alto a destra).</p></div><div id="risCerca"></div>`;
+}
+function bindCerca(){
+  const disegna=()=>{
+    const q=qCerca.trim().toLowerCase(),ris=risposte(anno).filter(r=>!q||r.cerca.includes(q)||q.split(/\s+/).every(w=>r.cerca.includes(w)));
+    let h=ris.map(r=>`<div class="card" style="margin-top:10px"><b>${esc(r.q)}</b><p style="margin-top:6px">${r.a}</p></div>`).join("");
+    if(q){
+      const ev=evtAll().filter(e=>[e.titolo,e.nota,e.livello,TIPI_EVT[e.tipo]&&TIPI_EVT[e.tipo][0],e.data].join(" ").toLowerCase().includes(q)).slice(0,30);
+      if(ev.length)h+=`<h2 class="sec">Eventi registrati</h2><div class="card"><table>`+ev.map(e=>`<tr><td>${fmtData(e.data)}</td><td>${esc(TIPI_EVT[e.tipo][0])}</td><td>${esc(e.titolo)}</td><td>${e.nF||0} D · ${e.nM||0} U</td><td>${urlOk(e.url)?`<a href="${esc(e.url)}" target="_blank" rel="noopener">link</a>`:""}</td></tr>`).join("")+`</table></div>`;
+      const ind=TUTTI.filter(i=>(i.testo+" "+(rec(i.id).evidenze||"")+" "+(rec(i.id).documenti||[]).map(d=>d.titolo).join(" ")).toLowerCase().includes(q)).slice(0,20);
+      if(ind.length)h+=`<h2 class="sec">Indicatori</h2><div class="card"><table>`+ind.map(i=>`<tr><td><b>${esc(i.id)}</b></td><td>${esc(i.testo)}</td><td>${pillStato(rec(i.id).stato||"")}</td></tr>`).join("")+`</table></div>`;
+      if(!h)h='<p class="muted" style="margin-top:10px">Nessun risultato.</p>';
+    }
+    $("risCerca").innerHTML=h;
+  };
+  $("q").oninput=e=>{qCerca=e.target.value;disegna()};disegna();
 }
 
 avvia();
